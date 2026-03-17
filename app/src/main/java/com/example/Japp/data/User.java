@@ -7,7 +7,14 @@ public class User implements Serializable {
     public User(){
         id=order.Generate_id();
     }
-    private String password,id,Phone,name,mail;
+
+    public User(String name,String phone,String password){
+        id=order.Generate_id();
+        this.name=name;
+        this.Phone=phone;
+        this.password=password;
+    }
+    private String password,id,Phone,name;
 
     public String getUsername() {
         return name;
@@ -25,9 +32,6 @@ public class User implements Serializable {
         this.name=name;
     }
 
-    public void setEmail(String mail) {
-        this.mail=mail;
-    }
 
     public String getPassword() {
         return password;

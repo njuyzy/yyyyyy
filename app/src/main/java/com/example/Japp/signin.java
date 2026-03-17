@@ -19,6 +19,7 @@ import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 
 public class signin extends AppCompatActivity {
@@ -61,19 +62,17 @@ public class signin extends AppCompatActivity {
         btnGetCode.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String phone = etPhone.getText().toString().trim();
+                String phone = Objects.requireNonNull(etPhone.getText()).toString().trim();
 
                 // 检查手机号是否为空
                 if (TextUtils.isEmpty(phone)) {
                     tilPhone.setError("手机号不能为空");
-                    Toast.makeText(signin.this,"手机号不能为空",Toast.LENGTH_SHORT).show();
                     return;
                 }
 
                 // 检查手机号格式（简单验证：11位数字）
                 if (!isValidPhone(phone)) {
                     tilPhone.setError("请输入正确的11位手机号");
-                    Toast.makeText(signin.this,"请输入正确的11位手机号",Toast.LENGTH_SHORT).show();
                     return;
                 }
 
@@ -90,8 +89,8 @@ public class signin extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 // 获取输入内容
-                String phone = etPhone.getText().toString().trim();
-                String code = etVerCode.getText().toString().trim();
+                String phone = Objects.requireNonNull(etPhone.getText()).toString().trim();
+                String code = Objects.requireNonNull(etVerCode.getText()).toString().trim();
 
                 // 检查各项是否为空
                 if (TextUtils.isEmpty(phone)) {
@@ -198,7 +197,9 @@ public class signin extends AppCompatActivity {
                 .apply();
 
         if(user.getMode()==User.Mode.NULL){
-            startActivity(new Intent(signin.this,RoleSelectionActivity.class));
+            Intent intent=new Intent(signin.this,RoleSelectionActivity.class);
+            intent.putExtra("user",user);
+            startActivity(intent);
             finish();
         }
         else if(user.getMode()==User.Mode.USER){
@@ -223,14 +224,14 @@ public class signin extends AppCompatActivity {
      * 根据手机号查找用户（模拟后端查询）
      */
     private User findUserByPhone(String phone) {
-        // TODO
+        // TODO:根据号码查找用户
         return new User();
     }
 
     /**
      * 验证手机号格式
      */
-    private boolean isValidPhone(String phone) {
+    public static boolean isValidPhone(String phone) {
         return phone != null && phone.length() == 11 && phone.matches("^1[3-9]\\d{9}$");
     }
 
