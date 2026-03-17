@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_leader"
+    app:startDestination="@id/orders">
+
+    <fragment
+        android:id="@+id/orders"
+        android:name="com.example.Japp.leader.fragment.order.orders"
+        android:label="接单">
+        <action
+            android:id="@+id/action_orders_to_orderDetail"
+            app:destination="@id/orderDetail" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/messages"
+        android:name="com.example.Japp.leader.fragment.chat.ConversationList"
+        android:label="消息">
+        <action
+            android:id="@+id/action_messages_to_chat"
+            app:destination="@id/chat" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/profile"
+        android:name="com.example.Japp.leader.fragment.profile.profile"
+        android:label="我的" />
+
+    <fragment
+        android:id="@+id/orderDetail"
+        android:name="com.example.Japp.leader.fragment.order.orderDetails"
+        android:label="路线详情">
+        <argument
+            android:name="orderId"
+            app:argType="string" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/chat"
+        android:name="com.example.Japp.leader.fragment.chat.ChatFragment"
+        android:label="聊天">
+        <argument
+            android:name="conversationId"
+            app:argType="string" />
+        <argument
+            android:name="orderId"
+            app:argType="string" />
+    </fragment>
+
+</navigation>

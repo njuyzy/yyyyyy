@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="end"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp">
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/bubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:layout_marginTop="4dp"
+        app:cardCornerRadius="18dp"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="#007AFF">
+
+        <TextView
+            android:id="@+id/txt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="12dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:maxWidth="280dp"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"/>
+    </androidx.cardview.widget.CardView>
+
+    <ImageView
+        android:id="@+id/avatar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="top"
+        android:layout_marginStart="8dp"
+        android:src="@drawable/ic_my_avatar"
+        android:scaleType="centerCrop"
+        android:background="@drawable/avatar_background_my"/>
+
+</LinearLayout>
