@@ -2,22 +2,22 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:id="@+id/path"
+        android:id="@+id/route"
         android:title="路线"
-        android:icon="@android:drawable/ic_menu_directions"/>
+        android:icon="@drawable/baseline_route_24"/>
 
     <item
         android:id="@+id/share"
         android:title="拼单"
-        android:icon="@drawable/pintuan"/>
+        android:icon="@drawable/baseline_group_add_24"/>
 
     <item
         android:id="@+id/messages"
         android:title="消息"
-        android:icon="@android:drawable/ic_dialog_email" />
+        android:icon="@drawable/baseline_message_24" />
 
     <item
         android:id="@+id/profile"
         android:title="我的"
-        android:icon="@android:drawable/ic_menu_myplaces" />
+        android:icon="@drawable/baseline_account_circle_24" />
 </menu>

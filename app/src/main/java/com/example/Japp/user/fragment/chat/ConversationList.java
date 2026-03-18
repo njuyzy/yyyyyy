@@ -1,4 +1,4 @@
-package com.example.Japp.leader.fragment.chat;
+package com.example.Japp.user.fragment.chat;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;

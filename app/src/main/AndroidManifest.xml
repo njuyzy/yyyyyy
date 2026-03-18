@@ -11,15 +11,15 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Japp">
-
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false" />
         <activity
             android:name=".leader.LeaderMainActivity"
-            android:exported="false"/>
-
+            android:exported="false" />
         <activity
             android:name=".user.UserMainActivity"
-            android:exported="false"/>
-
+            android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -29,19 +29,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
         <activity
-            android:name=".RoleSelectionActivity"
-            android:exported="false"/>
-
-        <activity
-            android:name=".signin"
-            android:exported="false"/>
-
-        <activity
-        android:name=".signup"
-        android:exported="false"/>
-
+            android:name=".signup"
+            android:exported="false" />
     </application>
 
 </manifest>

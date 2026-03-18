@@ -1,5 +1,7 @@
 package com.example.Japp.data;
 
+import androidx.annotation.NonNull;
+
 import java.io.Serializable;
 
 public class User implements Serializable {
@@ -14,38 +16,38 @@ public class User implements Serializable {
         this.Phone=phone;
         this.password=password;
     }
-    private String password,id,Phone,name;
+    private String password="111111";
+    private final String id;
+    private String Phone;
+    private String name;
 
-    public String getUsername() {
-        return name;
+    public String getId(String inf) {
+        String[] list=inf.split(" ");
+        return list[0].split(":")[1];
+    }
+    public String getUsername(String inf) {
+        String[] list=inf.split(" ");
+        return list[1].split(":")[1];
+    }
+    public String getPhone(String inf) {
+        String[] list=inf.split(" ");
+        return list[2].split(":")[1];
     }
 
-    public String getId() {
-        return id;
+
+    public String getPassword(String inf) {
+        String[] list=inf.split(" ");
+        return list[3].split(":")[1];
     }
 
-    public String getPhone() {
-        return Phone;
-    }
-
-    public void setUsername(String name) {
-        this.name=name;
-    }
-
-
-    public String getPassword() {
-        return password;
-    }
-
-    public Mode getMode() {
+    public String getMode() {
         return mode;
     }
 
 
-    public enum Mode{LEADER,USER,NULL}
-    private Mode mode=Mode.NULL;
+    String mode="USER";//默认user
 
-    public void setMode(Mode mode){
+    public void setMode(String mode){
         this.mode=mode;
     }
 
@@ -58,5 +60,10 @@ public class User implements Serializable {
     }
     public void setPassword(String password){
         this.password=password;
+    }
+
+    @NonNull
+    public String toString(){
+        return "id:"+id+" Username:"+name+" phoneNumber:"+Phone+" password:"+password+" Mode:"+mode.toString();
     }
 }

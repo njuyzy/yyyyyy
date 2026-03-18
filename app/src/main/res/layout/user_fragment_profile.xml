@@ -6,6 +6,18 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <ImageButton
+        android:id="@+id/btnSettings"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        app:contentDescription="设置"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/btnSwitchRole"
+        android:layout_alignParentEnd="true"
+        android:contextClickable="true"
+        android:background="?selectableItemBackgroundBorderless"
+        android:src="@drawable/baseline_settings_24" />
+
     <ImageView
         android:id="@+id/ivAvatar"
         android:layout_width="80dp"
@@ -69,12 +81,12 @@
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnViewReviews"
+            android:id="@+id/btnViewHistory"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
-            android:text="查看历史路线"
+            android:text="查看历史订单"
             android:textSize="12sp"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
     </LinearLayout>
@@ -96,7 +108,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
-        android:text="最近路线"
+        android:text="最近订单"
         android:textSize="16sp"
         android:textStyle="bold"
         app:layout_constraintTop_toBottomOf="@id/chipGroup"
