@@ -10,7 +10,7 @@
         android:id="@+id/toolbar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:title="聊天"
+        app:title="对方用户名"
         android:background="#FFFFFF"
         android:elevation="4dp"
         app:layout_constraintTop_toTopOf="parent"

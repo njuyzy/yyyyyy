@@ -9,13 +9,13 @@ import androidx.fragment.app.FragmentTransaction;
 
 import com.example.Japp.R;
 import com.example.Japp.leader.fragment.chat.ConversationList;
-import com.example.Japp.leader.fragment.order.orders;
+import com.example.Japp.leader.fragment.order.orderList;
 import com.example.Japp.leader.fragment.profile.profile;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class LeaderMainActivity extends AppCompatActivity {
 
-    private orders orderList;
+    private orderList orderList;
     private profile mine;
 
     private ConversationList conversationList;
@@ -55,7 +55,7 @@ public class LeaderMainActivity extends AppCompatActivity {
         if(position==0){
 
             if(orderList==null){
-                orderList=new orders();
+                orderList=new orderList();
                 fragmentTransaction.add(R.id.container,orderList);
             } else {
                 fragmentTransaction.show(orderList);

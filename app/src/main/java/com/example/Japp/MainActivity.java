@@ -331,13 +331,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void Jump(){
-        if (getSharedPreferences("user_pref",MODE_PRIVATE).getString("Mode","USER").equals("USER")) {
+
+        if(getSharedPreferences("user_pref",MODE_PRIVATE).getString("Mode","USER").equals("USER")){
             startActivity(new Intent(MainActivity.this, UserMainActivity.class));
-            //finish();
-        } else {
-            startActivity(new Intent(MainActivity.this, LeaderMainActivity.class));
-            //finish();
         }
+        else {
+            startActivity(new Intent(MainActivity.this, LeaderMainActivity.class));
+        }
+        finish();
     }
     private void loginSuccess(User user) {
         Toast.makeText(this, "登录成功！欢迎 " + user.getUsername(user.toString()), Toast.LENGTH_LONG).show();

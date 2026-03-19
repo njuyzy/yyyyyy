@@ -6,7 +6,8 @@
     android:layout_height="wrap_content"
     android:layout_marginBottom="10dp"
     app:cardUseCompatPadding="true"
-    app:cardCornerRadius="12dp">
+    app:cardCornerRadius="12dp"
+    android:id="@+id/conversationCard">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:padding="12dp"

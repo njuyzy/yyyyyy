@@ -13,6 +13,7 @@ import android.widget.ImageButton;
 import android.widget.Toast;
 
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentTransaction;
 
 import com.example.Japp.R;
 import com.example.Japp.SettingsActivity;
@@ -38,6 +39,17 @@ public class profile extends Fragment {
             @Override
             public void onClick(View v) {
                 switchMode();
+            }
+        });
+
+        check_review.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                review targetFragment = new review();
+                FragmentTransaction transaction = getParentFragmentManager().beginTransaction();
+                transaction.replace(R.id.container, targetFragment);
+                transaction.addToBackStack(null);
+                transaction.commit();
             }
         });
 

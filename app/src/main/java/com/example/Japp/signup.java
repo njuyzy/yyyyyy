@@ -11,8 +11,11 @@ import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.Japp.data.User;
@@ -26,7 +29,7 @@ public class signup extends AppCompatActivity {
     private TextInputEditText etName, etPhone, etPassword, etCode;
     private TextInputLayout tilName, tilPhone, tilPassword, tilCode;
     private Button getCode, Signup, cancel;
-
+    private CheckBox autoLogin;
     private int countdown = 60;
     private Handler handler = new Handler();
     private Runnable countdownRunnable;
@@ -44,6 +47,7 @@ public class signup extends AppCompatActivity {
     }
 
     private void initialize() {
+
         tilName = findViewById(R.id.usernameLayout);
         tilPhone = findViewById(R.id.phoneLayout);
         tilPassword = findViewById(R.id.passwordLayout);
@@ -57,6 +61,8 @@ public class signup extends AppCompatActivity {
         getCode = findViewById(R.id.get_code);
         Signup = findViewById(R.id.register);
         cancel = findViewById(R.id.cancel);
+
+        autoLogin=findViewById(R.id.autoLogin);
     }
 
     /**
@@ -173,6 +179,21 @@ public class signup extends AppCompatActivity {
     }
 
     private void setupListeners() {
+
+        autoLogin.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
+            @Override
+            public void onCheckedChanged(@NonNull CompoundButton buttonView, boolean isChecked){
+                if(isChecked){
+                    getSharedPreferences("user_pref",MODE_PRIVATE).edit()
+                            .putBoolean("autoLogin",true).apply();
+                }
+                else{
+                    getSharedPreferences("user_pref",MODE_PRIVATE).edit()
+                            .putBoolean("autoLogin",false).apply();
+                }
+            }
+        });
+
         getCode.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -330,6 +351,7 @@ public class signup extends AppCompatActivity {
         SharedPreferences sharedPreferences=getSharedPreferences("user_pref",MODE_PRIVATE);
         sharedPreferences.edit()
                 .putString("user_inf",user.toString())
+                .putBoolean("is_logged_in",true)
                 .apply();
         //返回登录
         Intent intent = new Intent(signup.this, MainActivity.class);

@@ -7,11 +7,11 @@ import java.io.Serializable;
 public class User implements Serializable {
 
     public User(){
-        id=order.Generate_id();
+        id=ID.Generate_id();
     }
 
     public User(String name,String phone,String password){
-        id=order.Generate_id();
+        id=ID.Generate_id();
         this.name=name;
         this.Phone=phone;
         this.password=password;
@@ -40,16 +40,8 @@ public class User implements Serializable {
         return list[3].split(":")[1];
     }
 
-    public String getMode() {
-        return mode;
-    }
 
 
-    String mode="USER";//默认user
-
-    public void setMode(String mode){
-        this.mode=mode;
-    }
 
     public void setName(String name){
         this.name=name;
@@ -64,6 +56,6 @@ public class User implements Serializable {
 
     @NonNull
     public String toString(){
-        return "id:"+id+" Username:"+name+" phoneNumber:"+Phone+" password:"+password+" Mode:"+mode.toString();
+        return "id:"+id+" Username:"+name+" phoneNumber:"+Phone+" password:"+password;
     }
 }
