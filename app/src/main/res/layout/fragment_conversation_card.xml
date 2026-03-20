@@ -47,7 +47,6 @@
             android:layout_height="wrap_content"
             android:minWidth="24dp"
             android:gravity="center"
-            android:textColor="#FFFFFF"
             android:background="@android:drawable/btn_default_small"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toBottomOf="@id/txtTime"/>

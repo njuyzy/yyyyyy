@@ -10,6 +10,7 @@ public class User implements Serializable {
         id=ID.Generate_id();
     }
 
+    private String ImgUrl;
     public User(String name,String phone,String password){
         id=ID.Generate_id();
         this.name=name;
@@ -19,7 +20,7 @@ public class User implements Serializable {
     private String password="111111";
     private final String id;
     private String Phone;
-    private String name;
+    private String name="未定义";
 
     public String getId(String inf) {
         String[] list=inf.split(" ");
@@ -40,7 +41,18 @@ public class User implements Serializable {
         return list[3].split(":")[1];
     }
 
+    public String getId() {
+        return id;
+    }
+    public String getUsername() {return name;}
+    public String getPhone() {
+        return Phone;
+    }
 
+
+    public String getPassword() {
+        return password;
+    }
 
 
     public void setName(String name){

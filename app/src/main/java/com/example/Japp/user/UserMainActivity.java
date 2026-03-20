@@ -8,7 +8,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.example.Japp.R;
-import com.example.Japp.user.fragment.chat.ConversationList;
+import com.example.Japp.Chat.fragment.ConversationList;
 import com.example.Japp.user.fragment.joinTeam.TeamList;
 import com.example.Japp.user.fragment.profile.profile;
 import com.example.Japp.user.fragment.route.routeDesign;

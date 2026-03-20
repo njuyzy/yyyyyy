@@ -12,6 +12,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Japp">
         <activity
+            android:name=".leader.orderDetailActivity"
+            android:exported="false"/>
+        <activity
+            android:name=".signup"
+            android:exported="false" />
+        <activity
+            android:name=".Chat.chatActivity"
+            android:exported="false"/>
+        <activity
             android:name=".SettingsActivity"
             android:exported="false" />
         <activity
@@ -29,9 +38,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".signup"
-            android:exported="false" />
+
     </application>
 
 </manifest>

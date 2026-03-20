@@ -11,11 +11,20 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         app:title="可选团队"
-        app:titleTextColor="@color/cardview_light_background"
-        android:background="#178C23"
+        android:background="#999999"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageButton
+            android:id="@+id/add"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:layout_marginEnd="30dp"
+            android:background="@drawable/baseline_add_circle_outline_24" />
+
+    </com.google.android.material.appbar.MaterialToolbar>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler"

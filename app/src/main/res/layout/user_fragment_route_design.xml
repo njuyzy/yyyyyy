@@ -18,10 +18,9 @@
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="@color/green"
-            app:title="智能路线设计"
-            app:titleTextColor="#FFFFFF"/>
+            android:layout_height="60dp"
+            android:background="#999999"
+            app:title="智能路线设计"/>
 
         <!-- 路线概览卡片 -->
         <androidx.cardview.widget.CardView

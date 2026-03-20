@@ -1,5 +1,6 @@
 package com.example.Japp.leader.fragment.order;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -13,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.Japp.R;
 import com.example.Japp.data.order;
 import com.example.Japp.leader.adapter.orderListAdapter;
+import com.example.Japp.leader.orderDetailActivity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,23 +39,17 @@ public class orderList extends Fragment {
         order_list.add(new order());
         order_list.add(new order());
         order_list.add(new order());
-
-
-        View.OnClickListener listener=new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                //点击卡片跳转至详情
-                orderDetail orderdetail=new orderDetail();
-                FragmentTransaction transaction=getParentFragmentManager().beginTransaction();
-                transaction.replace(R.id.container,orderdetail);
-                transaction.addToBackStack(null);
-                transaction.commit();
-            }
-        };
+        //
         adapter=new orderListAdapter();
         adapter.setListData(order_list);
-        adapter.setListener(listener);
-        adapter.setParentFragment(this);
+        adapter.setOrderOnClickListener(new orderListAdapter.OrderOnClickListener() {
+            @Override
+            public void onItemClick(int position) {
+                Intent intent=new Intent(requireContext(), orderDetailActivity.class);
+                intent.putExtra("order_info",order_list.get(position));
+                startActivity(intent);
+            }
+        });
 
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         recycler.setAdapter(adapter);
