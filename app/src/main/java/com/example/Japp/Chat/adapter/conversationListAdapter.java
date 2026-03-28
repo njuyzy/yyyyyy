@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -66,13 +67,15 @@ public class conversationListAdapter extends RecyclerView.Adapter<conversationLi
     }
 
     static class Holder extends RecyclerView.ViewHolder{
-        TextView UserName,LatestMessage,UnreadMessage;
+        ImageView avatar;
+        TextView UserName, LatestMessage, UnreadMessage;
         public Holder (@NonNull View itemView){
             super(itemView);
 
-            UserName=itemView.findViewById(R.id.txtName);
-            LatestMessage=itemView.findViewById(R.id.txtLast);
-            UnreadMessage=itemView.findViewById(R.id.txtUnread);
+            avatar = itemView.findViewById(R.id.avatar);
+            UserName = itemView.findViewById(R.id.txtName);
+            LatestMessage = itemView.findViewById(R.id.txtLast);
+            UnreadMessage = itemView.findViewById(R.id.txtUnread);
         }
     }
 

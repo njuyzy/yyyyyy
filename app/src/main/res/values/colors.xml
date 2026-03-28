@@ -17,4 +17,23 @@
     <color name="chat_toolbar_bg">#FFFFFF</color>
     <color name="chat_input_bg">#F5F5F5</color>
     <color name="chat_send_btn">#1A73E8</color>
+
+    <!-- Application colors -->
+    <color name="background">#F5F7FA</color>
+    <color name="toolbar_background">#FFFFFF</color>
+    <color name="toolbar_title">#000000</color>
+    <color name="card_background">#FFFFFF</color>
+    <color name="text_primary">#000000</color>
+    <color name="text_secondary">#666666</color>
+    <color name="unread_text">#FFFFFF</color>
+
+    <!-- Status colors -->
+    <color name="online">#4CAF50</color>
+    <color name="offline">#CCCCCC</color>
+    <color name="typing">#FF9800</color>
+
+    <!-- Accent colors -->
+    <color name="accent">#2196F3</color>
+    <color name="accent_light">#64B5F6</color>
+    <color name="accent_dark">#1976D2</color>
 </resources>
