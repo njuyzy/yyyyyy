@@ -3,6 +3,7 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="green">#178C23</color>
+    <color name="transparent">#00000000</color>
 
     <!-- Chat UI -->
     <color name="chat_bg">#F0F2F5</color>

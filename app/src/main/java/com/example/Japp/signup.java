@@ -10,6 +10,8 @@ import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
@@ -19,10 +21,26 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.Japp.data.User;
+import com.example.Japp.network.ApiClient;
+import com.example.Japp.network.api.UserService;
+import com.example.Japp.network.models.Account;
+import com.example.Japp.network.models.Result;
+import com.example.Japp.network.models.requests.LoginRequest;
+import com.example.Japp.network.models.requests.RegisterRequest;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
+import java.net.URL;
 import java.util.Objects;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class signup extends AppCompatActivity {
 
@@ -44,8 +62,57 @@ public class signup extends AppCompatActivity {
         initialize();
         setupListeners();
         setupErrorClearListeners(); // 添加错误清除监听
-    }
 
+
+    }
+    private void validatePhoneFormat() {
+        String phone = Objects.requireNonNull(etPhone.getText()).toString().trim();
+
+        // 实时输入时：空值不提示，由点击注册/获取验证码时统一做”不能为空”校验
+        if (TextUtils.isEmpty(phone)) {
+            if (tilPhone.isErrorEnabled()) {
+                tilPhone.setError(null);
+                tilPhone.setErrorEnabled(false);
+            }
+            return;
+        }
+
+        // 去掉手机号格式校验
+        if (tilPhone.isErrorEnabled()) {
+            tilPhone.setError(null);
+            tilPhone.setErrorEnabled(false);
+        }
+    }
+    private void validateUsernameFormat() {
+        String name = Objects.requireNonNull(etName.getText()).toString().trim();
+
+        // 实时输入时：空值不提示，由提交注册时统一做“不能为空”校验
+        if (TextUtils.isEmpty(name)) {
+            if (tilName.isErrorEnabled()) {
+                tilName.setError(null);
+                tilName.setErrorEnabled(false);
+            }
+            return;
+        }
+
+        // 长度限制：1~20
+        if (name.length() > 20) {
+            tilName.setError("用户名长度不能超过20");
+            return;
+        }
+
+        // 仅允许中文、英文、数字、下划线
+        if (!name.matches("^[a-zA-Z0-9_\\u4e00-\\u9fa5]+$")) {
+            tilName.setError("用户名仅支持中文、字母、数字和下划线");
+            return;
+        }
+
+        // 校验通过，清除错误
+        if (tilName.isErrorEnabled()) {
+            tilName.setError(null);
+            tilName.setErrorEnabled(false);
+        }
+    }
     private void initialize() {
 
         tilName = findViewById(R.id.usernameLayout);
@@ -88,7 +155,8 @@ public class signup extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable s) {
-                // 不需要操作
+                // 实时验证用户名格式
+                validateUsernameFormat();
             }
         });
 
@@ -108,6 +176,8 @@ public class signup extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable s) {
+                // 实时验证手机号格式
+                validatePhoneFormat();
             }
         });
 
@@ -146,6 +216,10 @@ public class signup extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable s) {
+                // 验证码输入满6位自动跳转到注册
+                if (s.length() == 6) {
+                    Signup.callOnClick();
+                }
             }
         });
 
@@ -217,6 +291,10 @@ public class signup extends AppCompatActivity {
                     return;
                 }
 
+                // 添加获取验证码动画
+                getCode.setEnabled(false);
+                getCode.setText("发送中...");
+
                 // 发送验证码
                 sendVerificationCode(phone);
             }
@@ -225,6 +303,9 @@ public class signup extends AppCompatActivity {
         cancel.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                // 添加取消按钮动画
+                cancel.setEnabled(false);
+                cancel.setText("取消中...");
                 finish();
             }
         });
@@ -309,6 +390,10 @@ public class signup extends AppCompatActivity {
                     return;
                 }
 
+                // 添加注册按钮动画
+                Signup.setEnabled(false);
+                Signup.setText("注册中...");
+
                 performRegister(name, phone, password, code);
             }
         });
@@ -344,32 +429,160 @@ public class signup extends AppCompatActivity {
             return;
         }
 
-        User user = new User(name, phone, password);//user!=null
-        //TODO:上传数据库
+        // 添加网络连接测试
+        if (!isServerReachable()) {
+            Toast.makeText(signup.this, "无法连接到服务器，请检查网络或稍后重试", Toast.LENGTH_LONG).show();
+            Signup.setEnabled(true);
+            Signup.setText("注册");
+            return;
+        }
 
-        //写入注册表
-        SharedPreferences sharedPreferences=getSharedPreferences("user_pref",MODE_PRIVATE);
-        sharedPreferences.edit()
-                .putString("user_inf",user.toString())
-                .putBoolean("is_logged_in",true)
-                .apply();
-        //返回登录
-        Intent intent = new Intent(signup.this, MainActivity.class);
-        startActivity(intent);
-        finish();
+        // 调用API注册
+        UserService service = ApiClient.getClient().create(UserService.class);
+        RegisterRequest request = new RegisterRequest("USER", name, phone, password, "210000");
+        Call<Result> call = service.register(request);
+
+        call.enqueue(new Callback<Result>() {
+            @Override
+            public void onResponse(Call<Result> call, Response<Result> response) {
+                // 恢复按钮状态
+                Signup.setEnabled(true);
+                Signup.setText("注册");
+
+                if (response.isSuccessful() && response.body() != null) {
+                    if (response.body().getCode() == 1) {
+                        // 注册成功，获取用户信息
+                        loginAfterRegister(phone, password);
+                    } else {
+                        // 处理注册失败
+                        if (response.body().getMsg() != null) {
+                            Toast.makeText(signup.this, response.body().getMsg(), Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(signup.this, "注册失败，请重试", Toast.LENGTH_SHORT).show();
+                        }
+                        tilPhone.setError("注册失败");
+                        tilPhone.requestFocus();
+                    }
+                } else {
+                    Toast.makeText(signup.this, "网络错误，请重试", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Result> call, Throwable t) {
+                // 恢复按钮状态
+                Signup.setEnabled(true);
+                Signup.setText("注册");
+
+                // 提供更具体的错误信息
+                if (t instanceof IOException) {
+                    Toast.makeText(signup.this, "网络连接超时，请检查网络", Toast.LENGTH_SHORT).show();
+                } else if (t instanceof SocketTimeoutException) {
+                    Toast.makeText(signup.this, "服务器响应超时，请稍后重试", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(signup.this, "网络连接失败，请检查网络", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+    }
+
+    // 添加网络连接测试方法
+    private boolean isServerReachable() {
+        try {
+            URL url = new URL("https://10.6.86.86/login/ping");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(5000); // 5秒超时
+            connection.setReadTimeout(5000);
+            int responseCode = connection.getResponseCode();
+            return responseCode == 200;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void loginAfterRegister(String phone, String password) {
+        UserService service = ApiClient.getClient().create(UserService.class);
+        LoginRequest request = new LoginRequest(phone, password);
+        Call<Result<Account>> call = service.login(request);
+
+        call.enqueue(new Callback<Result<Account>>() {
+            @Override
+            public void onResponse(Call<Result<Account>> call, Response<Result<Account>> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    if (response.body().getCode() == 1) {
+                        Account account = response.body().getData();
+                        if (account != null) {
+                            // 登录成功，保存用户信息
+                            User user = new User(
+                                    account.getUsername(),
+                                    account.getPhone(),
+                                    account.getPasswordHash()
+                            );
+                            user.setId(String.valueOf(account.getId()));
+
+                            // 写入注册表
+                            SharedPreferences sharedPreferences = getSharedPreferences("user_pref", MODE_PRIVATE);
+                            sharedPreferences.edit()
+                                    .putString("user_inf", user.toString())
+                                    .putString("Mode", account.getRole())
+                                    .putBoolean("is_logged_in", true)
+                                    .apply();
+
+                            // 添加注册成功动画
+                            Animation slideUp = AnimationUtils.loadAnimation(signup.this, R.anim.slide_up);
+                            slideUp.setAnimationListener(new Animation.AnimationListener() {
+                                @Override
+                                public void onAnimationStart(Animation animation) {
+                                }
+
+                                @Override
+                                public void onAnimationEnd(Animation animation) {
+                                    Toast.makeText(signup.this, "注册成功！", Toast.LENGTH_SHORT).show();
+
+                                    // 跳转到主页面
+                                    Intent intent = new Intent(signup.this, MainActivity.class);
+                                    startActivity(intent);
+                                    finish();
+                                }
+
+                                @Override
+                                public void onAnimationRepeat(Animation animation) {
+                                }
+                            });
+
+                            // 应用动画到注册按钮
+                            Signup.startAnimation(slideUp);
+                        }
+                    } else {
+                        Toast.makeText(signup.this, "登录失败，请重试", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(signup.this, "网络错误，请重试", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Result<Account>> call, Throwable t) {
+                Toast.makeText(signup.this, "网络连接失败，请检查网络", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private boolean PhoneExists(String phone) {
-        // TODO: 检查数据库中是否有相同phone
+        // 实际应用中应该调用API检查手机号是否已注册
+        // 这里简化实现，返回false
         return false;
     }
 
     private boolean NameExists(String name) {
-        // TODO: 检查数据库中是否有相同name
+        // 本地检查用户名是否已存在（简化实现）
+        // 实际应用中应该调用API检查
         return false;
     }
 
     private void sendVerificationCode(String phone) {
+        // 实际应用中应调用API发送验证码
         Toast.makeText(this, "验证码已发送", Toast.LENGTH_LONG).show();
         startCountdown();
         savedCode = "111111"; // TODO: 发送验证码，用savedCode记录

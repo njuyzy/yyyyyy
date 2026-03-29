@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 渐变背景 -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="#0D1F67"
+                android:endColor="#1A4287"
+                android:angle="270" />
+        </shape>
+    </item>
+
+    <!-- 中心圆形发光效果 -->
+    <item android:bottom="100dp" android:top="100dp" android:left="100dp" android:right="100dp">
+        <shape android:shape="oval">
+            <solid android:color="#1A4287" />
+            <size android:height="200dp" android:width="200dp"/>
+        </shape>
+    </item>
+
+    <!-- 中心圆形发光效果 -->
+    <item android:bottom="80dp" android:top="80dp" android:left="80dp" android:right="80dp">
+        <shape android:shape="oval">
+            <solid android:color="#0D1F67" />
+            <size android:height="160dp" android:width="160dp"/>
+        </shape>
+    </item>
+</layer-list>

@@ -2,23 +2,29 @@ package com.example.Japp.data;
 
 import androidx.annotation.NonNull;
 
+import com.example.Japp.network.models.Account;
+
 import java.io.Serializable;
+
+import static com.example.Japp.data.ID.Generate_id;
+import static com.example.Japp.data.ID.convertLocalIdToServerId;
+import static com.example.Japp.data.ID.convertServerIdToLocalId;
 
 public class User implements Serializable {
 
     public User(){
-        id=ID.Generate_id();
+        id= Generate_id();
     }
 
     private String ImgUrl;
     public User(String name,String phone,String password){
-        id=ID.Generate_id();
+        id= Generate_id();
         this.name=name;
         this.Phone=phone;
         this.password=password;
     }
     private String password="111111";
-    private final String id;
+    private String id;
     private String Phone;
     private String name="未定义";
 
@@ -66,8 +72,34 @@ public class User implements Serializable {
         this.password=password;
     }
 
+
     @NonNull
     public String toString(){
         return "id:"+id+" Username:"+name+" phoneNumber:"+Phone+" password:"+password;
+    }
+    public String setId(String id) {
+        return id;
+    }
+    // ID转换方法
+    public static User fromServerAccount(Account account) {
+        if (account == null) return null;
+
+        User user = new User();
+        user.setId(convertServerIdToLocalId(account.getId()));
+        user.setName(account.getUsername());
+        user.setPhone(account.getPhone());
+        user.setPassword(account.getPasswordHash());
+        return user;
+    }
+
+    public static Account toServerAccount(User user) {
+        if (user == null) return null;
+
+        Account account = new Account();
+        account.setId(convertLocalIdToServerId(user.getId()));
+        account.setUsername(user.getUsername());
+        account.setPhone(user.getPhone());
+        account.setPasswordHash(user.getPassword());
+        return account;
     }
 }

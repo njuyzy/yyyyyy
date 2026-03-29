@@ -40,6 +40,9 @@ dependencies {
     implementation(libs.navigation.ui.ktx)
     implementation(libs.datastore.core)
     testImplementation(libs.junit)
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+
 }
