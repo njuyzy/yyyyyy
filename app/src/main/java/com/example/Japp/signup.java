@@ -503,7 +503,7 @@ public class signup extends AppCompatActivity {
 
     private void loginAfterRegister(String phone, String password) {
         UserService service = ApiClient.getClient().create(UserService.class);
-        LoginRequest request = new LoginRequest(phone, password);
+        LoginRequest request = new LoginRequest(phone, password); // 直接使用明文密码
         Call<Result<Account>> call = service.login(request);
 
         call.enqueue(new Callback<Result<Account>>() {
@@ -517,7 +517,7 @@ public class signup extends AppCompatActivity {
                             User user = new User(
                                     account.getUsername(),
                                     account.getPhone(),
-                                    account.getPasswordHash()
+                                    password // 保存明文密码
                             );
                             user.setId(String.valueOf(account.getId()));
 
@@ -538,7 +538,7 @@ public class signup extends AppCompatActivity {
 
                                 @Override
                                 public void onAnimationEnd(Animation animation) {
-                                    Toast.makeText(signup.this, "注册成功！", Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(signup.this, "注册成功！欢迎 " + user.getUsername(), Toast.LENGTH_SHORT).show();
 
                                     // 跳转到主页面
                                     Intent intent = new Intent(signup.this, MainActivity.class);

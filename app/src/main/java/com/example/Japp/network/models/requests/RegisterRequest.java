@@ -4,14 +4,14 @@ public class RegisterRequest {
     private String role;
     private String username;
     private String phone;
-    private String passwordHash;
+    private String password;
     private String regionCode;
 
-    public RegisterRequest(String role, String username, String phone, String passwordHash, String regionCode) {
+    public RegisterRequest(String role, String username, String phone, String password, String regionCode) {
         this.role = role;
         this.username = username;
         this.phone = phone;
-        this.passwordHash = passwordHash;
+        this.password = password;
         this.regionCode = regionCode;
     }
 
@@ -24,8 +24,8 @@ public class RegisterRequest {
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
 
-    public String getPasswordHash() { return passwordHash; }
-    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
 
     public String getRegionCode() { return regionCode; }
     public void setRegionCode(String regionCode) { this.regionCode = regionCode; }

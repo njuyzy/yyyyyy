@@ -231,12 +231,7 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                if (findUserByPhone(phone) == null) {
-                    tilPhone.setError("手机号未注册");
-                    tilPhone.requestFocus();
-                    Toast.makeText(MainActivity.this, "该手机号尚未注册", Toast.LENGTH_SHORT).show();
-                    return;
-                }
+
 
                 sendVerificationCode(phone);
             }
@@ -345,7 +340,7 @@ public class MainActivity extends AppCompatActivity {
                             User user = new User(
                                     account.getUsername(),
                                     account.getPhone(),
-                                    account.getPasswordHash()
+                                    password // 保存明文密码
                             );
                             user.setId(String.valueOf(account.getId()));
 
@@ -441,31 +436,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private User findUserByPhone(String phone) {
-        // 从服务器获取用户（使用固定ID 1，假设该用户存在）
-        UserService service = ApiClient.getClient().create(UserService.class);
-        Call<Result<Account>> call = service.getAccount(1);
-
-        try {
-            Response<Result<Account>> response = call.execute();
-            if (response.isSuccessful() && response.body() != null) {
-                if (response.body().getCode() == 1 && response.body().getData() != null) {
-                    Account account = response.body().getData();
-                    // 对比手机号
-                    if (account.getPhone().equals(phone)) {
-                        // 如果手机号匹配，返回用户
-                        return new User(
-                                account.getUsername(),
-                                account.getPhone(),
-                                account.getPasswordHash()
-                        );
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // 处理异常
-            Log.e("MainActivity", "Error finding user by phone", e);
-        }
-
+        // 实际应用中应该调用API检查手机号是否已注册
+        // 这里简化实现，返回false
         return null;
     }
 
