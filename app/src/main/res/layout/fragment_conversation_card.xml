@@ -4,24 +4,44 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="10dp"
-    app:cardUseCompatPadding="true"
-    app:cardCornerRadius="12dp"
+    android:layout_margin="8dp"
+    android:elevation="4dp"
+    app:cardCornerRadius="16dp"
+    app:cardBackgroundColor="@color/card_background"
     android:id="@+id/conversationCard">
 
     <androidx.constraintlayout.widget.ConstraintLayout
-        android:padding="12dp"
+        android:padding="16dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
+
+        <ImageView
+            android:id="@+id/avatar"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/shape_avatar"
+            android:contentDescription="@string/avatar"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:src="@drawable/ic_default_avatar" />
 
         <TextView
             android:id="@+id/txtName"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:text="Name"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
             android:textStyle="bold"
+<<<<<<< HEAD
             android:maxLines="1"
             android:ellipsize="end"
             app:layout_constraintStart_toStartOf="parent"
+=======
+            app:layout_constraintStart_toEndOf="@id/avatar"
+>>>>>>> 8e17abf98766200ef08a42fca1e64b4600ad7f30
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintEnd_toStartOf="@id/txtTime"
             app:layout_constraintHorizontal_bias="0"/>
@@ -30,7 +50,12 @@
             android:id="@+id/txtTime"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+<<<<<<< HEAD
             android:textColor="#999999"
+=======
+            android:text="10:30"
+            android:textColor="@color/text_secondary"
+>>>>>>> 8e17abf98766200ef08a42fca1e64b4600ad7f30
             android:textSize="12sp"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintEnd_toEndOf="parent"/>
@@ -40,22 +65,40 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
+<<<<<<< HEAD
             android:textColor="#666666"
             android:textSize="14sp"
             android:maxLines="1"
             android:ellipsize="end"
             app:layout_constraintStart_toStartOf="parent"
+=======
+            android:text="Last message"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            app:layout_constraintStart_toEndOf="@id/avatar"
+>>>>>>> 8e17abf98766200ef08a42fca1e64b4600ad7f30
             app:layout_constraintTop_toBottomOf="@id/txtName"
-            app:layout_constraintEnd_toStartOf="@id/txtUnread"/>
+            app:layout_constraintEnd_toStartOf="@id/txtTime"/>
 
         <TextView
             android:id="@+id/txtUnread"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:minWidth="24dp"
+            android:layout_marginEnd="16dp"
             android:gravity="center"
-            android:background="@android:drawable/btn_default_small"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/txtTime"/>
+            android:minWidth="20dp"
+            android:minHeight="20dp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
+            android:text="0"
+            android:textColor="@color/unread_text"
+            android:textSize="10sp"
+            android:background="@drawable/shape_unread_badge"
+            app:layout_constraintEnd_toStartOf="@id/avatar"
+            app:layout_constraintTop_toBottomOf="@id/txtTime"
+            app:layout_constraintBottom_toBottomOf="parent" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>

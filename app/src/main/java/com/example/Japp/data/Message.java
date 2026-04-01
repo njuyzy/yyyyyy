@@ -1,6 +1,7 @@
 package com.example.Japp.data;
 
 import java.io.Serializable;
+<<<<<<< HEAD
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -44,6 +45,33 @@ public class Message implements Serializable {
         this.receiverId = receiverId;
         this.timestamp = System.currentTimeMillis();
         this.formattedTime = formatTime(this.timestamp);
+=======
+import java.util.Date;
+
+public class Message implements Serializable {
+    private User sender;
+    private String content;
+    private long timestamp;
+
+    public Message() {
+        this.sender = new User();
+        this.content = "";
+        this.timestamp = System.currentTimeMillis();
+    }
+
+    public Message(User sender, String content, long timestamp) {
+        this.sender = sender;
+        this.content = content;
+        this.timestamp = timestamp;
+    }
+
+    public User getSender() {
+        return sender;
+    }
+
+    public void setSender(User sender) {
+        this.sender = sender;
+>>>>>>> 8e17abf98766200ef08a42fca1e64b4600ad7f30
     }
 
     public String getContent() {
@@ -54,6 +82,7 @@ public class Message implements Serializable {
         this.content = content;
     }
 
+<<<<<<< HEAD
     public String getType() {
         return type;
     }
@@ -78,12 +107,15 @@ public class Message implements Serializable {
         this.receiverId = receiverId;
     }
 
+=======
+>>>>>>> 8e17abf98766200ef08a42fca1e64b4600ad7f30
     public long getTimestamp() {
         return timestamp;
     }
 
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
+<<<<<<< HEAD
         this.formattedTime = formatTime(timestamp);
     }
 
@@ -98,5 +130,7 @@ public class Message implements Serializable {
 
     public boolean isSent() {
         return TYPE_SENT.equals(type);
+=======
+>>>>>>> 8e17abf98766200ef08a42fca1e64b4600ad7f30
     }
 }

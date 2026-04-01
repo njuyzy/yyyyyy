@@ -4,9 +4,7 @@ plugins {
 
 android {
     namespace = "com.example.Japp"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.Japp"
@@ -40,8 +38,12 @@ dependencies {
     implementation(libs.constraintlayout)
     implementation(libs.navigation.fragment.ktx)
     implementation(libs.navigation.ui.ktx)
+<<<<<<< HEAD
     implementation(libs.sdp)
     implementation(libs.ssp)
+=======
+    implementation(libs.datastore.core)
+>>>>>>> 8e17abf98766200ef08a42fca1e64b4600ad7f30
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

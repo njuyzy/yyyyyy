@@ -9,8 +9,12 @@ activity = "1.8.0"
 constraintlayout = "2.1.4"
 navigationFragmentKtx = "2.6.0"
 navigationUiKtx = "2.6.0"
+<<<<<<< HEAD
 sdp = "1.1.0"
 ssp = "1.1.0"
+=======
+datastoreCore = "1.2.1"
+>>>>>>> 8e17abf98766200ef08a42fca1e64b4600ad7f30
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -22,8 +26,13 @@ activity = { group = "androidx.activity", name = "activity", version.ref = "acti
 constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 navigation-fragment-ktx = { group = "androidx.navigation", name = "navigation-fragment-ktx", version.ref = "navigationFragmentKtx" }
 navigation-ui-ktx = { group = "androidx.navigation", name = "navigation-ui-ktx", version.ref = "navigationUiKtx" }
+<<<<<<< HEAD
 sdp = { module = "com.intuit.sdp:sdp-android", version.ref = "sdp" }
 ssp = { module = "com.intuit.ssp:ssp-android", version.ref = "ssp" }
+=======
+datastore-core = { group = "androidx.datastore", name = "datastore-core", version.ref = "datastoreCore" }
+
+>>>>>>> 8e17abf98766200ef08a42fca1e64b4600ad7f30
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 
