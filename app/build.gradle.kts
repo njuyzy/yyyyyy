@@ -40,7 +40,12 @@ dependencies {
     implementation(libs.constraintlayout)
     implementation(libs.navigation.fragment.ktx)
     implementation(libs.navigation.ui.ktx)
+    implementation(libs.sdp)
+    implementation(libs.ssp)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+
+
+
 }

@@ -10,6 +10,19 @@ public class User implements Serializable {
         id=ID.Generate_id();
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        User user = (User) o;
+        return id != null && id.equals(user.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id != null ? id.hashCode() : 0;
+    }
+
     private String ImgUrl;
     public User(String name,String phone,String password){
         id=ID.Generate_id();
@@ -45,6 +58,10 @@ public class User implements Serializable {
         return id;
     }
     public String getUsername() {return name;}
+
+    public void setUsername(String username) {
+        this.name = username;
+    }
     public String getPhone() {
         return Phone;
     }
@@ -69,5 +86,9 @@ public class User implements Serializable {
     @NonNull
     public String toString(){
         return "id:"+id+" Username:"+name+" phoneNumber:"+Phone+" password:"+password;
+    }
+
+    public void setId(String currentUserId) {
+
     }
 }

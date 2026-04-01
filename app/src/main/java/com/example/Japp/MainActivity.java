@@ -48,7 +48,6 @@ public class MainActivity extends AppCompatActivity {
 
         initialize();
         //如果用户设置自动登录，直接跳转
-
         if(getSharedPreferences("user_pref",MODE_PRIVATE).getBoolean("autoLogin",false)
             &&getSharedPreferences("user_pref",MODE_PRIVATE).getBoolean("is_logged_in",false)) {
             Jump();
