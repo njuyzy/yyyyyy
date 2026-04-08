@@ -34,9 +34,7 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.io.IOException;
-import java.net.HttpURLConnection;
 import java.net.SocketTimeoutException;
-import java.net.URL;
 import java.util.Objects;
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -429,15 +427,7 @@ public class signup extends AppCompatActivity {
             return;
         }
 
-        // 添加网络连接测试
-        if (!isServerReachable()) {
-            Toast.makeText(signup.this, "无法连接到服务器，请检查网络或稍后重试", Toast.LENGTH_LONG).show();
-            Signup.setEnabled(true);
-            Signup.setText("注册");
-            return;
-        }
-
-        // 调用API注册
+        // 直接调用注册接口，不做阻断性的预检查
         UserService service = ApiClient.getClient().create(UserService.class);
         RegisterRequest request = new RegisterRequest("USER", name, phone, password, "210000");
         Call<Result> call = service.register(request);
@@ -486,20 +476,6 @@ public class signup extends AppCompatActivity {
         });
     }
 
-    // 添加网络连接测试方法
-    private boolean isServerReachable() {
-        try {
-            URL url = new URL("https://10.6.86.86/login/ping");
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(5000); // 5秒超时
-            connection.setReadTimeout(5000);
-            int responseCode = connection.getResponseCode();
-            return responseCode == 200;
-        } catch (Exception e) {
-            return false;
-        }
-    }
 
     private void loginAfterRegister(String phone, String password) {
         UserService service = ApiClient.getClient().create(UserService.class);

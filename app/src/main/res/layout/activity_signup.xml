@@ -3,25 +3,23 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background"
-    android:padding="24dp">
+    android:background="@color/background">
 
-    <!-- 背景变渐 -->
+    <!-- 背景变渐：填满父布局 -->
     <View
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginTop="48dp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:background="@drawable/gradient_background"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- 平滑条容器 -->
+    <!-- 平滑条容器：使用 padding 保留内边距 -->
     <ScrollView
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_margin="24dp"
+        android:padding="24dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -30,12 +28,13 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:clipToPadding="false"
             android:orientation="vertical"
-            android:padding="32dp">
+            android:padding="32dp"
+            android:clipToPadding="false">
 
             <!-- 头像动画区域 -->
             <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/logoContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="48dp">
@@ -44,11 +43,9 @@
                     android:id="@+id/logo"
                     android:layout_width="96dp"
                     android:layout_height="96dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_marginEnd="8dp"
-                    android:src="@mipmap/ic_launcher"
+                    android:contentDescription="@string/app_name"
                     android:scaleType="centerInside"
-                    app:layout_constraintBottom_toBottomOf="parent"
+                    android:src="@mipmap/ic_launcher"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
@@ -58,220 +55,227 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
+                    android:fontFamily="sans-serif-medium"
                     android:text="创建账号"
                     android:textColor="#FFFFFF"
                     android:textSize="32sp"
                     android:textStyle="bold"
-                    android:fontFamily="sans-serif-medium"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/logo"/>
+                    app:layout_constraintTop_toBottomOf="@id/logo" />
 
                 <TextView
                     android:id="@+id/subtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
+                    android:fontFamily="sans-serif"
                     android:text="入门研学导览平台"
                     android:textColor="#FFFFFF"
                     android:textSize="16sp"
-                    android:fontFamily="sans-serif"
+                    app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/signup_title"/>
+                    app:layout_constraintTop_toBottomOf="@id/signup_title" />
             </androidx.constraintlayout.widget.ConstraintLayout>
 
-            <!-- 输入卡片容器 -->
-            <LinearLayout
+            <!-- 输入卡片 -->
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="24dp">
+                android:layout_marginBottom="20dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp">
 
-                <!-- 用户名输入 - 使用TextInputLayout -->
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/usernameLayout"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:hint="用户名"
-                    app:startIconDrawable="@drawable/ic_user"
-                    app:endIconMode="clear_text"
-                    app:boxBackgroundMode="outline"
-                    app:counterEnabled="true"
-                    app:counterMaxLength="20"
-                    app:errorEnabled="true"
-                    app:hintTextColor="?attr/colorOnSurface"
-                    app:errorTextColor="?attr/colorError">
+                    android:orientation="vertical"
+                    android:padding="24dp">
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/username"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:maxLines="1"
-                        android:inputType="textPersonName"
-                        android:textColorHint="?attr/colorOnSurface"
-                        android:textColor="?attr/colorOnSurface"
-                        android:hint=""/>
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <!-- 手机号输入 - 使用TextInputLayout -->
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/phoneLayout"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:hint="手机号"
-                    app:boxBackgroundMode="outline"
-                    app:counterEnabled="true"
-                    app:counterMaxLength="11"
-                    app:errorEnabled="true"
-                    app:helperText="请输入11位手机号"
-                    app:helperTextEnabled="true"
-                    app:errorTextColor="?attr/colorError">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/phone_num"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:maxLines="1"
-                        android:inputType="phone"
-                        android:maxLength="11"
-                        android:textColorHint="?attr/colorOnSurface"
-                        android:textColor="?attr/colorOnSurface"
-                        android:hint=""/>
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <!-- 密码输入 - 使用TextInputLayout -->
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/passwordLayout"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:hint="密码"
-                    app:endIconMode="password_toggle"
-                    app:boxBackgroundMode="outline"
-                    app:counterEnabled="true"
-                    app:counterMaxLength="20"
-                    app:errorEnabled="true"
-                    app:hintTextColor="?attr/colorOnSurface"
-                    app:errorTextColor="?attr/colorError">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/password"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:maxLines="1"
-                        android:inputType="textPassword"
-                        android:textColorHint="?attr/colorOnSurface"
-                        android:textColor="?attr/colorOnSurface"
-                        android:hint=""/>
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <!-- 验证码输入 - 优化布局 -->
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
-
+                    <!-- 用户名输入 -->
                     <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/codeLayout"
-                        android:layout_width="0dp"
+                        android:id="@+id/usernameLayout"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="验证码"
+                        android:layout_marginBottom="16dp"
+                        android:hint="用户名"
                         app:boxBackgroundMode="outline"
+                        app:counterEnabled="true"
+                        app:counterMaxLength="20"
+                        app:endIconMode="clear_text"
                         app:errorEnabled="true"
-                        app:hintTextColor="?attr/colorOnSurface"
                         app:errorTextColor="?attr/colorError"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintEnd_toStartOf="@id/get_code"
-                        app:layout_constraintTop_toTopOf="parent">
+                        app:hintTextColor="?attr/colorOnSurface"
+                        app:startIconDrawable="@drawable/ic_user">
 
                         <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/code"
+                            android:id="@+id/username"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:hint=""
+                            android:inputType="textPersonName"
                             android:maxLines="1"
-                            android:inputType="number"
-                            android:maxLength="6"
-                            android:imeOptions="actionDone"
-                            android:textColorHint="?attr/colorOnSurface"
                             android:textColor="?attr/colorOnSurface"
-                            android:hint=""/>
-
+                            android:textColorHint="?attr/colorOnSurface" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/get_code"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="wrap_content"
+                    <!-- 手机号输入 -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/phoneLayout"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:text="获取验证码"
+                        android:layout_marginBottom="16dp"
+                        android:hint="手机号"
+                        app:boxBackgroundMode="outline"
+                        app:counterEnabled="true"
+                        app:counterMaxLength="11"
+                        app:errorEnabled="true"
+                        app:errorTextColor="?attr/colorError"
+                        app:helperText="请输入11位手机号"
+                        app:helperTextEnabled="true">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/phone_num"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint=""
+                            android:inputType="phone"
+                            android:maxLength="11"
+                            android:maxLines="1"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textColorHint="?attr/colorOnSurface" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- 密码输入 -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/passwordLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp"
+                        android:hint="密码"
+                        app:boxBackgroundMode="outline"
+                        app:counterEnabled="true"
+                        app:counterMaxLength="20"
+                        app:endIconMode="password_toggle"
+                        app:errorEnabled="true"
+                        app:errorTextColor="?attr/colorError"
+                        app:hintTextColor="?attr/colorOnSurface">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/password"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint=""
+                            android:inputType="textPassword"
+                            android:maxLines="1"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textColorHint="?attr/colorOnSurface" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- 验证码输入 -->
+                    <androidx.constraintlayout.widget.ConstraintLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:id="@+id/codeLayout"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:hint="验证码"
+                            app:boxBackgroundMode="outline"
+                            app:errorEnabled="true"
+                            app:errorTextColor="?attr/colorError"
+                            app:hintTextColor="?attr/colorOnSurface"
+                            app:layout_constraintLeft_toLeftOf="parent"
+                            app:layout_constraintRight_toLeftOf="@id/get_code"
+                            app:layout_constraintTop_toTopOf="parent">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/code"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint=""
+                                android:imeOptions="actionDone"
+                                android:inputType="number"
+                                android:maxLength="6"
+                                android:maxLines="1"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textColorHint="?attr/colorOnSurface" />
+
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/get_code"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:text="获取验证码"
+                            android:textColor="?attr/colorOnSurface"
+                            app:layout_constraintBottom_toBottomOf="@id/codeLayout"
+                            app:layout_constraintLeft_toRightOf="@id/codeLayout"
+                            app:layout_constraintRight_toRightOf="parent"
+                            app:layout_constraintTop_toTopOf="@id/codeLayout" />
+
+                    </androidx.constraintlayout.widget.ConstraintLayout>
+
+                    <!-- 注册按钮 -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/register"
+                        style="@style/Widget.MaterialComponents.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginBottom="12dp"
+                        android:background="?attr/colorPrimary"
+                        android:text="注册"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="28dp"
+                        app:iconGravity="textStart" />
+
+                    <!-- 取消按钮 -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/cancel"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="?attr/colorSurface"
+                        android:text="取消"
                         android:textColor="?attr/colorOnSurface"
-                        app:layout_constraintBottom_toBottomOf="@id/codeLayout"
-                        app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toEndOf="@id/codeLayout"
-                        app:layout_constraintTop_toTopOf="@id/codeLayout" />
+                        android:textSize="16sp"
+                        app:cornerRadius="28dp"
+                        app:iconGravity="textStart" />
 
-                </androidx.constraintlayout.widget.ConstraintLayout>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-            </LinearLayout>
+                        <CheckBox
+                            android:id="@+id/autoLogin"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="false"
+                            android:text="自动登录"
+                            android:textColor="#666666"
+                            android:textSize="15sp" />
+                    </LinearLayout>
 
-            <!-- 按钮区域 - 使用MaterialButton -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:weightSum="2"
-                android:layout_marginTop="8dp">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/register"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
-                    android:text="注册"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="28dp"
-                    app:iconGravity="textStart"
-                    style="@style/Widget.MaterialComponents.Button"
-                    android:textColor="#FFFFFF"
-                    android:background="?attr/colorPrimary"/>
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/cancel"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:text="取消"
-                    android:textSize="16sp"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    app:cornerRadius="28dp"
-                    app:iconGravity="textStart"
-                    android:textColor="?attr/colorOnSurface"
-                    android:background="?attr/colorSurface"/>
-
-            </LinearLayout>
-
-            <CheckBox
-                android:id="@+id/autoLogin"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="15dp"
-                android:text="自动登录"
-                android:checked="false"
-                android:textColor="#FFFFFF"
-                android:layout_marginTop="16dp"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
 
             <!-- 协议提示 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
                 android:layout_marginBottom="20dp"
+                android:layout_marginTop="4dp"
                 android:gravity="center"
                 android:orientation="horizontal">
 
@@ -279,43 +283,44 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="注册即表示同意 "
-                    android:textSize="13sp"
-                    android:textColor="#FFFFFF"/>
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp" />
 
                 <TextView
                     android:id="@+id/user_agreement"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="《用户协议》"
-                    android:textSize="13sp"
-                    android:padding="2dp"
                     android:background="?android:attr/selectableItemBackgroundBorderless"
                     android:clickable="true"
                     android:focusable="true"
-                    android:textColor="#1A73E8"/>
+                    android:padding="2dp"
+                    android:text="《用户协议》"
+                    android:textColor="#1A73E8"
+                    android:textSize="13sp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text=" 和 "
-                    android:textSize="13sp"
-                    android:textColor="#FFFFFF"/>
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp" />
 
                 <TextView
                     android:id="@+id/privacy_policy"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="《隐私政策》"
-                    android:textSize="13sp"
-                    android:padding="2dp"
                     android:background="?android:attr/selectableItemBackgroundBorderless"
                     android:clickable="true"
                     android:focusable="true"
-                    android:textColor="#1A73E8"/>
+                    android:padding="2dp"
+                    android:text="《隐私政策》"
+                    android:textColor="#1A73E8"
+                    android:textSize="13sp" />
 
             </LinearLayout>
 
         </LinearLayout>
+
     </ScrollView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
