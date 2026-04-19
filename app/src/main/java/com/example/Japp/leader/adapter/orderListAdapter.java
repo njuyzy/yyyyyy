@@ -17,51 +17,63 @@ import java.util.List;
 
 public class orderListAdapter extends RecyclerView.Adapter<orderListAdapter.MyHolder> {
 
-    static class MyHolder extends RecyclerView.ViewHolder{
-        TextView customerName,route,duration,peopleCnt;
-        public MyHolder(@NonNull View itemView){
+    static class MyHolder extends RecyclerView.ViewHolder {
+        TextView customerName, city, tag, route, duration, peopleCnt;
+
+        public MyHolder(@NonNull View itemView) {
             super(itemView);
-            //初始化控件
-            customerName=itemView.findViewById(R.id.txtCustomerName);
-            route=itemView.findViewById(R.id.txtRoute);
-            duration=itemView.findViewById(R.id.txtTime);
-            peopleCnt=itemView.findViewById(R.id.txtPeople);
+            customerName = itemView.findViewById(R.id.txtCustomerName);
+            city = itemView.findViewById(R.id.txtCity);
+            tag = itemView.findViewById(R.id.txtTag);
+            route = itemView.findViewById(R.id.txtRoute);
+            duration = itemView.findViewById(R.id.txtTime);
+            peopleCnt = itemView.findViewById(R.id.txtPeople);
         }
     }
 
-    private List<order> orderlist=new ArrayList<>();
-    public void setListData(List<order> list){
-        this.orderlist=list;
-        notifyDataSetChanged();//刷新
-    }
+    private List<order> orderlist = new ArrayList<>();
 
+    public void setListData(List<order> list) {
+        this.orderlist = list;
+        notifyDataSetChanged();
+    }
 
     @NonNull
     @Override
     public MyHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view=LayoutInflater.from(parent.getContext()).inflate(R.layout.leader_activity_order_card,parent,false);
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.leader_activity_order_card, parent, false);
         return new MyHolder(view);
     }
 
-
-    private User user;
     @Override
     public void onBindViewHolder(@NonNull MyHolder holder, @SuppressLint("RecyclerView") int position) {
+        order o = orderlist.get(position);
 
-        order order=orderlist.get(position);
+        holder.customerName.setText(o.getCustomer().getUsername());
 
-        //设置文本
-        holder.customerName.setText(order.getCustomer().getUsername());
-        holder.route.setText(order.getRoute().toString());
-        holder.duration.setText(order.getEstimatedDuration());
-        holder.peopleCnt.setText(order.getPeopleCnt());
+        String cityText = o.getCity();
+        holder.city.setText(cityText.isEmpty() ? "未知城市" : cityText);
 
-        holder.itemView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if(null!=orderOnClickListener){
-                    orderOnClickListener.onItemClick(position);
-                }
+        String tagText = o.getTag();
+        if (tagText.isEmpty()) {
+            holder.tag.setVisibility(View.GONE);
+        } else {
+            holder.tag.setVisibility(View.VISIBLE);
+            holder.tag.setText(tagText);
+        }
+
+        String routeText = o.getRoute().toString();
+        holder.route.setText(routeText.isEmpty() ? "途经：暂无景点信息" : "途经：" + routeText);
+
+        String dur = o.getEstimatedDuration();
+        holder.duration.setText(dur != null && !dur.isEmpty() ? "用时：" + dur : "用时：暂无");
+
+        holder.peopleCnt.setText(o.getPeopleCnt());
+
+        holder.itemView.setOnClickListener(view -> {
+            if (orderOnClickListener != null) {
+                orderOnClickListener.onItemClick(position);
             }
         });
     }
@@ -77,8 +89,7 @@ public class orderListAdapter extends RecyclerView.Adapter<orderListAdapter.MyHo
 
     private OrderOnClickListener orderOnClickListener;
 
-    public interface OrderOnClickListener{
+    public interface OrderOnClickListener {
         void onItemClick(int position);
     }
-
 }

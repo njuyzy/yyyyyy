@@ -250,20 +250,28 @@
                     </LinearLayout>
 
                     <LinearLayout
+                        android:id="@+id/autoLoginRow"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        android:gravity="center_vertical"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp"
+                        android:background="?attr/selectableItemBackground">
 
                         <CheckBox
                             android:id="@+id/autoLogin"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textSize="15dp"
-                            android:text="自动登录"
                             android:checked="false"
-                            android:textColor="#666666"/>
-
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:text="自动登录"
+                            android:textColor="#666666"
+                            android:textSize="14sp"
+                            android:buttonTint="?attr/colorPrimary" />
                     </LinearLayout>
 
                 </LinearLayout>

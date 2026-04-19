@@ -25,6 +25,7 @@ import com.example.Japp.leader.LeaderMainActivity;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
+import com.example.Japp.network.models.LoginResponse;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.requests.LoginRequest;
 import com.example.Japp.user.UserMainActivity;
@@ -32,7 +33,6 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.Objects;
-import android.util.Log;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -60,12 +60,14 @@ public class MainActivity extends AppCompatActivity {
 
         initialize();
 
-        // 添加启动动画
+        // 同步自动登录复选框状态，交由用户自主选择
+        boolean autoLoginEnabled = getSharedPreferences("user_pref", MODE_PRIVATE)
+                .getBoolean("autoLogin", false);
+        autoLogin.setChecked(autoLoginEnabled);
 
-
-        // 如果用户设置自动登录，直接跳转
-        if(getSharedPreferences("user_pref",MODE_PRIVATE).getBoolean("autoLogin",false)
-            &&getSharedPreferences("user_pref",MODE_PRIVATE).getBoolean("is_logged_in",false)) {
+        // 仅在用户勾选自动登录且存在登录态时自动跳转
+        if (autoLoginEnabled
+                && getSharedPreferences("user_pref", MODE_PRIVATE).getBoolean("is_logged_in", false)) {
             Jump();
         }
         setupListeners();
@@ -86,6 +88,8 @@ public class MainActivity extends AppCompatActivity {
         btnRegister = findViewById(R.id.btnRegister);
 
         autoLogin=findViewById(R.id.autoLogin);
+        View autoLoginRow = findViewById(R.id.autoLoginRow);
+        autoLoginRow.setOnClickListener(v -> autoLogin.setChecked(!autoLogin.isChecked()));
     }
 
     private void setupErrorClearListeners() {
@@ -152,7 +156,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // 为每个输入框设置焦点变化监听，当获得焦点时也清除错误
+        // 为每个输入框设置焦点变化监听，当获得焦点时也清除对应的错误
         View.OnFocusChangeListener focusChangeListener = new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean hasFocus) {
@@ -323,18 +327,19 @@ public class MainActivity extends AppCompatActivity {
         // 调用API登录
         UserService service = ApiClient.getClient().create(UserService.class);
         LoginRequest request = new LoginRequest(phone, password);
-        Call<Result<Account>> call = service.login(request);
+        Call<Result<LoginResponse>> call = service.login(request);
 
-        call.enqueue(new Callback<Result<Account>>() {
+        call.enqueue(new Callback<Result<LoginResponse>>() {
             @Override
-            public void onResponse(Call<Result<Account>> call, Response<Result<Account>> response) {
+            public void onResponse(Call<Result<LoginResponse>> call, Response<Result<LoginResponse>> response) {
                 // 恢复按钮状态
                 btnLogin.setEnabled(true);
                 btnLogin.setText("登录");
 
                 if (response.isSuccessful() && response.body() != null) {
                     if (response.body().getCode() == 1) {
-                        Account account = response.body().getData();
+                        LoginResponse loginData = response.body().getData();
+                        Account account = loginData != null ? loginData.getAccount() : null;
                         if (account != null) {
                             // 登录成功，保存用户信息
                             User user = new User(
@@ -349,8 +354,14 @@ public class MainActivity extends AppCompatActivity {
                             sharedPreferences.edit()
                                     .putString("user_inf", user.toString())
                                     .putString("Mode", account.getRole())
+                                    .putInt("account_id", account.getId())
                                     .putBoolean("is_logged_in", true)
                                     .apply();
+
+                            // 保存 token
+                            if (loginData.getToken() != null) {
+                                ApiClient.saveToken(loginData.getToken());
+                            }
 
                             loginSuccess(user);
                         }
@@ -384,7 +395,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onFailure(Call<Result<Account>> call, Throwable t) {
+            public void onFailure(Call<Result<LoginResponse>> call, Throwable t) {
                 // 恢复按钮状态
                 btnLogin.setEnabled(true);
                 btnLogin.setText("登录");
@@ -416,11 +427,13 @@ public class MainActivity extends AppCompatActivity {
             public void onAnimationEnd(Animation animation) {
                 Toast.makeText(MainActivity.this, "登录成功！欢迎 " + user.getUsername(), Toast.LENGTH_LONG).show();
 
-                //更新注册表
+                // 更新登录态并持久化用户当前的自动登录选择
+                boolean autoLoginEnabled = autoLogin.isChecked();
                 getSharedPreferences("user_pref", MODE_PRIVATE)
                         .edit()
                         .putBoolean("is_logged_in", true)
-                        .putString("user_inf",user.toString())
+                        .putBoolean("autoLogin", autoLoginEnabled)
+                        .putString("user_inf", user.toString())
                         .apply();
 
                 Jump();

@@ -10,6 +10,8 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.Japp.network.ApiClient;
+
 public class SplashActivity extends AppCompatActivity {
 
     private static final int SPLASH_DURATION = 2000; // 2秒
@@ -20,6 +22,9 @@ public class SplashActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.splash_screen);
+
+        // 初始化 ApiClient（用于后续请求自动携带 token）
+        ApiClient.init(this);
 
         // 初始化动画
         initializeAnimations();

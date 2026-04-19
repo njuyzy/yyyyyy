@@ -8,6 +8,11 @@ import java.util.List;
 public class Route {
 
     List<String> attractions=new ArrayList<>();
+
+    public void addAttraction(String name) {
+        attractions.add(name);
+    }
+
     @NonNull
     public String toString(){
         if(attractions.isEmpty())

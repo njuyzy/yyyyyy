@@ -1,18 +1,56 @@
 package com.example.Japp.network;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
 public class ApiClient {
     private static final String BASE_URL = "http://47.94.95.110:8080";
-    public static Retrofit retrofit;
+    public static volatile Retrofit retrofit;
+    private static Context appContext;
+
+    public static void init(Context context) {
+        appContext = context.getApplicationContext();
+    }
+
+    public static String getToken() {
+        if (appContext == null) return null;
+        SharedPreferences prefs = appContext.getSharedPreferences("user_pref", Context.MODE_PRIVATE);
+        return prefs.getString("token", null);
+    }
+
+    public static void saveToken(String token) {
+        if (appContext == null) return;
+        SharedPreferences prefs = appContext.getSharedPreferences("user_pref", Context.MODE_PRIVATE);
+        prefs.edit().putString("token", token).apply();
+    }
 
     public static Retrofit getClient() {
         if (retrofit == null) {
-            retrofit = new Retrofit.Builder()
-                    .baseUrl(BASE_URL)
-                    .addConverterFactory(GsonConverterFactory.create())
-                    .build();
+            synchronized (ApiClient.class) {
+                if (retrofit == null) {
+                    OkHttpClient client = new OkHttpClient.Builder()
+                            .addInterceptor(chain -> {
+                                Request.Builder builder = chain.request().newBuilder();
+                                String token = getToken();
+                                if (token != null && !token.isEmpty()) {
+                                    builder.addHeader("Authorization", "Bearer " + token);
+                                }
+                                return chain.proceed(builder.build());
+                            })
+                            .build();
+
+                    retrofit = new Retrofit.Builder()
+                            .baseUrl(BASE_URL)
+                            .client(client)
+                            .addConverterFactory(GsonConverterFactory.create())
+                            .build();
+                }
+            }
         }
         return retrofit;
     }

@@ -24,6 +24,7 @@ import com.example.Japp.data.User;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
+import com.example.Japp.network.models.LoginResponse;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.requests.LoginRequest;
 import com.example.Japp.network.models.requests.RegisterRequest;
@@ -480,14 +481,15 @@ public class signup extends AppCompatActivity {
     private void loginAfterRegister(String phone, String password) {
         UserService service = ApiClient.getClient().create(UserService.class);
         LoginRequest request = new LoginRequest(phone, password); // 直接使用明文密码
-        Call<Result<Account>> call = service.login(request);
+        Call<Result<LoginResponse>> call = service.login(request);
 
-        call.enqueue(new Callback<Result<Account>>() {
+        call.enqueue(new Callback<Result<LoginResponse>>() {
             @Override
-            public void onResponse(Call<Result<Account>> call, Response<Result<Account>> response) {
+            public void onResponse(Call<Result<LoginResponse>> call, Response<Result<LoginResponse>> response) {
                 if (response.isSuccessful() && response.body() != null) {
                     if (response.body().getCode() == 1) {
-                        Account account = response.body().getData();
+                        LoginResponse loginData = response.body().getData();
+                        Account account = loginData != null ? loginData.getAccount() : null;
                         if (account != null) {
                             // 登录成功，保存用户信息
                             User user = new User(
@@ -502,8 +504,14 @@ public class signup extends AppCompatActivity {
                             sharedPreferences.edit()
                                     .putString("user_inf", user.toString())
                                     .putString("Mode", account.getRole())
+                                    .putInt("account_id", account.getId())
                                     .putBoolean("is_logged_in", true)
                                     .apply();
+
+                            // 保存 token
+                            if (loginData.getToken() != null) {
+                                ApiClient.saveToken(loginData.getToken());
+                            }
 
                             // 添加注册成功动画
                             Animation slideUp = AnimationUtils.loadAnimation(signup.this, R.anim.slide_up);
@@ -539,7 +547,7 @@ public class signup extends AppCompatActivity {
             }
 
             @Override
-            public void onFailure(Call<Result<Account>> call, Throwable t) {
+            public void onFailure(Call<Result<LoginResponse>> call, Throwable t) {
                 Toast.makeText(signup.this, "网络连接失败，请检查网络", Toast.LENGTH_SHORT).show();
             }
         });
