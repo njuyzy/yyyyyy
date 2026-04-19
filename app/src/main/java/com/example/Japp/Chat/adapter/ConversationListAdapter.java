@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -12,15 +13,15 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.Japp.R;
 import com.example.Japp.data.Conversation;
 
-import java.util.ArrayList;
 import java.util.List;
 
-public class ConversationListAdapter extends RecyclerView.Adapter<ConversationListAdapter.Holder> {
+public class conversationListAdapter extends RecyclerView.Adapter<conversationListAdapter.Holder> {
 
-    private List<Conversation> conversationList;
+    List<Conversation> conversationList;
+
 
     public void setListData(List<Conversation> conversationList){
-        this.conversationList = conversationList != null ? conversationList : new ArrayList<>();
+        this.conversationList=conversationList;
         notifyDataSetChanged();
     }
     @NonNull
@@ -32,79 +33,49 @@ public class ConversationListAdapter extends RecyclerView.Adapter<ConversationLi
         return new Holder(view);
     }
 
-    @SuppressLint({"SetTextI18n", "RecyclerView"})
+    @SuppressLint("SetTextI18n")
     @Override
-    public void onBindViewHolder(@NonNull Holder holder, int position) {
-        try {
-            if (conversationList == null || position >= conversationList.size()) {
-                return;
-            }
+    public void onBindViewHolder(@NonNull Holder holder, @SuppressLint("RecyclerView") int position) {
 
-            Conversation conversation = conversationList.get(position);
-            holder.bind(conversation);
+        Conversation conversation=conversationList.get(position);
+        List<String> messages=conversation.getMessages();
+        holder.UserName.setText(conversation.getUser_opposite().getUsername());
+        holder.LatestMessage.setText(messages.get(messages.size()-1));
 
-            // 设置点击监听器
-            holder.itemView.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    if (conversationOnClickListener != null) {
-                        conversationOnClickListener.onItemClick(position);
-                    }
-                }
-            });
-        } catch (Exception e) {
-            android.util.Log.e("ConversationListAdapter", "Error binding view: " + e.getMessage());
+
+        if(conversation.getUnRead_num()>0){
+            holder.UnreadMessage.setVisibility(View.VISIBLE);
+            holder.UnreadMessage.setText(conversation.getUnRead_num()+"");
         }
+        //如果没有未读消息，隐藏控件
+        else
+            holder.UnreadMessage.setVisibility(View.GONE);
+        //
+        holder.itemView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(conversationOnClickListener!=null){
+                    conversationOnClickListener.onItemClick(position);
+                }
+            }
+        });
     }
 
     @Override
     public int getItemCount() {
-        return conversationList != null ? conversationList.size() : 0;
+        return conversationList.size();
     }
 
     static class Holder extends RecyclerView.ViewHolder{
-        TextView UserName,LatestMessage,Time,UnreadMessage;
+        ImageView avatar;
+        TextView UserName, LatestMessage, UnreadMessage;
         public Holder (@NonNull View itemView){
             super(itemView);
 
-            UserName=itemView.findViewById(R.id.txtName);
-            LatestMessage=itemView.findViewById(R.id.txtLast);
-            Time=itemView.findViewById(R.id.txtTime);
-            UnreadMessage=itemView.findViewById(R.id.txtUnread);
-        }
-
-        void bind(Conversation conversation) {
-            try {
-                if (conversation.getUser_opposite() != null) {
-                    UserName.setText(conversation.getUser_opposite().getUsername());
-                } else {
-                    UserName.setText("未知联系人");
-                }
-
-                String latestMsg = conversation.getLatestMessage();
-                if (latestMsg != null && !latestMsg.isEmpty()) {
-                    LatestMessage.setText(latestMsg);
-                } else {
-                    LatestMessage.setText("暂无消息");
-                }
-
-                long time = conversation.getLatestMessageTime();
-                if (time > 0) {
-                    Time.setText(conversation.getLatestMessageFormattedTime());
-                } else {
-                    Time.setText("");
-                }
-
-                int unreadCount = conversation.getUnRead_num();
-                if (unreadCount > 0) {
-                    UnreadMessage.setVisibility(View.VISIBLE);
-                    UnreadMessage.setText(String.valueOf(unreadCount));
-                } else {
-                    UnreadMessage.setVisibility(View.GONE);
-                }
-            } catch (Exception e) {
-                android.util.Log.e("ConversationListAdapter", "Error binding holder: " + e.getMessage());
-            }
+            avatar = itemView.findViewById(R.id.avatar);
+            UserName = itemView.findViewById(R.id.txtName);
+            LatestMessage = itemView.findViewById(R.id.txtLast);
+            UnreadMessage = itemView.findViewById(R.id.txtUnread);
         }
     }
 
@@ -115,43 +86,5 @@ public class ConversationListAdapter extends RecyclerView.Adapter<ConversationLi
     private ConversationOnClickListener conversationOnClickListener;
     public interface ConversationOnClickListener{
         void onItemClick(int position);
-    }
-
-    // 添加重置未读消息的方法
-    public void resetUnreadCount(int position) {
-        try {
-            if (conversationList != null && position >= 0 && position < conversationList.size()) {
-                Conversation conversation = conversationList.get(position);
-                conversation.resetUnRead_num();
-                notifyItemChanged(position);
-            }
-        } catch (Exception e) {
-            android.util.Log.e("ConversationListAdapter", "Error resetting unread count: " + e.getMessage());
-        }
-    }
-
-    // 更新指定位置的会话
-    public void updateConversation(int position, Conversation newConversation) {
-        try {
-            if (conversationList != null && position >= 0 && position < conversationList.size()) {
-                conversationList.set(position, newConversation);
-                notifyItemChanged(position);
-            }
-        } catch (Exception e) {
-            android.util.Log.e("ConversationListAdapter", "Error updating conversation: " + e.getMessage());
-        }
-    }
-
-    // 删除指定位置的会话
-    public void removeConversation(int position) {
-        try {
-            if (conversationList != null && position >= 0 && position < conversationList.size()) {
-                conversationList.remove(position);
-                notifyItemRemoved(position);
-                notifyItemRangeChanged(position, conversationList.size());
-            }
-        } catch (Exception e) {
-            android.util.Log.e("ConversationListAdapter", "Error removing conversation: " + e.getMessage());
-        }
     }
 }
