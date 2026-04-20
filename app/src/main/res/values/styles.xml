@@ -74,7 +74,7 @@
     </style>
 
     <!-- 复选框样式 -->
-    <style name="Widget.MaterialComponents.CompoundButton.CheckBox" parent="Widget.MaterialComponents.CompoundButton.CheckBox">
+    <style name="Widget.App.CheckBox" parent="Widget.MaterialComponents.CompoundButton.CheckBox">
         <item name="android:textColor">@color/white</item>
         <item name="android:textSize">15sp</item>
         <item name="buttonTint">@color/accent</item>

@@ -15,6 +15,9 @@ public class RouteNode {
     @SerializedName("name")
     private String name;
 
+    @SerializedName("visitTime")
+    private String visitTime;
+
     @SerializedName("cityname")
     private String cityname;
 
@@ -28,6 +31,7 @@ public class RouteNode {
     public int getVisitOrder() { return visitOrder; }
     public String getPoiId() { return poiId; }
     public String getName() { return name; }
+    public String getVisitTime() { return visitTime; }
     public String getCityname() { return cityname; }
     public int getRecommendedDuration() { return recommendedDuration; }
     public String getNotes() { return notes; }

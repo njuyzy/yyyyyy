@@ -50,4 +50,8 @@ public interface UserService {
 
     @GET("routes/{id}")
     Call<Result<List<RouteNode>>> getRouteNodes(@Path("id") int routeId);
+
+    @POST("projects/{id}/leader")
+    Call<Result> assignLeader(@Path("id") int projectId,
+                             @Body com.example.Japp.network.models.requests.AssignLeaderRequest request);
 }

@@ -24,8 +24,11 @@ import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
+import com.example.Japp.data.RouteStop;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -122,8 +125,10 @@ public class orderList extends Fragment {
                     Project project = available.get(i);
                     order o = new order();
                     o.setProjectId(project.getId());
+                    o.setRouteId(project.getRouteId());
                     o.setTitle(project.getTitle());
                     o.setDepartureDate(project.getDepartureDate());
+                    o.setCreatedAt(project.getCreatedAt());
                     o.setTag(project.getTag() != null ? project.getTag() : "");
                     o.set_peopleCnt(project.getMaxMembers());
                     o.setCurrentMembers(project.getCurrentMembers());
@@ -188,14 +193,25 @@ public class orderList extends Fragment {
                 if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
                     List<RouteNode> nodes = response.body().getData();
                     if (nodes != null && !nodes.isEmpty()) {
+                        Collections.sort(nodes, Comparator.comparingInt(RouteNode::getVisitOrder));
                         // 计算总用时（分钟）
                         int totalMin = 0;
                         Route route = new Route();
+                        List<RouteStop> stops = new ArrayList<>();
                         for (RouteNode node : nodes) {
                             totalMin += node.getRecommendedDuration();
                             route.addAttraction(node.getName() != null ? node.getName() : "");
+
+                            RouteStop stop = new RouteStop();
+                            stop.setVisitOrder(node.getVisitOrder());
+                            stop.setName(node.getName());
+                            stop.setVisitTime(node.getVisitTime());
+                            stop.setRecommendedDuration(node.getRecommendedDuration());
+                            stop.setNotes(node.getNotes());
+                            stops.add(stop);
                         }
                         o.setRoute(route);
+                        o.setRouteStops(stops);
                         o.setEstimatedDuration(formatDuration(totalMin));
                     }
                 }
