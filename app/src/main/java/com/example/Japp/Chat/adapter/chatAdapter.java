@@ -67,6 +67,25 @@ public class chatAdapter extends RecyclerView.Adapter<chatAdapter.ViewHolder> {
         return message.getSender().getId().equals(currentUserId) ? 1 : 0;
     }
 
+
+    public void addMessage(Message message) {
+        messages.add(message);
+        notifyItemInserted(messages.size() - 1);
+    }
+
+
+    public void updateMessages(List<Message> newMessages) {
+        messages.clear();
+        messages.addAll(newMessages);
+        notifyDataSetChanged();
+    }
+
+
+    public Message getLastMessage() {
+        if (messages.isEmpty()) return null;
+        return messages.get(messages.size() - 1);
+    }
+
     public static class ViewHolder extends RecyclerView.ViewHolder {
         TextView txtName;
         TextView txtMessage;
@@ -80,11 +99,5 @@ public class chatAdapter extends RecyclerView.Adapter<chatAdapter.ViewHolder> {
             txtTime    = itemView.findViewById(R.id.txtTime);
             txtAvatar  = itemView.findViewById(R.id.txtAvatar);
         }
-    }
-
-    public void updateMessages(List<Message> newMessages) {
-        this.messages.clear();
-        this.messages.addAll(newMessages);
-        notifyDataSetChanged();
     }
 }
