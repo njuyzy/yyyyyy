@@ -34,6 +34,7 @@
 
     <application
     android:allowBackup="true"
+        android:name=".JappApplication"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -77,6 +78,9 @@
             android:exported="true"
             android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustPan" />
+        <activity
+            android:name=".leader.RouteMapActivity"
+            android:exported="false" />
 
         <!-- 添加FileProvider声明 -->
         <provider
@@ -93,7 +97,7 @@
 
 
         <!--设置高德Key-->
-        <meta-data android:name="com.amap.api.v2.apikey" android:value="c9cd1b618f3fcec3cc51611010ba2a5f"/>
+        <meta-data android:name="com.amap.api.v2.apikey" android:value="${AMAP_API_KEY}"/>
 
 
     </application>

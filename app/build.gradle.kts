@@ -6,6 +6,10 @@ android {
     namespace = "com.example.Japp"
     compileSdk = 36
 
+    val amapApiKey: String = (project.findProperty("AMAP_API_KEY") as String?)
+        ?: System.getenv("AMAP_API_KEY")
+        ?: ""
+
     defaultConfig {
         applicationId = "com.example.Japp"
         minSdk = 26
@@ -14,6 +18,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["AMAP_API_KEY"] = amapApiKey
     }
 
     buildTypes {

@@ -12,6 +12,7 @@ public class JappApplication extends Application {
 
         // 初始化数据库
         DatabaseManager.getInstance(this);
+        com.example.Japp.network.ApiClient.init(this);
     }
 
     @Override

@@ -44,10 +44,10 @@ public class orderDetailActivity extends AppCompatActivity {
         setContentView(R.layout.activity_order_detail);
 
         service = ApiClient.getClient().create(UserService.class);
-        initialize();
+        initialize(savedInstanceState);
     }
 
-    private void initialize(){
+    private void initialize(Bundle savedInstanceState){
 
         Button btnAccept=findViewById(R.id.btnAccept);
         btnAccept.setOnClickListener(new View.OnClickListener() {
@@ -57,6 +57,7 @@ public class orderDetailActivity extends AppCompatActivity {
             }
         });
 
+        Button btnRouteDetail = findViewById(R.id.btnRouteDetail);
         ImageView imageView=findViewById(R.id.imgRoute);
         TextView price=findViewById(R.id.txtPrice);
         TextView title=findViewById(R.id.txtTitle);
@@ -67,6 +68,10 @@ public class orderDetailActivity extends AppCompatActivity {
         txtRouteDetail=findViewById(R.id.txtRouteDetail);
 
         txtRouteDetail.setMovementMethod(new ScrollingMovementMethod());
+        btnRouteDetail.setOnClickListener(v -> {
+            Intent intent = new Intent(orderDetailActivity.this, RouteMapActivity.class);
+            startActivity(intent);
+        });
 
         currentOrder = getOrderFromIntent();
         if (currentOrder != null) {
@@ -235,3 +240,4 @@ public class orderDetailActivity extends AppCompatActivity {
                 });
     }
 }
+
