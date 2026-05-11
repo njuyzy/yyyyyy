@@ -1,13 +1,23 @@
+import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
 }
+
+
 
 android {
     namespace = "com.example.Japp"
     compileSdk = 36
 
+    val localProperties = Properties().apply {
+        val file = rootProject.file("local.properties")
+        if (file.exists()) {
+            file.inputStream().use { load(it) }
+        }
+    }
     val amapApiKey: String = (project.findProperty("AMAP_API_KEY") as String?)
         ?: System.getenv("AMAP_API_KEY")
+        ?: localProperties.getProperty("AMAP_API_KEY")
         ?: ""
 
     defaultConfig {

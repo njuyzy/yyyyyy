@@ -7,6 +7,7 @@ import com.example.Japp.network.models.LoginResponse;
 import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
+import com.google.gson.JsonElement;
 import com.example.Japp.network.models.requests.IntroRequest;
 import com.example.Japp.network.models.requests.LoginRequest;
 import com.example.Japp.network.models.requests.RegisterRequest;
@@ -50,6 +51,9 @@ public interface UserService {
 
     @GET("routes/{id}")
     Call<Result<List<RouteNode>>> getRouteNodes(@Path("id") int routeId);
+
+    @GET("routes/{id}")
+    Call<Result<JsonElement>> getRouteNodesRaw(@Path("id") int routeId);
 
     @POST("projects/{id}/leader")
     Call<Result> assignLeader(@Path("id") int projectId,
