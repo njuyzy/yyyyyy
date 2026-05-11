@@ -21,7 +21,9 @@ import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.example.Japp.network.models.requests.AssignLeaderRequest;
+import com.google.gson.Gson;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -37,6 +39,7 @@ public class orderDetailActivity extends AppCompatActivity {
     private TextView txtRouteOverview;
     private TextView txtRouteDetail;
     private order currentOrder;
+    private List<RouteNode> cachedRouteNodes = new ArrayList<>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -70,6 +73,14 @@ public class orderDetailActivity extends AppCompatActivity {
         txtRouteDetail.setMovementMethod(new ScrollingMovementMethod());
         btnRouteDetail.setOnClickListener(v -> {
             Intent intent = new Intent(orderDetailActivity.this, RouteMapActivity.class);
+            if (currentOrder != null) {
+                intent.putExtra(RouteMapActivity.EXTRA_ROUTE_ID, currentOrder.getRouteId());
+                intent.putExtra(RouteMapActivity.EXTRA_PROJECT_ID, currentOrder.getProjectId());
+            }
+            if (cachedRouteNodes != null && !cachedRouteNodes.isEmpty()) {
+                String nodesJson = new Gson().toJson(cachedRouteNodes);
+                intent.putExtra(RouteMapActivity.EXTRA_ROUTE_NODES_JSON, nodesJson);
+            }
             startActivity(intent);
         });
 
@@ -100,11 +111,31 @@ public class orderDetailActivity extends AppCompatActivity {
 
             if (!currentOrder.getRouteStops().isEmpty()) {
                 renderRouteStops(currentOrder.getRouteStops());
+                cacheNodesFromStops(currentOrder.getRouteStops(), currentOrder.getRouteId());
+                preloadRouteNodes(currentOrder.getRouteId());
             } else {
                 loadRouteDetail(currentOrder.getRouteId());
             }
         }
         // TODO: 设置路线图片（目前使用占位图）
+    }
+
+    private void preloadRouteNodes(int routeId) {
+        if (routeId <= 0) return;
+        service.getRouteNodes(routeId).enqueue(new Callback<Result<List<RouteNode>>>() {
+            @Override
+            public void onResponse(Call<Result<List<RouteNode>>> call, Response<Result<List<RouteNode>>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
+                    List<RouteNode> nodes = response.body().getData();
+                    cachedRouteNodes = nodes != null ? nodes : new ArrayList<>();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Result<List<RouteNode>>> call, Throwable t) {
+                // Keep cachedRouteNodes as-is; map will fetch by routeId if needed.
+            }
+        });
     }
 
     private void renderRouteStops(List<RouteStop> stops) {
@@ -145,6 +176,25 @@ public class orderDetailActivity extends AppCompatActivity {
         txtRouteDetail.setText("路线详情：\n" + detail);
     }
 
+    private void cacheNodesFromStops(List<RouteStop> stops, int routeId) {
+        if (stops == null || stops.isEmpty()) return;
+        List<RouteNode> nodes = new ArrayList<>();
+        for (RouteStop stop : stops) {
+            RouteNode node = new RouteNode();
+            node.setRouteId(routeId);
+            node.setVisitOrder(stop.getVisitOrder());
+            node.setName(stop.getName());
+            node.setVisitTime(stop.getVisitTime());
+            node.setRecommendedDuration(stop.getRecommendedDuration());
+            node.setNotes(stop.getNotes());
+            node.setLocation(stop.getLocation());
+            node.setAddress(stop.getAddress());
+            node.setCityname(stop.getCityname());
+            nodes.add(node);
+        }
+        cachedRouteNodes = nodes;
+    }
+
     private void loadRouteDetail(int routeId) {
         if (routeId <= 0) {
             txtRouteOverview.setText("具体路线：暂无");
@@ -156,6 +206,7 @@ public class orderDetailActivity extends AppCompatActivity {
             public void onResponse(Call<Result<List<RouteNode>>> call, Response<Result<List<RouteNode>>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
                     List<RouteNode> nodes = response.body().getData();
+                    cachedRouteNodes = nodes != null ? nodes : new ArrayList<>();
                     if (nodes == null || nodes.isEmpty()) {
                         txtRouteOverview.setText("具体路线：暂无");
                         txtRouteDetail.setText("路线详情：暂无");
@@ -208,6 +259,13 @@ public class orderDetailActivity extends AppCompatActivity {
     private order getOrderFromIntent() {
         Intent intent = getIntent();
         if (intent == null) return null;
+        String json = intent.getStringExtra("order_json");
+        if (!TextUtils.isEmpty(json)) {
+            try {
+                return new Gson().fromJson(json, order.class);
+            } catch (RuntimeException ignored) {
+            }
+        }
         Object extra = intent.getSerializableExtra("order_info");
         if (extra instanceof order) {
             return (order) extra;
@@ -240,4 +298,3 @@ public class orderDetailActivity extends AppCompatActivity {
                 });
     }
 }
-

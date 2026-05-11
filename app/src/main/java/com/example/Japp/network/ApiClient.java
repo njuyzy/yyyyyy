@@ -29,6 +29,12 @@ public class ApiClient {
         prefs.edit().putString("token", token).apply();
     }
 
+    public static void clearToken() {
+        if (appContext == null) return;
+        SharedPreferences prefs = appContext.getSharedPreferences("user_pref", Context.MODE_PRIVATE);
+        prefs.edit().remove("token").apply();
+    }
+
     public static Retrofit getClient() {
         if (retrofit == null) {
             synchronized (ApiClient.class) {
@@ -37,8 +43,12 @@ public class ApiClient {
                             .addInterceptor(chain -> {
                                 Request.Builder builder = chain.request().newBuilder();
                                 String token = getToken();
-                                if (token != null && !token.isEmpty()) {
-                                    builder.addHeader("Authorization", "Bearer " + token);
+                                if (token != null && !token.trim().isEmpty()) {
+                                    String normalized = token.trim();
+                                    if (!normalized.regionMatches(true, 0, "Bearer ", 0, 7)) {
+                                        normalized = "Bearer " + normalized;
+                                    }
+                                    builder.header("Authorization", normalized);
                                 }
                                 return chain.proceed(builder.build());
                             })

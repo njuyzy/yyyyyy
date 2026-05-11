@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.Japp.R;
+import com.example.Japp.MainActivity;
 import com.example.Japp.data.Route;
 import com.example.Japp.data.User;
 import com.example.Japp.data.order;
@@ -25,6 +26,7 @@ import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.example.Japp.data.RouteStop;
+import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,7 +59,7 @@ public class orderList extends Fragment {
         adapter.setListData(order_list);
         adapter.setOrderOnClickListener(position -> {
             Intent intent = new Intent(requireContext(), orderDetailActivity.class);
-            intent.putExtra("order_info", order_list.get(position));
+            intent.putExtra("order_json", new Gson().toJson(order_list.get(position)));
             startActivity(intent);
         });
 
@@ -75,12 +77,24 @@ public class orderList extends Fragment {
         int accountId = prefs.getInt("account_id", -1);
         if (accountId == -1) return;
 
+        String token = ApiClient.getToken();
+        if (token == null || token.trim().isEmpty()) {
+            Toast.makeText(requireContext(), "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
+            handleUnauthorized();
+            return;
+        }
+
         final int finalAccountId = accountId;
         service.getProjects(finalAccountId, 1, 20).enqueue(new Callback<Result<List<Project>>>() {
             @Override
             public void onResponse(Call<Result<List<Project>>> call, Response<Result<List<Project>>> response) {
                 if (!isAdded()) return;
                 if (!response.isSuccessful()) {
+                    if (response.code() == 401) {
+                        Toast.makeText(requireContext(), "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
+                        handleUnauthorized();
+                        return;
+                    }
                     Toast.makeText(requireContext(), "获取订单失败：" + response.code(), Toast.LENGTH_SHORT).show();
                     order_list.clear();
                     adapter.setListData(order_list);
@@ -208,6 +222,9 @@ public class orderList extends Fragment {
                             stop.setVisitTime(node.getVisitTime());
                             stop.setRecommendedDuration(node.getRecommendedDuration());
                             stop.setNotes(node.getNotes());
+                            stop.setLocation(node.getLocation());
+                            stop.setAddress(node.getAddress());
+                            stop.setCityname(node.getCityname());
                             stops.add(stop);
                         }
                         o.setRoute(route);
@@ -276,5 +293,18 @@ public class orderList extends Fragment {
             case "6101": return "西安市";
             default: return adcode;
         }
+    }
+
+    private void handleUnauthorized() {
+        SharedPreferences prefs = requireContext().getSharedPreferences("user_pref", MODE_PRIVATE);
+        prefs.edit()
+                .putBoolean("is_logged_in", false)
+                .remove("account_id")
+                .apply();
+        ApiClient.clearToken();
+
+        Intent intent = new Intent(requireContext(), MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
     }
 }
