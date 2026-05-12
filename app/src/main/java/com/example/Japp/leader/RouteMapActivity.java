@@ -1,14 +1,9 @@
 package com.example.Japp.leader;
 
-import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.util.Log;
-import android.view.View;
-import android.widget.RelativeLayout;
-import android.widget.TextView;
 import android.widget.Toast;
+import android.content.pm.PackageManager;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -20,15 +15,6 @@ import com.amap.api.maps.model.LatLng;
 import com.amap.api.maps.model.LatLngBounds;
 import com.amap.api.maps.model.MarkerOptions;
 import com.amap.api.maps.model.PolylineOptions;
-import com.amap.api.services.core.AMapException;
-import com.amap.api.services.core.LatLonPoint;
-import com.amap.api.services.route.BusRouteResult;
-import com.amap.api.services.route.DriveRouteResult;
-import com.amap.api.services.route.RideRouteResult;
-import com.amap.api.services.route.RouteSearch;
-import com.amap.api.services.route.WalkPath;
-import com.amap.api.services.route.WalkRouteResult;
-import com.amap.api.services.route.WalkStep;
 import com.example.Japp.R;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
@@ -46,15 +32,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class RouteMapActivity extends AppCompatActivity implements RouteSearch.OnRouteSearchListener {
+public class RouteMapActivity extends AppCompatActivity {
 
     public static final String EXTRA_ROUTE_ID = "route_id";
     public static final String EXTRA_PROJECT_ID = "project_id";
@@ -63,26 +46,11 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
 
     private MapView mapView;
     private AMap aMap;
-    private RelativeLayout bottomLayout;
-    private TextView routeTimeDes;
-    private TextView routeDetailDes;
     private UserService service;
     private final Gson gson = new Gson();
+    private int fallbackProjectId = -1;
     private final List<Integer> routeIdCandidates = new ArrayList<>();
-    private final List<LatLng> routePoints = new ArrayList<>();
-    private final List<String> routePointLabels = new ArrayList<>();
-    private final List<LatLng> plannedPolylinePoints = new ArrayList<>();
-    private final ArrayList<String> walkInstructions = new ArrayList<>();
     private int currentRouteCandidateIndex = 0;
-    private int currentSegmentIndex = 0;
-    private int totalWalkDistance = 0;
-    private int totalWalkDuration = 0;
-    private boolean routeHasFailedSegment = false;
-
-    private RouteSearch routeSearch;
-
-    private static final String TAG = "RouteMapActivity";
-    private static final Pattern COORDINATE_PATTERN = Pattern.compile("(-?\\d+(?:\\.\\d+)?)");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,26 +63,17 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
             return;
         }
 
+        // AMap SDK requires privacy consent prior to map creation.
         MapsInitializer.updatePrivacyShow(this, true, true);
         MapsInitializer.updatePrivacyAgree(this, true);
 
         mapView = findViewById(R.id.mapView);
-        bottomLayout = findViewById(R.id.bottom_layout);
-        routeTimeDes = findViewById(R.id.firstline);
-        routeDetailDes = findViewById(R.id.secondline);
         mapView.onCreate(savedInstanceState);
 
         aMap = mapView.getMap();
         if (aMap != null) {
             LatLng defaultCenter = new LatLng(39.9042, 116.4074);
             aMap.moveCamera(CameraUpdateFactory.newLatLngZoom(defaultCenter, 10f));
-        }
-        try {
-            routeSearch = new RouteSearch(this);
-            routeSearch.setRouteSearchListener(this);
-        } catch (AMapException e) {
-            routeSearch = null;
-            Toast.makeText(this, "路线服务初始化失败，将使用直线连接", Toast.LENGTH_SHORT).show();
         }
 
         service = ApiClient.getClient().create(UserService.class);
@@ -125,8 +84,8 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
             return;
         }
         int routeId = getIntent() != null ? getIntent().getIntExtra(EXTRA_ROUTE_ID, -1) : -1;
-        int projectId = getIntent() != null ? getIntent().getIntExtra(EXTRA_PROJECT_ID, -1) : -1;
-        initRouteCandidates(routeId, projectId);
+        fallbackProjectId = getIntent() != null ? getIntent().getIntExtra(EXTRA_PROJECT_ID, -1) : -1;
+        initRouteCandidates(routeId, fallbackProjectId);
         List<RouteNode> nodesFromIntent = parseNodesFromIntent();
         if (nodesFromIntent != null && !nodesFromIntent.isEmpty()) {
             boolean rendered = renderRoute(nodesFromIntent);
@@ -142,8 +101,7 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
         if (getIntent() == null) return null;
         String nodesJson = getIntent().getStringExtra(EXTRA_ROUTE_NODES_JSON);
         if (TextUtils.isEmpty(nodesJson)) return null;
-        Type listType = new TypeToken<List<RouteNode>>() {
-        }.getType();
+        Type listType = new TypeToken<List<RouteNode>>() {}.getType();
         try {
             return gson.fromJson(nodesJson, listType);
         } catch (Exception e) {
@@ -220,8 +178,7 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
 
     private List<RouteNode> parseRouteNodes(JsonElement data) {
         if (data == null || data.isJsonNull()) return new ArrayList<>();
-        Type listType = new TypeToken<List<RouteNode>>() {
-        }.getType();
+        Type listType = new TypeToken<List<RouteNode>>() {}.getType();
         if (data.isJsonPrimitive() && data.getAsJsonPrimitive().isString()) {
             try {
                 JsonElement parsed = JsonParser.parseString(data.getAsString());
@@ -275,8 +232,6 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
         List<RouteNode> orderedNodes = new ArrayList<>(nodes);
         Collections.sort(orderedNodes, Comparator.comparingInt(RouteNode::getVisitOrder));
         aMap.clear();
-        hidePlanPanel();
-        routePointLabels.clear();
 
         List<LatLng> points = new ArrayList<>();
         for (int i = 0; i < orderedNodes.size(); i++) {
@@ -288,7 +243,6 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
             String title = !TextUtils.isEmpty(node.getName())
                     ? node.getName()
                     : (!TextUtils.isEmpty(node.getAddress()) ? node.getAddress() : "未命名地点");
-            routePointLabels.add(title);
             aMap.addMarker(new MarkerOptions()
                     .position(point)
                     .title(title)
@@ -301,7 +255,10 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
         }
 
         if (points.size() >= 2) {
-            startRoutePlanning(points);
+            aMap.addPolyline(new PolylineOptions()
+                    .addAll(points)
+                    .color(0xFF1E88E5)
+                    .width(8f));
         }
 
         LatLngBounds.Builder builder = new LatLngBounds.Builder();
@@ -311,222 +268,6 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
         int padding = (int) (getResources().getDisplayMetrics().density * 48);
         aMap.moveCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), padding));
         return true;
-    }
-
-    private void startRoutePlanning(List<LatLng> points) {
-        if (routeSearch == null) {
-            drawDirectPolyline(points);
-            return;
-        }
-        routePoints.clear();
-        routePoints.addAll(points);
-        plannedPolylinePoints.clear();
-        walkInstructions.clear();
-        currentSegmentIndex = 0;
-        totalWalkDistance = 0;
-        totalWalkDuration = 0;
-        routeHasFailedSegment = false;
-        requestNextWalkSegment();
-    }
-
-    private void requestNextWalkSegment() {
-        if (routePoints.size() < 2) return;
-        if (currentSegmentIndex >= routePoints.size() - 1) {
-            onPlanningFinished();
-            return;
-        }
-        LatLng from = routePoints.get(currentSegmentIndex);
-        LatLng to = routePoints.get(currentSegmentIndex + 1);
-        if (isSamePoint(from, to)) {
-            appendDuplicateSegmentNote(currentSegmentIndex);
-            currentSegmentIndex++;
-            requestNextWalkSegment();
-            return;
-        }
-        RouteSearch.FromAndTo fromAndTo = new RouteSearch.FromAndTo(toLatLonPoint(from), toLatLonPoint(to));
-        RouteSearch.WalkRouteQuery query = new RouteSearch.WalkRouteQuery(fromAndTo, RouteSearch.WalkDefault);
-        routeSearch.calculateWalkRouteAsyn(query);
-    }
-
-    private void appendDuplicateSegmentNote(int segmentIndex) {
-        String fromLabel = getRoutePointLabel(segmentIndex);
-        String toLabel = getRoutePointLabel(segmentIndex + 1);
-        walkInstructions.add("第" + (segmentIndex + 1) + "段：" + fromLabel + " -> " + toLabel);
-        walkInstructions.add("起点与终点重合，已跳过该段");
-    }
-
-    private void onPlanningFinished() {
-        if (plannedPolylinePoints.size() >= 2) {
-            drawPlannedPolyline();
-            showWalkPlanPanel();
-        } else if (routePoints.size() >= 2) {
-            drawDirectPolyline(routePoints);
-        }
-        if (routeHasFailedSegment) {
-            Toast.makeText(this, "部分路段规划失败，已用直线连接", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void showWalkPlanPanel() {
-        if (bottomLayout == null || routeTimeDes == null || routeDetailDes == null) return;
-        String summary = formatWalkTime(totalWalkDuration) + "（" + formatWalkDistance(totalWalkDistance) + "）";
-        routeTimeDes.setText(summary);
-        routeDetailDes.setText("点击查看步行路线详情");
-        routeDetailDes.setVisibility(View.VISIBLE);
-        bottomLayout.setVisibility(View.VISIBLE);
-        bottomLayout.setOnClickListener(v -> {
-            Intent intent = new Intent(RouteMapActivity.this, WalkRouteDetailActivity.class);
-            intent.putStringArrayListExtra(WalkRouteDetailActivity.EXTRA_WALK_INSTRUCTIONS, walkInstructions);
-            intent.putExtra(WalkRouteDetailActivity.EXTRA_WALK_SUMMARY, summary);
-            startActivity(intent);
-        });
-    }
-
-    private void hidePlanPanel() {
-        if (bottomLayout != null) {
-            bottomLayout.setVisibility(View.GONE);
-            bottomLayout.setOnClickListener(null);
-        }
-    }
-
-    private void drawPlannedPolyline() {
-        if (aMap == null || plannedPolylinePoints.size() < 2) return;
-        aMap.addPolyline(new PolylineOptions()
-                .addAll(plannedPolylinePoints)
-                .color(0xFF1E88E5)
-                .width(8f));
-    }
-
-    private void drawDirectPolyline(List<LatLng> points) {
-        if (aMap == null || points == null || points.size() < 2) return;
-        aMap.addPolyline(new PolylineOptions()
-                .addAll(points)
-                .color(0xFF1E88E5)
-                .width(8f));
-    }
-
-    private LatLonPoint toLatLonPoint(LatLng latLng) {
-        return new LatLonPoint(latLng.latitude, latLng.longitude);
-    }
-
-    private void appendSegmentPoints(List<LatLng> segmentPoints) {
-        if (segmentPoints == null || segmentPoints.isEmpty()) return;
-        if (!plannedPolylinePoints.isEmpty()
-                && isSamePoint(plannedPolylinePoints.get(plannedPolylinePoints.size() - 1), segmentPoints.get(0))) {
-            plannedPolylinePoints.addAll(segmentPoints.subList(1, segmentPoints.size()));
-            return;
-        }
-        plannedPolylinePoints.addAll(segmentPoints);
-    }
-
-    private boolean isSamePoint(LatLng a, LatLng b) {
-        return Math.abs(a.latitude - b.latitude) < 1e-6 && Math.abs(a.longitude - b.longitude) < 1e-6;
-    }
-
-    private List<LatLng> extractWalkPathPoints(WalkPath path, LatLng from, LatLng to) {
-        List<LatLng> segmentPoints = new ArrayList<>();
-        if (path != null && path.getSteps() != null) {
-            for (WalkStep step : path.getSteps()) {
-                if (step.getPolyline() == null) continue;
-                for (LatLonPoint point : step.getPolyline()) {
-                    segmentPoints.add(new LatLng(point.getLatitude(), point.getLongitude()));
-                }
-            }
-        }
-        if (segmentPoints.isEmpty()) {
-            segmentPoints.add(from);
-            segmentPoints.add(to);
-        }
-        return segmentPoints;
-    }
-
-    private void appendWalkInstructions(WalkPath path) {
-        appendWalkInstructions(path, currentSegmentIndex, false);
-    }
-
-    private void appendWalkInstructions(WalkPath path, int segmentIndex, boolean fallback) {
-        String fromLabel = getRoutePointLabel(segmentIndex);
-        String toLabel = getRoutePointLabel(segmentIndex + 1);
-        walkInstructions.add("第" + (segmentIndex + 1) + "段：" + fromLabel + " -> " + toLabel);
-        if (fallback) {
-            walkInstructions.add("路径规划失败，已改用直线连接至下一站");
-            return;
-        }
-        if (path == null || path.getSteps() == null || path.getSteps().isEmpty()) {
-            walkInstructions.add("请沿当前道路前往下一站");
-            return;
-        }
-        int stepOrder = 1;
-        for (WalkStep step : path.getSteps()) {
-            String instruction = step.getInstruction();
-            if (!TextUtils.isEmpty(instruction)) {
-                walkInstructions.add(stepOrder + ". " + instruction);
-                stepOrder++;
-            }
-        }
-        if (stepOrder == 1) {
-            walkInstructions.add("请沿当前道路前往下一站");
-        }
-    }
-
-    private String getRoutePointLabel(int index) {
-        if (index >= 0 && index < routePointLabels.size()) {
-            String label = routePointLabels.get(index);
-            if (!TextUtils.isEmpty(label)) {
-                return label;
-            }
-        }
-        return "第" + (index + 1) + "站";
-    }
-
-    private void appendFallbackSegment() {
-        LatLng from = routePoints.get(currentSegmentIndex);
-        LatLng to = routePoints.get(currentSegmentIndex + 1);
-        List<LatLng> fallback = new ArrayList<>();
-        fallback.add(from);
-        fallback.add(to);
-        appendWalkInstructions(null, currentSegmentIndex, true);
-        appendSegmentPoints(fallback);
-        routeHasFailedSegment = true;
-        currentSegmentIndex++;
-        requestNextWalkSegment();
-    }
-
-    @Override
-    public void onBusRouteSearched(BusRouteResult busRouteResult, int i) {
-    }
-
-    @Override
-    public void onDriveRouteSearched(DriveRouteResult result, int errorCode) {
-    }
-
-    @Override
-    public void onWalkRouteSearched(WalkRouteResult result, int errorCode) {
-        if (currentSegmentIndex >= routePoints.size() - 1) return;
-        LatLng from = routePoints.get(currentSegmentIndex);
-        LatLng to = routePoints.get(currentSegmentIndex + 1);
-        if (errorCode != AMapException.CODE_AMAP_SUCCESS
-                || result == null
-                || result.getPaths() == null
-                || result.getPaths().isEmpty()) {
-            Log.w(TAG, "Walk route failed segment=" + currentSegmentIndex
-                    + ", errorCode=" + errorCode
-                    + ", from=" + from.latitude + "," + from.longitude
-                    + ", to=" + to.latitude + "," + to.longitude);
-            appendFallbackSegment();
-            return;
-        }
-        WalkPath bestPath = result.getPaths().get(0);
-        totalWalkDistance += (int) bestPath.getDistance();
-        totalWalkDuration += (int) bestPath.getDuration();
-        appendWalkInstructions(bestPath);
-        appendSegmentPoints(extractWalkPathPoints(bestPath, from, to));
-        currentSegmentIndex++;
-        requestNextWalkSegment();
-    }
-
-    @Override
-    public void onRideRouteSearched(RideRouteResult rideRouteResult, int errorCode) {
     }
 
     private String buildMarkerSnippet(RouteNode node, int order) {
@@ -546,57 +287,26 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
 
     private LatLng parseLocation(String location) {
         if (TextUtils.isEmpty(location)) return null;
-        String normalized = location.replace(";", ",").replace("，", ",");
-        Matcher matcher = COORDINATE_PATTERN.matcher(normalized);
-        double first;
-        double second;
-        if (matcher.find()) {
-            try {
-                first = Double.parseDouble(matcher.group(1));
-            } catch (NumberFormatException e) {
-                return null;
+        String normalized = location.replace(";", ",");
+        String[] parts = normalized.split(",");
+        if (parts.length < 2) {
+            parts = normalized.trim().split("\\s+");
+        }
+        if (parts.length < 2) return null;
+        try {
+            double first = Double.parseDouble(parts[0].trim());
+            double second = Double.parseDouble(parts[1].trim());
+            double lng = first;
+            double lat = second;
+            if (Math.abs(lat) > 90 && Math.abs(lng) <= 90) {
+                lat = first;
+                lng = second;
             }
-        } else {
+            if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+            return new LatLng(lat, lng);
+        } catch (NumberFormatException e) {
             return null;
         }
-        if (matcher.find()) {
-            try {
-                second = Double.parseDouble(matcher.group(1));
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        } else {
-            return null;
-        }
-        double lng = first;
-        double lat = second;
-        if (Math.abs(lat) > 90 && Math.abs(lng) <= 90) {
-            lat = first;
-            lng = second;
-        } else if (Math.abs(first) <= 90 && Math.abs(second) > 90) {
-            lat = first;
-            lng = second;
-        }
-        if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-            Log.w(TAG, "Invalid coordinate: " + location);
-            return null;
-        }
-        return new LatLng(lat, lng);
-    }
-
-    private String formatWalkTime(int seconds) {
-        if (seconds < 60) return "1分钟以内";
-        int minutes = seconds / 60;
-        if (minutes < 60) return minutes + "分钟";
-        int hours = minutes / 60;
-        int remainMin = minutes % 60;
-        if (remainMin == 0) return hours + "小时";
-        return String.format(Locale.CHINA, "%d小时%d分钟", hours, remainMin);
-    }
-
-    private String formatWalkDistance(int meters) {
-        if (meters < 1000) return meters + "米";
-        return String.format(Locale.CHINA, "%.1f公里", meters / 1000f);
     }
 
     private boolean hasConfiguredAmapKey() {
@@ -607,7 +317,7 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
                     .getApplicationInfo(packageName, PackageManager.GET_META_DATA);
             if (appInfo.metaData == null) return false;
             String apiKey = appInfo.metaData.getString("com.amap.api.v2.apikey");
-            return !TextUtils.isEmpty(apiKey) && !apiKey.contains("${");
+            return !TextUtils.isEmpty(apiKey) && apiKey.contains("${") == false;
         } catch (PackageManager.NameNotFoundException e) {
             return false;
         }
