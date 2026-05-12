@@ -82,6 +82,9 @@
         <activity
             android:name=".leader.RouteMapActivity"
             android:exported="false" />
+        <activity
+            android:name=".leader.WalkRouteDetailActivity"
+            android:exported="false" />
 
         <!-- 添加FileProvider声明 -->
         <provider

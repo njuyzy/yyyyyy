@@ -25,4 +25,3 @@ datastore-core = { group = "androidx.datastore", name = "datastore-core", versio
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-
