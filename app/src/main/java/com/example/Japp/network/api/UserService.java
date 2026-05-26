@@ -17,9 +17,13 @@ import java.util.List;
 import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
+import retrofit2.http.Multipart;
 import retrofit2.http.POST;
+import retrofit2.http.Part;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
+import retrofit2.http.Url;
+import okhttp3.MultipartBody;
 
 public interface UserService {
 
@@ -43,6 +47,10 @@ public interface UserService {
 
     @POST("accounts/{id}/tagPrefs")
     Call<Result> updateTagPrefs(@Path("id") int id, @Body List<AccountTagPref> prefs);
+
+    @Multipart
+    @POST
+    Call<Result<String>> uploadAvatar(@Url String url, @Part MultipartBody.Part image);
 
     @GET("projects")
     Call<Result<List<Project>>> getProjects(@Query("accountId") int accountId,

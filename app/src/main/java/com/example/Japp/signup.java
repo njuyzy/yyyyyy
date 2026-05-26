@@ -15,6 +15,7 @@ import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -28,9 +29,7 @@ import com.example.Japp.network.models.LoginResponse;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.requests.LoginRequest;
 import com.example.Japp.network.models.requests.RegisterRequest;
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
@@ -43,10 +42,12 @@ import retrofit2.Response;
 
 public class signup extends AppCompatActivity {
 
-    private TextInputEditText etName, etPhone, etPassword, etCode;
-    private TextInputLayout tilName, tilPhone, tilPassword, tilCode;
+    private TextInputEditText etName, etPhone, etPassword, etConfirmPassword, etCode;
+    private TextInputLayout tilName, tilPhone, tilPassword, tilConfirmPassword, tilCode;
     private Button getCode, Signup, cancel;
     private CheckBox autoLogin;
+    private MaterialButton signupModeToggle;
+
     private int countdown = 60;
     private Handler handler = new Handler();
     private Runnable countdownRunnable;
@@ -76,7 +77,16 @@ public class signup extends AppCompatActivity {
             return;
         }
 
-        // 去掉手机号格式校验
+        if (phone.length() > 11) {
+            tilPhone.setError("手机号长度不能超过11位");
+            return;
+        }
+
+        if (phone.length() == 11 && !isValidPhone(phone)) {
+            tilPhone.setError("请输入正确的11位手机号");
+            return;
+        }
+
         if (tilPhone.isErrorEnabled()) {
             tilPhone.setError(null);
             tilPhone.setErrorEnabled(false);
@@ -112,23 +122,48 @@ public class signup extends AppCompatActivity {
             tilName.setErrorEnabled(false);
         }
     }
+
+    private void validatePasswordFormat() {
+        String password = normalizePasswordInput(Objects.requireNonNull(etPassword.getText()).toString());
+
+        if (TextUtils.isEmpty(password)) {
+            if (tilPassword.isErrorEnabled()) {
+                tilPassword.setError(null);
+                tilPassword.setErrorEnabled(false);
+            }
+            return;
+        }
+
+        if (password.length() > 20) {
+            tilPassword.setError("密码长度不能超过20");
+            return;
+        }
+
+        if (tilPassword.isErrorEnabled()) {
+            tilPassword.setError(null);
+            tilPassword.setErrorEnabled(false);
+        }
+    }
     private void initialize() {
 
         tilName = findViewById(R.id.usernameLayout);
         tilPhone = findViewById(R.id.phoneLayout);
         tilPassword = findViewById(R.id.passwordLayout);
+        tilConfirmPassword = findViewById(R.id.confirmPasswordLayout);
         tilCode = findViewById(R.id.codeLayout);
 
         etName = findViewById(R.id.username);
         etPhone = findViewById(R.id.phone_num);
         etPassword = findViewById(R.id.password);
+        etConfirmPassword = findViewById(R.id.confirmPassword);
         etCode = findViewById(R.id.code);
 
         getCode = findViewById(R.id.get_code);
         Signup = findViewById(R.id.register);
         cancel = findViewById(R.id.cancel);
 
-        autoLogin=findViewById(R.id.autoLogin);
+        signupModeToggle = findViewById(R.id.signup_mode_toggle);
+        autoLogin = findViewById(R.id.autoLogin);
     }
 
     /**
@@ -196,6 +231,26 @@ public class signup extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable s) {
+                validatePasswordFormat();
+            }
+        });
+
+        // 确认密码输入监听
+        etConfirmPassword.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (tilConfirmPassword.isErrorEnabled()) {
+                    tilConfirmPassword.setError(null);
+                    tilConfirmPassword.setErrorEnabled(false);
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
             }
         });
 
@@ -237,6 +292,9 @@ public class signup extends AppCompatActivity {
                     } else if (v == etPassword && tilPassword.isErrorEnabled()) {
                         tilPassword.setError(null);
                         tilPassword.setErrorEnabled(false);
+                    } else if (v == etConfirmPassword && tilConfirmPassword.isErrorEnabled()) {
+                        tilConfirmPassword.setError(null);
+                        tilConfirmPassword.setErrorEnabled(false);
                     } else if (v == etCode && tilCode.isErrorEnabled()) {
                         tilCode.setError(null);
                         tilCode.setErrorEnabled(false);
@@ -248,10 +306,19 @@ public class signup extends AppCompatActivity {
         etName.setOnFocusChangeListener(focusChangeListener);
         etPhone.setOnFocusChangeListener(focusChangeListener);
         etPassword.setOnFocusChangeListener(focusChangeListener);
+        etConfirmPassword.setOnFocusChangeListener(focusChangeListener);
         etCode.setOnFocusChangeListener(focusChangeListener);
     }
 
     private void setupListeners() {
+
+        signupModeToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(signup.this, MainActivity.class));
+                finish();
+            }
+        });
 
         autoLogin.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
             @Override
@@ -318,7 +385,8 @@ public class signup extends AppCompatActivity {
                 String name = Objects.requireNonNull(etName.getText()).toString().trim();
                 String phone = Objects.requireNonNull(etPhone.getText()).toString().trim();
                 String code = Objects.requireNonNull(etCode.getText()).toString().trim();
-                String password = Objects.requireNonNull(etPassword.getText()).toString().trim();
+                String password = normalizePasswordInput(Objects.requireNonNull(etPassword.getText()).toString());
+                String confirmPassword = normalizePasswordInput(Objects.requireNonNull(etConfirmPassword.getText()).toString());
 
                 // 验证用户名
                 if (TextUtils.isEmpty(name)) {
@@ -373,6 +441,13 @@ public class signup extends AppCompatActivity {
                     return;
                 }
 
+                if (TextUtils.isEmpty(confirmPassword)) {
+                    tilConfirmPassword.setError("请再次输入密码");
+                    tilConfirmPassword.requestFocus();
+                    Toast.makeText(signup.this, "请再次输入密码", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
                 // 检查用户名是否已存在
                 if (NameExists(name)) {
                     tilName.setError("用户名已存在");
@@ -389,11 +464,19 @@ public class signup extends AppCompatActivity {
                     return;
                 }
 
-                // 添加注册按钮动画
-                Signup.setEnabled(false);
-                Signup.setText("注册中...");
+                if (TextUtils.isEmpty(savedCode) || !code.equals(savedCode)) {
+                    tilCode.setError("验证码错误");
+                    tilCode.requestFocus();
+                    Toast.makeText(signup.this, "验证码错误", Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
-                performRegister(name, phone, password, code);
+                Intent intent = new Intent(signup.this, ProfileSetupActivity.class);
+                intent.putExtra(ProfileSetupActivity.EXTRA_NAME, name);
+                intent.putExtra(ProfileSetupActivity.EXTRA_PHONE, phone);
+                intent.putExtra(ProfileSetupActivity.EXTRA_PASSWORD, password);
+                intent.putExtra(ProfileSetupActivity.EXTRA_CODE, code);
+                startActivity(intent);
             }
         });
     }
@@ -413,6 +496,10 @@ public class signup extends AppCompatActivity {
         if (tilPassword.isErrorEnabled()) {
             tilPassword.setError(null);
             tilPassword.setErrorEnabled(false);
+        }
+        if (tilConfirmPassword.isErrorEnabled()) {
+            tilConfirmPassword.setError(null);
+            tilConfirmPassword.setErrorEnabled(false);
         }
         if (tilCode.isErrorEnabled()) {
             tilCode.setError(null);
@@ -504,6 +591,7 @@ public class signup extends AppCompatActivity {
                             sharedPreferences.edit()
                                     .putString("user_inf", user.toString())
                                     .putString("Mode", account.getRole())
+                                    .putString("region_code", account.getRegionCode())
                                     .putInt("account_id", account.getId())
                                     .putBoolean("is_logged_in", true)
                                     .apply();
@@ -570,6 +658,13 @@ public class signup extends AppCompatActivity {
         Toast.makeText(this, "验证码已发送", Toast.LENGTH_LONG).show();
         startCountdown();
         savedCode = "111111"; // TODO: 发送验证码，用savedCode记录
+    }
+
+    private String normalizePasswordInput(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replaceAll("^\\s+|\\s+$", "");
     }
 
     private void startCountdown() {

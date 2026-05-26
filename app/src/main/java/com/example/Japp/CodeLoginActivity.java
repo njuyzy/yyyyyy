@@ -3,6 +3,7 @@ package com.example.Japp;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -15,7 +16,8 @@ import android.widget.CompoundButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.activity.EdgeToEdge;
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -36,62 +38,62 @@ import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.Objects;
 
-import android.util.Log;
-
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class MainActivity extends AppCompatActivity {
+public class CodeLoginActivity extends AppCompatActivity {
 
-    private TextInputLayout tilPhone, tilPassword;
-    private Button btnLogin;
-    private TextInputEditText etPhone, etPassword;
+    private TextInputLayout tilPhone, tilCode;
+    private TextInputEditText etPhone, etCode;
+    private Button btnLogin, btnGetCode;
     private TextView btnRegister;
-    private MaterialButton loginModeToggle;
+    private MaterialButton passwordModeToggle;
     private CheckBox autoLogin;
+
+    private int countdown = 60;
+    private Handler handler = new Handler();
+    private Runnable countdownRunnable;
+    private String savedCode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_code_login);
 
         initialize();
 
-        // 同步自动登录复选框状态，交由用户自主选择
         boolean autoLoginEnabled = getSharedPreferences("user_pref", MODE_PRIVATE)
                 .getBoolean("autoLogin", false);
         autoLogin.setChecked(autoLoginEnabled);
 
-        // 仅在用户勾选自动登录且存在登录态时自动跳转
         if (autoLoginEnabled
                 && getSharedPreferences("user_pref", MODE_PRIVATE).getBoolean("is_logged_in", false)) {
             Jump();
         }
+
         setupListeners();
         setupErrorClearListeners();
     }
 
     private void initialize() {
         tilPhone = findViewById(R.id.tilPhone);
-        tilPassword = findViewById(R.id.tilPassword);
+        tilCode = findViewById(R.id.tilCode);
 
         etPhone = findViewById(R.id.etPhone);
-        etPassword = findViewById(R.id.etPassword);
+        etCode = findViewById(R.id.etCode);
 
         btnLogin = findViewById(R.id.btnLogin);
+        btnGetCode = findViewById(R.id.btnGetCode);
         btnRegister = findViewById(R.id.btnRegister);
-        loginModeToggle = findViewById(R.id.login_mode_toggle);
+        passwordModeToggle = findViewById(R.id.password_mode_toggle);
 
-        autoLogin=findViewById(R.id.autoLogin);
+        autoLogin = findViewById(R.id.autoLogin);
         View autoLoginRow = findViewById(R.id.autoLoginRow);
         autoLoginRow.setOnClickListener(v -> autoLogin.setChecked(!autoLogin.isChecked()));
     }
 
     private void setupErrorClearListeners() {
-        // 手机号输入监听
         etPhone.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -107,22 +109,20 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable s) {
-                // 实时验证手机号格式
                 validatePhoneFormat();
             }
         });
 
-        // 密码输入监听
-        etPassword.addTextChangedListener(new TextWatcher() {
+        etCode.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
             }
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (tilPassword.isErrorEnabled()) {
-                    tilPassword.setError(null);
-                    tilPassword.setErrorEnabled(false);
+                if (tilCode.isErrorEnabled()) {
+                    tilCode.setError(null);
+                    tilCode.setErrorEnabled(false);
                 }
             }
 
@@ -131,25 +131,23 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // 为每个输入框设置焦点变化监听，当获得焦点时也清除对应的错误
         View.OnFocusChangeListener focusChangeListener = new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean hasFocus) {
                 if (hasFocus) {
-                    // 根据获得焦点的视图清除对应的错误
                     if (v == etPhone && tilPhone.isErrorEnabled()) {
                         tilPhone.setError(null);
                         tilPhone.setErrorEnabled(false);
-                    } else if (v == etPassword && tilPassword.isErrorEnabled()) {
-                        tilPassword.setError(null);
-                        tilPassword.setErrorEnabled(false);
+                    } else if (v == etCode && tilCode.isErrorEnabled()) {
+                        tilCode.setError(null);
+                        tilCode.setErrorEnabled(false);
                     }
                 }
             }
         };
 
         etPhone.setOnFocusChangeListener(focusChangeListener);
-        etPassword.setOnFocusChangeListener(focusChangeListener);
+        etCode.setOnFocusChangeListener(focusChangeListener);
     }
 
     private void clearAllErrors() {
@@ -157,32 +155,31 @@ public class MainActivity extends AppCompatActivity {
             tilPhone.setError(null);
             tilPhone.setErrorEnabled(false);
         }
-        if (tilPassword.isErrorEnabled()) {
-            tilPassword.setError(null);
-            tilPassword.setErrorEnabled(false);
+        if (tilCode.isErrorEnabled()) {
+            tilCode.setError(null);
+            tilCode.setErrorEnabled(false);
         }
     }
 
     private void setupListeners() {
-
-        autoLogin.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
+        autoLogin.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
-            public void onCheckedChanged(@NonNull CompoundButton buttonView, boolean isChecked){
-                if(isChecked){
-                    getSharedPreferences("user_pref",MODE_PRIVATE).edit()
-                            .putBoolean("autoLogin",true).apply();
-                }
-                else{
-                    getSharedPreferences("user_pref",MODE_PRIVATE).edit()
-                            .putBoolean("autoLogin",false).apply();
+            public void onCheckedChanged(@NonNull CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                    getSharedPreferences("user_pref", MODE_PRIVATE).edit()
+                            .putBoolean("autoLogin", true).apply();
+                } else {
+                    getSharedPreferences("user_pref", MODE_PRIVATE).edit()
+                            .putBoolean("autoLogin", false).apply();
                 }
             }
         });
 
-        loginModeToggle.setOnClickListener(new View.OnClickListener() {
+        passwordModeToggle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, CodeLoginActivity.class);
+                Intent intent = new Intent(CodeLoginActivity.this, MainActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                 startActivity(intent);
                 finish();
             }
@@ -191,8 +188,34 @@ public class MainActivity extends AppCompatActivity {
         btnRegister.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, signup.class);
+                Intent intent = new Intent(CodeLoginActivity.this, signup.class);
                 startActivity(intent);
+            }
+        });
+
+        btnGetCode.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String phone = Objects.requireNonNull(etPhone.getText()).toString().trim();
+
+                tilPhone.setError(null);
+                tilPhone.setErrorEnabled(false);
+
+                if (TextUtils.isEmpty(phone)) {
+                    tilPhone.setError("手机号不能为空");
+                    tilPhone.requestFocus();
+                    return;
+                }
+
+                if (!MainActivity.isValidPhone(phone)) {
+                    tilPhone.setError("请输入正确的11位手机号");
+                    tilPhone.requestFocus();
+                    return;
+                }
+
+                btnGetCode.setEnabled(false);
+                btnGetCode.setText("发送中...");
+                sendVerificationCode(phone);
             }
         });
 
@@ -202,34 +225,71 @@ public class MainActivity extends AppCompatActivity {
                 clearAllErrors();
 
                 String phone = Objects.requireNonNull(etPhone.getText()).toString().trim();
-                String password = Objects.requireNonNull(etPassword.getText()).toString().trim();
+                String code = Objects.requireNonNull(etCode.getText()).toString().trim();
 
                 if (TextUtils.isEmpty(phone)) {
                     tilPhone.setError("手机号不能为空");
                     tilPhone.requestFocus();
-                    Toast.makeText(MainActivity.this, "手机号不能为空", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CodeLoginActivity.this, "手机号不能为空", Toast.LENGTH_SHORT).show();
                     return;
                 }
 
-                if (TextUtils.isEmpty(password)) {
-                    tilPassword.setError("密码不能为空");
-                    tilPassword.requestFocus();
-                    Toast.makeText(MainActivity.this, "密码不能为空", Toast.LENGTH_SHORT).show();
+                if (!MainActivity.isValidPhone(phone)) {
+                    tilPhone.setError("请输入正确的11位手机号");
+                    tilPhone.requestFocus();
+                    Toast.makeText(CodeLoginActivity.this, "请输入正确的手机号", Toast.LENGTH_SHORT).show();
                     return;
                 }
 
-                // 添加登录按钮点击动画
+                if (TextUtils.isEmpty(code)) {
+                    tilCode.setError("验证码不能为空");
+                    tilCode.requestFocus();
+                    Toast.makeText(CodeLoginActivity.this, "验证码不能为空", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                if (TextUtils.isEmpty(savedCode) || !code.equals(savedCode)) {
+                    tilCode.setError("验证码错误");
+                    tilCode.requestFocus();
+                    Toast.makeText(CodeLoginActivity.this, "验证码错误", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
                 btnLogin.setEnabled(false);
                 btnLogin.setText("登录中...");
-
-                performLogin(phone, password);
+                performLogin(phone, code);
             }
         });
     }
 
-    private void performLogin(String phone, String password) {
+    private void sendVerificationCode(String phone) {
+        Toast.makeText(this, "验证码已发送", Toast.LENGTH_LONG).show();
+        startCountdown();
+        savedCode = "111111";
+    }
 
-        // 调用API登录
+    private void startCountdown() {
+        btnGetCode.setEnabled(false);
+
+        countdownRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (countdown > 0) {
+                    btnGetCode.setText(countdown + "秒后重试");
+                    countdown--;
+                    handler.postDelayed(this, 1000);
+                } else {
+                    btnGetCode.setEnabled(true);
+                    btnGetCode.setText("获取验证码");
+                    countdown = 60;
+                }
+            }
+        };
+
+        handler.post(countdownRunnable);
+    }
+
+    private void performLogin(String phone, String password) {
         UserService service = ApiClient.getClient().create(UserService.class);
         LoginRequest request = new LoginRequest(phone, password);
         Call<Result<LoginResponse>> call = service.login(request);
@@ -237,7 +297,6 @@ public class MainActivity extends AppCompatActivity {
         call.enqueue(new Callback<Result<LoginResponse>>() {
             @Override
             public void onResponse(Call<Result<LoginResponse>> call, Response<Result<LoginResponse>> response) {
-                // 恢复按钮状态
                 btnLogin.setEnabled(true);
                 btnLogin.setText("登录");
 
@@ -246,38 +305,22 @@ public class MainActivity extends AppCompatActivity {
                         LoginResponse loginData = response.body().getData();
                         Account account = loginData != null ? loginData.getAccount() : null;
                         if (account != null) {
-                            // 登录成功，保存用户信息
                             User user = new User(
                                     account.getUsername(),
                                     account.getPhone(),
-                                    password // 保存明文密码
+                                    password
                             );
                             user.setId(String.valueOf(account.getId()));
 
-                            String roleScope = RoleSelectionActivity.ROLE_SCOPE_USER;
-                            String mode = "USER";
-                            String role = account.getRole();
-                            if ("LEADER".equalsIgnoreCase(role)) {
-                                roleScope = RoleSelectionActivity.ROLE_SCOPE_LEADER;
-                                mode = "LEADER";
-                            } else if ("BOTH".equalsIgnoreCase(role)) {
-                                roleScope = RoleSelectionActivity.ROLE_SCOPE_BOTH;
-                                mode = "LEADER";
-                            }
-
-                            // 写入注册表
                             SharedPreferences sharedPreferences = getSharedPreferences("user_pref", MODE_PRIVATE);
                             sharedPreferences.edit()
                                     .putString("user_inf", user.toString())
-                                    .putString("Mode", mode)
-                                    .putString(RoleSelectionActivity.ROLE_SCOPE, roleScope)
-                                    .putString(RoleSelectionActivity.EXTRA_ROLE, role)
+                                    .putString("Mode", account.getRole())
                                     .putString("region_code", account.getRegionCode())
                                     .putInt("account_id", account.getId())
                                     .putBoolean("is_logged_in", true)
                                     .apply();
 
-                            // 保存 token
                             if (loginData.getToken() != null) {
                                 ApiClient.saveToken(loginData.getToken());
                             }
@@ -285,53 +328,49 @@ public class MainActivity extends AppCompatActivity {
                             loginSuccess(user);
                         }
                     } else {
-                        // 处理登录失败
                         if (response.body().getMsg() != null) {
-                            Toast.makeText(MainActivity.this, response.body().getMsg(), Toast.LENGTH_SHORT).show();
+                            Toast.makeText(CodeLoginActivity.this, response.body().getMsg(), Toast.LENGTH_SHORT).show();
                         } else {
-                            Toast.makeText(MainActivity.this, "登录失败，请重试", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(CodeLoginActivity.this, "登录失败，请重试", Toast.LENGTH_SHORT).show();
                         }
 
-                        tilPassword.setError("用户名或密码错误");
-                        tilPassword.requestFocus();
+                        tilCode.setError("验证码错误");
+                        tilCode.requestFocus();
                     }
                 } else {
-                    Toast.makeText(MainActivity.this, "网络错误，请重试", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CodeLoginActivity.this, "网络错误，请重试", Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onFailure(Call<Result<LoginResponse>> call, Throwable t) {
-                // 恢复按钮状态
                 btnLogin.setEnabled(true);
                 btnLogin.setText("登录");
 
                 String reason = t != null ? t.getMessage() : "unknown";
-                Log.e("MainActivity", "login failed: " + reason, t);
+                Log.e("CodeLoginActivity", "login failed: " + reason, t);
 
                 if (t instanceof SocketTimeoutException) {
-                    Toast.makeText(MainActivity.this, "服务器响应超时，请稍后重试", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CodeLoginActivity.this, "服务器响应超时，请稍后重试", Toast.LENGTH_SHORT).show();
                 } else if (t instanceof IOException) {
-                    Toast.makeText(MainActivity.this, "网络连接超时，请检查网络", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CodeLoginActivity.this, "网络连接超时，请检查网络", Toast.LENGTH_SHORT).show();
                 } else {
-                    Toast.makeText(MainActivity.this, "网络连接失败，请检查网络（" + reason + "）", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CodeLoginActivity.this, "网络连接失败，请检查网络（" + reason + "）", Toast.LENGTH_SHORT).show();
                 }
             }
         });
     }
 
-    private void Jump(){
-
-        if(getSharedPreferences("user_pref",MODE_PRIVATE).getString("Mode","USER").equals("USER")){
-            startActivity(new Intent(MainActivity.this, UserMainActivity.class));
-        }
-        else {
-            startActivity(new Intent(MainActivity.this, LeaderMainActivity.class));
+    private void Jump() {
+        if (getSharedPreferences("user_pref", MODE_PRIVATE).getString("Mode", "USER").equals("USER")) {
+            startActivity(new Intent(CodeLoginActivity.this, UserMainActivity.class));
+        } else {
+            startActivity(new Intent(CodeLoginActivity.this, LeaderMainActivity.class));
         }
         finish();
     }
+
     private void loginSuccess(User user) {
-        // 添加登录成功动画
         Animation slideUp = AnimationUtils.loadAnimation(this, R.anim.slide_up);
         slideUp.setAnimationListener(new Animation.AnimationListener() {
             @Override
@@ -340,9 +379,8 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onAnimationEnd(Animation animation) {
-                Toast.makeText(MainActivity.this, "登录成功！欢迎 " + user.getUsername(), Toast.LENGTH_LONG).show();
+                Toast.makeText(CodeLoginActivity.this, "登录成功！欢迎 " + user.getUsername(), Toast.LENGTH_LONG).show();
 
-                // 更新登录态并持久化用户当前的自动登录选择
                 boolean autoLoginEnabled = autoLogin.isChecked();
                 getSharedPreferences("user_pref", MODE_PRIVATE)
                         .edit()
@@ -359,18 +397,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // 应用动画到登录按钮
         btnLogin.startAnimation(slideUp);
-    }
-
-    private User findUserByPhone(String phone) {
-        // 实际应用中应该调用API检查手机号是否已注册
-        // 这里简化实现，返回false
-        return null;
-    }
-
-    public static boolean isValidPhone(String phone) {
-        return phone != null && phone.length() == 11 && phone.matches("^1[3-9]\\d{9}$");
     }
 
     private void validatePhoneFormat() {
@@ -390,4 +417,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (handler != null && countdownRunnable != null) {
+            handler.removeCallbacks(countdownRunnable);
+        }
+    }
 }

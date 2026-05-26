@@ -25,6 +25,9 @@ public class LeaderMainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
         setContentView(R.layout.leader_activity_main);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide();
+        }
 
         BottomNavigationView bottomNavigationView = findViewById(R.id.LeaderBottomNav);
 

@@ -3,6 +3,7 @@ package com.example.Japp.leader.fragment.order;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -156,7 +157,9 @@ public class orderList extends Fragment {
             @Override
             public void onFailure(Call<Result<List<Project>>> call, Throwable t) {
                 if (isAdded()) {
-                    Toast.makeText(requireContext(), "网络错误，无法加载订单", Toast.LENGTH_SHORT).show();
+                    String reason = t != null ? t.getMessage() : "unknown";
+                    Log.e("orderList", "loadOrders failed: " + reason, t);
+                    Toast.makeText(requireContext(), "网络错误，无法加载订单（" + reason + "）", Toast.LENGTH_SHORT).show();
                 }
             }
         });

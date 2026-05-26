@@ -45,6 +45,9 @@ public class orderDetailActivity extends AppCompatActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_order_detail);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide();
+        }
 
         service = ApiClient.getClient().create(UserService.class);
         initialize(savedInstanceState);
