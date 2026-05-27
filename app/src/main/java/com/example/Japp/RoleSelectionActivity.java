@@ -59,7 +59,10 @@ public class RoleSelectionActivity extends AppCompatActivity {
         cardUser = findViewById(R.id.cardUser);
         cardLeader = findViewById(R.id.cardLeader);
         cardBoth = findViewById(R.id.cardBoth);
+<<<<<<< Updated upstream
         txtPhoneInfo = findViewById(R.id.txtPhoneInfo);
+=======
+>>>>>>> Stashed changes
 
         if (!readExtras()) {
             startActivity(new Intent(RoleSelectionActivity.this, signup.class));

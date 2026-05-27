@@ -4,15 +4,23 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
+<<<<<<< Updated upstream
+=======
+import android.content.res.ColorStateList;
+>>>>>>> Stashed changes
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+<<<<<<< Updated upstream
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+=======
+import androidx.core.content.ContextCompat;
+>>>>>>> Stashed changes
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
@@ -49,6 +57,11 @@ public class ProfileSetupActivity extends AppCompatActivity {
 
     private final Map<String, String[]> cityMap = buildCityMap();
     private final Map<Integer, Integer> chipIdToTagId = new LinkedHashMap<>();
+<<<<<<< Updated upstream
+=======
+    private static final int ROUTE_TAG_COUNT = 15;
+    private static final int MAX_ROUTE_TAG_SELECTION = 3;
+>>>>>>> Stashed changes
     private final Map<String, String> regionCodeMap = buildRegionCodeMap();
     private final Map<String, String> provinceCodeMap = buildProvinceCodeMap();
 
@@ -65,7 +78,11 @@ public class ProfileSetupActivity extends AppCompatActivity {
 
         initializeViews();
         setupProvinceCitySelectors();
+<<<<<<< Updated upstream
         setupTagMapping();
+=======
+        setupTagChips();
+>>>>>>> Stashed changes
         setupListeners();
     }
 
@@ -128,11 +145,41 @@ public class ProfileSetupActivity extends AppCompatActivity {
         etCity.setText("", false);
     }
 
+<<<<<<< Updated upstream
     private void setupTagMapping() {
         chipIdToTagId.put(R.id.chipTech, 1);
         chipIdToTagId.put(R.id.chipRed, 2);
         chipIdToTagId.put(R.id.chipHistory, 3);
         chipIdToTagId.put(R.id.chipEnglish, 4);
+=======
+    private void setupTagChips() {
+        String[] tagNames = getResources().getStringArray(R.array.route_tag_names);
+        int tagCount = Math.min(tagNames.length, ROUTE_TAG_COUNT);
+        chipGroup.removeAllViews();
+        chipIdToTagId.clear();
+
+        for (int i = 0; i < tagCount; i++) {
+            int tagId = i + 1;
+            Chip chip = new Chip(this);
+            chip.setText(tagNames[i]);
+            chip.setCheckable(true);
+            chip.setTextColor(ContextCompat.getColor(this, R.color.route_tag_chip_text));
+            chip.setChipBackgroundColor(
+                    ColorStateList.valueOf(ContextCompat.getColor(this, R.color.route_tag_chip_bg)));
+            chip.setId(View.generateViewId());
+            chip.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (!isChecked) {
+                    return;
+                }
+                if (chipGroup.getCheckedChipIds().size() > MAX_ROUTE_TAG_SELECTION) {
+                    chip.setChecked(false);
+                    Toast.makeText(this, "最多选择 3 个偏好", Toast.LENGTH_SHORT).show();
+                }
+            });
+            chipGroup.addView(chip);
+            chipIdToTagId.put(chip.getId(), tagId);
+        }
+>>>>>>> Stashed changes
     }
 
     private void setupListeners() {
@@ -175,6 +222,13 @@ public class ProfileSetupActivity extends AppCompatActivity {
                 Toast.makeText(this, "请选择至少一个路线偏好", Toast.LENGTH_SHORT).show();
                 return;
             }
+<<<<<<< Updated upstream
+=======
+            if (selectedTagIds.size() > MAX_ROUTE_TAG_SELECTION) {
+                Toast.makeText(this, "最多选择 3 个偏好", Toast.LENGTH_SHORT).show();
+                return;
+            }
+>>>>>>> Stashed changes
 
             String regionCode = resolveRegionCode(province, city);
             saveLocalPreferences(province, city, regionCode);

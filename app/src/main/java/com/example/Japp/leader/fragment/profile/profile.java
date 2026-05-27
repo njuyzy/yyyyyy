@@ -33,7 +33,13 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.example.Japp.R;
+<<<<<<< Updated upstream
 import com.example.Japp.RoleSelectionActivity;
+=======
+import com.example.Japp.PersonalInfoActivity;
+import com.example.Japp.RoleSelectionActivity;
+import com.example.Japp.leader.LeaderHistoryRouteActivity;
+>>>>>>> Stashed changes
 import com.example.Japp.SettingsActivity;
 import com.example.Japp.MainActivity;
 import com.example.Japp.user.UserMainActivity;
@@ -55,7 +61,13 @@ import retrofit2.Response;
 
 public class profile extends Fragment {
 
+<<<<<<< Updated upstream
     private Button switchMode, check_review;
+=======
+    private static final int REQUEST_PERSONAL_INFO = 1003;
+
+    private Button switchMode, check_review, btnPersonalInfo, btnHistoryRoute;
+>>>>>>> Stashed changes
     private Button btnLogout;
     private ImageView ivAvatar;
     private ImageButton Settings;
@@ -73,6 +85,11 @@ public class profile extends Fragment {
         ivAvatar = view.findViewById(R.id.ivAvatar);
         switchMode = view.findViewById(R.id.btnViewReviews);
         check_review = view.findViewById(R.id.btnSwitchRole);
+<<<<<<< Updated upstream
+=======
+        btnPersonalInfo = view.findViewById(R.id.btnPersonalInfo);
+        btnHistoryRoute = view.findViewById(R.id.btnHistoryRoute);
+>>>>>>> Stashed changes
         btnLogout = view.findViewById(R.id.btnLogout);
         Settings = view.findViewById(R.id.btnSettings);
         txtName = view.findViewById(R.id.txtName);
@@ -111,6 +128,12 @@ public class profile extends Fragment {
                 transaction.commit();
             }
         });
+
+        btnPersonalInfo.setOnClickListener(v ->
+                startActivityForResult(new Intent(requireContext(), PersonalInfoActivity.class), REQUEST_PERSONAL_INFO));
+
+        btnHistoryRoute.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), LeaderHistoryRouteActivity.class)));
 
         Settings.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -382,6 +405,11 @@ public class profile extends Fragment {
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_PERSONAL_INFO && resultCode == android.app.Activity.RESULT_OK) {
+            bindProfileInfo();
+            loadImageFromLocal();
+            return;
+        }
         if (resultCode == requireActivity().RESULT_OK) {
             if (requestCode == SELECT_FILE) {
                 if (data != null) {

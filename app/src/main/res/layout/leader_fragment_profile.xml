@@ -115,6 +115,7 @@
                 app:backgroundTint="#FFFFFF" />
         </com.google.android.material.card.MaterialCardView>
 
+<<<<<<< Updated upstream
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -129,6 +130,37 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
+=======
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="12dp"
+            app:cardBackgroundColor="#FFFFFF"
+            app:cardCornerRadius="18dp"
+            app:cardElevation="2dp"
+            app:cardUseCompatPadding="false">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnHistoryRoute"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="start|center_vertical"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:text="历史路线"
+                android:textAllCaps="false"
+                android:textColor="#121212"
+                android:textSize="18sp"
+                app:backgroundTint="#FFFFFF" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+>>>>>>> Stashed changes
             app:cardBackgroundColor="#FFFFFF"
             app:cardCornerRadius="18dp"
             app:cardElevation="2dp"
@@ -176,6 +208,24 @@
                 android:orientation="vertical">
 
                 <com.google.android.material.button.MaterialButton
+<<<<<<< Updated upstream
+=======
+                    android:id="@+id/btnPersonalInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp"
+                    android:gravity="start|center_vertical"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="20dp"
+                    android:text="个人信息"
+                    android:textAllCaps="false"
+                    android:textColor="#121212"
+                    android:textSize="18sp"
+                    app:backgroundTint="#FFFFFF" />
+
+                <com.google.android.material.button.MaterialButton
+>>>>>>> Stashed changes
                     android:id="@+id/btnSwitchRole"
                     android:layout_width="match_parent"
                     android:layout_height="60dp"

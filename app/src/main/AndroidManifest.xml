@@ -97,6 +97,17 @@
             android:name=".leader.WalkRouteDetailActivity"
             android:exported="false" />
         <activity
+<<<<<<< Updated upstream
+=======
+            android:name=".PersonalInfoActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".leader.LeaderHistoryRouteActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+>>>>>>> Stashed changes
             android:name=".CodeLoginActivity"
             android:exported="false"
             android:screenOrientation="portrait"

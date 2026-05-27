@@ -9,6 +9,7 @@ import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.google.gson.JsonElement;
 import com.example.Japp.network.models.requests.IntroRequest;
+import com.example.Japp.network.models.requests.UpdateUsernameRequest;
 import com.example.Japp.network.models.requests.LoginRequest;
 import com.example.Japp.network.models.requests.RegisterRequest;
 
@@ -41,6 +42,9 @@ public interface UserService {
 
     @POST("accounts/{id}/intro")
     Call<Result> updateIntro(@Path("id") int id, @Body IntroRequest request);
+
+    @POST("accounts/{id}/username")
+    Call<Result> updateUsername(@Path("id") int id, @Body UpdateUsernameRequest request);
 
     @GET("accounts/{id}/tagPrefs")
     Call<Result<List<AccountTagPref>>> getTagPrefs(@Path("id") int id);
