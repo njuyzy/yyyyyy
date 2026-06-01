@@ -12,12 +12,9 @@ import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.amap.api.maps.AMap;
-import com.amap.api.maps.CameraUpdateFactory;
 import com.amap.api.maps.MapView;
 import com.amap.api.maps.model.LatLng;
-import com.amap.api.maps.model.LatLngBounds;
 import com.amap.api.maps.model.Polyline;
-import com.amap.api.maps.model.PolylineOptions;
 import com.example.Japp.R;
 import com.google.android.material.button.MaterialButton;
 
@@ -38,6 +35,8 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
 
     public interface RouteChatListener {
         void onPublishClick(RouteChatItem item, int position);
+
+        default void onMapClick(RouteChatItem item) {}
     }
 
     private RouteChatListener listener;
@@ -49,9 +48,6 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         this.recyclerView = recyclerView;
     }
 
-    /**
-     * 传入 Fragment 的 savedInstanceState，供列表内 MapView.onCreate 使用；可为 null。
-     */
     public void setMapCreateBundle(@Nullable Bundle mapCreateBundle) {
         this.mapCreateBundle = mapCreateBundle;
     }
@@ -65,26 +61,59 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         notifyItemInserted(items.size() - 1);
     }
 
+    public void refreshLastAssistantMap() {
+        if (recyclerView == null || items.isEmpty()) {
+            return;
+        }
+        int pos = items.size() - 1;
+        if (items.get(pos).getType() != RouteChatItem.TYPE_ASSISTANT_ROUTE) {
+            return;
+        }
+        RecyclerView.ViewHolder holder = recyclerView.findViewHolderForAdapterPosition(pos);
+        if (holder instanceof AssistantVH) {
+            AssistantVH vh = (AssistantVH) holder;
+            vh.mapResume();
+            vh.redrawRouteIfNeeded();
+        } else {
+            notifyItemChanged(pos);
+        }
+    }
+
     public List<RouteChatItem> getItems() {
         return items;
     }
 
-    /** Fragment.onResume：恢复当前可见项内的 MapView */
     public void onHostResume() {
         forEachVisibleAssistant(AssistantVH::mapResume);
     }
 
-    /** Fragment.onPause */
     public void onHostPause() {
         forEachVisibleAssistant(AssistantVH::mapPause);
     }
 
-    /** Fragment.onLowMemory */
+    /** 打开全屏地图前彻底释放列表内 MapView，高德 SDK 不支持多个 MapView 同时存在 */
+    public void releaseMapsForFullscreen() {
+        forEachVisibleAssistant(AssistantVH::releaseMapForFullscreen);
+    }
+
+    /** 从全屏地图返回后重建可见项内的 MapView */
+    public void recreateVisibleMaps() {
+        if (recyclerView == null) {
+            return;
+        }
+        for (int i = 0; i < recyclerView.getChildCount(); i++) {
+            View child = recyclerView.getChildAt(i);
+            RecyclerView.ViewHolder holder = recyclerView.getChildViewHolder(child);
+            if (holder instanceof AssistantVH) {
+                ((AssistantVH) holder).recreateMapIfNeeded();
+            }
+        }
+    }
+
     public void onHostLowMemory() {
         forEachVisibleAssistant(AssistantVH::mapLowMemory);
     }
 
-    /** Fragment.onDestroyView */
     public void onHostDestroy() {
         forEachVisibleAssistant(AssistantVH::destroyMapCompletely);
         recyclerView = null;
@@ -92,8 +121,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
 
     private void forEachVisibleAssistant(Consumer<AssistantVH> action) {
         if (recyclerView == null) return;
-        int n = recyclerView.getChildCount();
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < recyclerView.getChildCount(); i++) {
             View child = recyclerView.getChildAt(i);
             RecyclerView.ViewHolder h = recyclerView.getChildViewHolder(child);
             if (h instanceof AssistantVH) {
@@ -112,35 +140,21 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         LayoutInflater inflater = LayoutInflater.from(parent.getContext());
         if (viewType == TYPE_USER) {
-            View v = inflater.inflate(R.layout.item_route_user_requirement, parent, false);
-            return new UserVH(v);
+            return new UserVH(inflater.inflate(R.layout.item_route_user_requirement, parent, false));
         }
-        View v = inflater.inflate(R.layout.item_route_assistant_route, parent, false);
-        return new AssistantVH(v);
+        return new AssistantVH(inflater.inflate(R.layout.item_route_assistant_route, parent, false), listener);
     }
 
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
         RouteChatItem item = items.get(position);
         String time = timeFmt.format(new Date(item.getTimestamp()));
-
         if (holder instanceof UserVH) {
             UserVH vh = (UserVH) holder;
             vh.message.setText(item.getText());
             vh.time.setText(time);
         } else if (holder instanceof AssistantVH) {
-            AssistantVH vh = (AssistantVH) holder;
-            vh.message.setText(item.getText());
-            vh.time.setText(time);
-            vh.bindMapArea(item, mapCreateBundle);
-            vh.publish.setOnClickListener(v -> {
-                if (listener != null) {
-                    int pos = holder.getAdapterPosition();
-                    if (pos != RecyclerView.NO_POSITION) {
-                        listener.onPublishClick(item, pos);
-                    }
-                }
-            });
+            ((AssistantVH) holder).bind(item, time, mapCreateBundle);
         }
     }
 
@@ -148,7 +162,9 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     public void onViewAttachedToWindow(@NonNull RecyclerView.ViewHolder holder) {
         super.onViewAttachedToWindow(holder);
         if (holder instanceof AssistantVH) {
-            ((AssistantVH) holder).mapResume();
+            AssistantVH vh = (AssistantVH) holder;
+            vh.mapResume();
+            vh.redrawRouteIfNeeded();
         }
     }
 
@@ -163,7 +179,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     @Override
     public void onViewRecycled(@NonNull RecyclerView.ViewHolder holder) {
         if (holder instanceof AssistantVH) {
-            ((AssistantVH) holder).destroyMapCompletely();
+            ((AssistantVH) holder).mapPause();
         }
         super.onViewRecycled(holder);
     }
@@ -184,95 +200,168 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         }
     }
 
-    public static class AssistantVH extends RecyclerView.ViewHolder {
+    static class AssistantVH extends RecyclerView.ViewHolder {
         final TextView message;
         final TextView time;
         final MaterialButton publish;
         final FrameLayout mapContainer;
         final MapView routeMapView;
+        final TextView mapTapHint;
 
+        @Nullable
+        private final RouteChatListener listener;
         @Nullable
         private AMap aMap;
         @Nullable
         private Polyline polyline;
+        @Nullable
+        private List<LatLng> pendingPoints;
+        @Nullable
+        private Bundle lastMapBundle;
         private boolean mapCreated;
 
-        AssistantVH(@NonNull View itemView) {
+        AssistantVH(@NonNull View itemView, @Nullable RouteChatListener listener) {
             super(itemView);
+            this.listener = listener;
             message = itemView.findViewById(R.id.txtMessage);
             time = itemView.findViewById(R.id.txtTime);
             publish = itemView.findViewById(R.id.btnPublish);
             mapContainer = itemView.findViewById(R.id.mapContainer);
             routeMapView = itemView.findViewById(R.id.routeMapView);
+            mapTapHint = itemView.findViewById(R.id.mapTapHint);
         }
 
-        void bindMapArea(@NonNull RouteChatItem item, @Nullable Bundle mapBundle) {
-            if (!item.hasPolyline()) {
-                mapContainer.setVisibility(View.GONE);
-                destroyMapCompletely();
-                return;
+        void bind(@NonNull RouteChatItem item, @NonNull String timeText, @Nullable Bundle mapBundle) {
+            if (message != null) {
+                message.setText(item.getText());
             }
-            mapContainer.setVisibility(View.VISIBLE);
-            if (!mapCreated) {
-                routeMapView.onCreate(mapBundle);
-                mapCreated = true;
-                aMap = routeMapView.getMap();
-                if (aMap != null) {
-                    aMap.getUiSettings().setZoomControlsEnabled(false);
-                    aMap.getUiSettings().setMyLocationButtonEnabled(false);
-                    aMap.getUiSettings().setRotateGesturesEnabled(false);
-                    aMap.getUiSettings().setTiltGesturesEnabled(false);
+            if (time != null) {
+                time.setText(timeText);
+            }
+            if (publish != null) {
+                publish.setOnClickListener(v -> {
+                    if (listener != null) {
+                        int pos = getAdapterPosition();
+                        if (pos != RecyclerView.NO_POSITION) {
+                            listener.onPublishClick(item, pos);
+                        }
+                    }
+                });
+            }
+
+            if (mapContainer == null || routeMapView == null || !item.hasPolyline()) {
+                if (mapContainer != null) {
+                    mapContainer.setVisibility(View.GONE);
                 }
-            }
-            drawPolyline(item.getPolylinePoints());
-        }
-
-        private void drawPolyline(@NonNull List<LatLng> points) {
-            if (aMap == null || points.size() < 2) {
                 return;
             }
-            if (polyline != null) {
-                polyline.remove();
-                polyline = null;
-            }
-            polyline = aMap.addPolyline(new PolylineOptions()
-                    .addAll(points)
-                    .width(12f)
-                    .color(0xFF1A73E8));
 
-            LatLngBounds.Builder b = LatLngBounds.builder();
-            for (LatLng p : points) {
-                b.include(p);
+            mapContainer.setVisibility(View.VISIBLE);
+            pendingPoints = item.getPolylinePoints();
+            lastMapBundle = mapBundle;
+            ensureMapCreated(mapBundle);
+            setupMapClick(item);
+            mapResume();
+            routeMapView.post(this::redrawRouteIfNeeded);
+            routeMapView.postDelayed(this::redrawRouteIfNeeded, 500);
+        }
+
+        private void ensureMapCreated(@Nullable Bundle mapBundle) {
+            if (mapCreated || routeMapView == null) {
+                return;
             }
-            int pad = (int) (24 * itemView.getResources().getDisplayMetrics().density);
-            aMap.animateCamera(CameraUpdateFactory.newLatLngBounds(b.build(), pad));
+            Bundle bundle = mapBundle != null ? new Bundle(mapBundle) : new Bundle();
+            routeMapView.onCreate(bundle);
+            mapCreated = true;
+            aMap = routeMapView.getMap();
+            if (aMap != null) {
+                aMap.getUiSettings().setZoomControlsEnabled(false);
+                aMap.getUiSettings().setMyLocationButtonEnabled(false);
+                aMap.getUiSettings().setRotateGesturesEnabled(false);
+                aMap.getUiSettings().setTiltGesturesEnabled(false);
+                aMap.getUiSettings().setScrollGesturesEnabled(false);
+                aMap.getUiSettings().setZoomGesturesEnabled(false);
+                aMap.setOnMapLoadedListener(this::redrawRouteIfNeeded);
+            }
+        }
+
+        private void setupMapClick(@NonNull RouteChatItem item) {
+            if (mapContainer == null) {
+                return;
+            }
+            View.OnClickListener openFullscreen = v -> {
+                if (listener != null && item.hasPolyline()) {
+                    listener.onMapClick(item);
+                }
+            };
+            mapContainer.setOnClickListener(openFullscreen);
+            if (mapTapHint != null) {
+                mapTapHint.setOnClickListener(openFullscreen);
+            }
+        }
+
+        void redrawRouteIfNeeded() {
+            if (!mapCreated || aMap == null || pendingPoints == null || pendingPoints.size() < 2) {
+                return;
+            }
+            polyline = RouteMapDrawHelper.drawRoute(aMap, pendingPoints);
         }
 
         void mapResume() {
+            if (routeMapView == null) {
+                return;
+            }
+            if (!mapCreated && pendingPoints != null && pendingPoints.size() >= 2) {
+                ensureMapCreated(lastMapBundle);
+            }
             if (mapCreated) {
                 routeMapView.onResume();
             }
         }
 
         void mapPause() {
-            if (mapCreated) {
+            if (mapCreated && routeMapView != null) {
                 routeMapView.onPause();
             }
         }
 
+        void releaseMapForFullscreen() {
+            if (!mapCreated || routeMapView == null) {
+                return;
+            }
+            routeMapView.onPause();
+            routeMapView.onDestroy();
+            mapCreated = false;
+            aMap = null;
+            polyline = null;
+        }
+
+        void recreateMapIfNeeded() {
+            if (routeMapView == null || mapContainer == null
+                    || mapContainer.getVisibility() != View.VISIBLE) {
+                return;
+            }
+            if (pendingPoints == null || pendingPoints.size() < 2) {
+                return;
+            }
+            if (!mapCreated) {
+                ensureMapCreated(lastMapBundle);
+            }
+            mapResume();
+            routeMapView.post(this::redrawRouteIfNeeded);
+        }
+
         void mapLowMemory() {
-            if (mapCreated) {
+            if (mapCreated && routeMapView != null) {
                 routeMapView.onLowMemory();
             }
         }
 
         void destroyMapCompletely() {
-            if (polyline != null) {
-                polyline.remove();
-                polyline = null;
-            }
+            polyline = null;
             aMap = null;
-            if (mapCreated) {
+            pendingPoints = null;
+            if (mapCreated && routeMapView != null) {
                 routeMapView.onDestroy();
                 mapCreated = false;
             }

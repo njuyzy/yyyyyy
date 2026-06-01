@@ -3,11 +3,14 @@ package com.example.Japp.network.api;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.AccountLeaderProfile;
 import com.example.Japp.network.models.AccountTagPref;
+import com.example.Japp.network.models.ChatSession;
 import com.example.Japp.network.models.LoginResponse;
 import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.google.gson.JsonElement;
+import com.example.Japp.network.models.requests.CreateProjectRequest;
+import com.example.Japp.network.models.requests.CreateSessionRequest;
 import com.example.Japp.network.models.requests.IntroRequest;
 import com.example.Japp.network.models.requests.UpdateUsernameRequest;
 import com.example.Japp.network.models.requests.LoginRequest;
@@ -61,6 +64,23 @@ public interface UserService {
                                             @Query("pageNum") int pageNum,
                                             @Query("pageSize") int pageSize);
 
+    @GET("projects/filter")
+    Call<Result<List<Project>>> filterProjects(@Query("accountId") int accountId,
+                                              @Query("pageNum") int pageNum,
+                                              @Query("pageSize") int pageSize,
+                                              @Query("regionAdcode") String regionAdcode,
+                                              @Query("tag") String tag,
+                                              @Query("status") String status,
+                                              @Query("departureDate") String departureDate,
+                                              @Query("joinableOnly") boolean joinableOnly);
+
+    @POST("projects")
+    Call<Result> createProject(@Body CreateProjectRequest request);
+
+    @POST("routes/plan")
+    Call<Result<JsonElement>> planRouteByAi(@Query("memoryId") String memoryId,
+                                            @Query("text") String text);
+
     @GET("routes/{id}")
     Call<Result<List<RouteNode>>> getRouteNodes(@Path("id") int routeId);
 
@@ -70,4 +90,10 @@ public interface UserService {
     @POST("projects/{id}/leader")
     Call<Result> assignLeader(@Path("id") int projectId,
                              @Body com.example.Japp.network.models.requests.AssignLeaderRequest request);
+
+    @POST("projects/{id}/join")
+    Call<Result> joinProject(@Path("id") int projectId);
+
+    @POST("chat/sessions")
+    Call<Result<ChatSession>> createChatSession(@Body CreateSessionRequest request);
 }

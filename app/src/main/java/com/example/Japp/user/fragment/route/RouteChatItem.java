@@ -2,12 +2,10 @@ package com.example.Japp.user.fragment.route;
 
 import com.amap.api.maps.model.LatLng;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * 路线对话中的一条记录：用户要求 或 后端返回的路线说明。
- */
 public class RouteChatItem {
 
     public static final int TYPE_USER = 0;
@@ -16,22 +14,29 @@ public class RouteChatItem {
     private final int type;
     private final String text;
     private final long timestamp;
-    /** 后端返回的折线路径（GCJ-02），用于地图连线；用户消息为 null */
+    private final int routeId;
     private final List<LatLng> polylinePoints;
 
-    public RouteChatItem(int type, String text, long timestamp, List<LatLng> polylinePoints) {
+    private RouteChatItem(int type, String text, long timestamp, int routeId, List<LatLng> polylinePoints) {
         this.type = type;
         this.text = text;
         this.timestamp = timestamp;
-        this.polylinePoints = polylinePoints != null ? polylinePoints : Collections.emptyList();
+        this.routeId = routeId;
+        this.polylinePoints = polylinePoints != null
+                ? new ArrayList<>(polylinePoints)
+                : new ArrayList<>();
     }
 
     public static RouteChatItem user(String text) {
-        return new RouteChatItem(TYPE_USER, text, System.currentTimeMillis(), null);
+        return new RouteChatItem(TYPE_USER, text, System.currentTimeMillis(), 0, null);
     }
 
-    public static RouteChatItem assistantRoute(String text, List<LatLng> polylinePoints) {
-        return new RouteChatItem(TYPE_ASSISTANT_ROUTE, text, System.currentTimeMillis(), polylinePoints);
+    public static RouteChatItem assistantRoute(String text, List<LatLng> points) {
+        return assistantRoute(text, points, 0);
+    }
+
+    public static RouteChatItem assistantRoute(String text, List<LatLng> points, int routeId) {
+        return new RouteChatItem(TYPE_ASSISTANT_ROUTE, text, System.currentTimeMillis(), routeId, points);
     }
 
     public int getType() {
@@ -46,11 +51,19 @@ public class RouteChatItem {
         return timestamp;
     }
 
-    public List<LatLng> getPolylinePoints() {
-        return polylinePoints;
+    public boolean hasPolyline() {
+        return polylinePoints.size() >= 2;
     }
 
-    public boolean hasPolyline() {
-        return polylinePoints != null && !polylinePoints.isEmpty();
+    public List<LatLng> getPolylinePoints() {
+        return Collections.unmodifiableList(polylinePoints);
+    }
+
+    public int getRouteId() {
+        return routeId;
+    }
+
+    public boolean canPublish() {
+        return type == TYPE_ASSISTANT_ROUTE && routeId > 0;
     }
 }

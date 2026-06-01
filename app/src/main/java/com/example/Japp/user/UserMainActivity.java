@@ -19,19 +19,17 @@ public class UserMainActivity extends AppCompatActivity {
     private routeDesign routeDesign;
     private TeamList teamList;
     private profile mine;
-
     private ConversationList conversationList;
+
+    private BottomNavigationView bottomNavigationView;
     int position;
 
     @Override
     protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
         setContentView(R.layout.user_activity_main);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().hide();
-        }
 
-        BottomNavigationView bottomNavigationView = findViewById(R.id.UserBottomNav);
+        bottomNavigationView = findViewById(R.id.UserBottomNav);
 
         bottomNavigationView.setOnNavigationItemSelectedListener(new BottomNavigationView.OnNavigationItemSelectedListener() {
             @Override
@@ -54,6 +52,24 @@ public class UserMainActivity extends AppCompatActivity {
         });
 
         selectedFragment(0);
+    }
+
+    public void switchToRouteTab() {
+        position = 0;
+        if (bottomNavigationView != null) {
+            bottomNavigationView.setSelectedItemId(R.id.route);
+        } else {
+            selectedFragment(0);
+        }
+    }
+
+    public void switchToTeamTab() {
+        position = 1;
+        if (bottomNavigationView != null) {
+            bottomNavigationView.setSelectedItemId(R.id.share);
+        } else {
+            selectedFragment(1);
+        }
     }
 
     private void selectedFragment(int position){

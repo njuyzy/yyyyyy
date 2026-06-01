@@ -75,6 +75,10 @@
             android:name=".user.UserMainActivity"
             android:exported="false" />
         <activity
+            android:name=".user.TeamDetailActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".SplashActivity"
             android:exported="true"
             android:screenOrientation="portrait"
@@ -93,6 +97,10 @@
         <activity
             android:name=".leader.RouteMapActivity"
             android:exported="false" />
+        <activity
+            android:name=".user.fragment.route.RouteMapFullscreenActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
         <activity
             android:name=".leader.WalkRouteDetailActivity"
             android:exported="false" />
