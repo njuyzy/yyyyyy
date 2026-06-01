@@ -48,15 +48,11 @@ public class SplashActivity extends AppCompatActivity {
 
         // 获取控件
         ImageView logo = findViewById(R.id.logo);
-        TextView appName = findViewById(R.id.app_name);
         TextView versionInfo = findViewById(R.id.version_info);
 
         // 应用动画
         if (logo != null) {
             logo.startAnimation(fadeIn);
-        }
-        if (appName != null) {
-            appName.startAnimation(slideUp);
         }
         if (versionInfo != null) {
             versionInfo.startAnimation(fadeIn);

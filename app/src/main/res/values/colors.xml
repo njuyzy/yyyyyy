@@ -37,4 +37,7 @@
     <color name="accent">#2196F3</color>
     <color name="accent_light">#64B5F6</color>
     <color name="accent_dark">#1976D2</color>
+
+    <color name="route_tag_chip_bg">#EDEFF5</color>
+    <color name="route_tag_chip_text">#333333</color>
 </resources>

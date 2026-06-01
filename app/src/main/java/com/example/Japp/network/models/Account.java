@@ -18,7 +18,7 @@ public class Account {
     @SerializedName("passwordHash")
     private String passwordHash;
 
-    @SerializedName("regionCode")
+    @SerializedName(value = "regionCode", alternate = {"region_code", "region", "regionName", "regionAdcode", "adcode"})
     private String regionCode;
 
     @SerializedName("avatarUrl")

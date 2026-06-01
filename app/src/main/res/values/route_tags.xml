@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="route_tag_names">
+        <item>历史人文</item>
+        <item>博物馆研学</item>
+        <item>非遗体验</item>
+        <item>科技探索</item>
+        <item>自然生态</item>
+        <item>地理地质</item>
+        <item>航天航空</item>
+        <item>农耕劳动</item>
+        <item>艺术美育</item>
+        <item>红色教育</item>
+        <item>高校参访</item>
+        <item>职业启蒙</item>
+        <item>英语实践</item>
+        <item>摄影记录</item>
+        <item>亲子互动</item>
+    </string-array>
+</resources>

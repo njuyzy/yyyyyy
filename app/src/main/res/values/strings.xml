@@ -1,25 +1,9 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">研学导览</string>
-    <string name="login">登录</string>
-    <string name="phone_number">手机号</string>
-    <string name="password">密码</string>
-    <string name="verification_code">验证码</string>
-    <string name="get_verification_code">获取验证码</string>
-    <string name="login_button">登录</string>
-    <string name="register">没有账号？点此注册</string>
-    <string name="auto_login">自动登录</string>
-    <string name="invalid_phone">请输入正确的11位手机号</string>
-    <string name="empty_phone">手机号不能为空</string>
-    <string name="empty_password">密码不能为空</string>
-    <string name="empty_verification_code">验证码不能为空</string>
-    <string name="user_not_found">用户不存在</string>
-    <string name="verification_code_error">验证码错误</string>
-    <string name="password_error">密码错误</string>
-    <string name="login_success">登录成功！欢迎</string>
-    <string name="send_verification_code">验证码已发送到</string>
-    <string name="enter_leader">进入领队端</string>
-    <string name="enter_user">进入用户端</string>
-    <string name="choose_identity">选择身份进入</string>
+    <string name="app_name">踏学</string>
     <string name="avatar">Avatar</string>
+    <string name="route_toolbar_title">智能路线</string>
+    <string name="route_input_hint">描述你的路线需求，例如：从南京大学鼓楼校区到夫子庙，少换乘…</string>
+    <string name="route_send_desc">发送路线需求</string>
+    <!-- 在高德开放平台创建应用后替换为 Web 服务端 Key 或 Android 平台 Key（与 manifest 中 meta-data 一致） -->
+    <string name="amap_api_key">请替换为你的高德地图Key</string>
 </resources>

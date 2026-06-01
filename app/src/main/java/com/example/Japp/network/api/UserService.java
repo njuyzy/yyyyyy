@@ -9,6 +9,7 @@ import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.google.gson.JsonElement;
 import com.example.Japp.network.models.requests.IntroRequest;
+import com.example.Japp.network.models.requests.UpdateUsernameRequest;
 import com.example.Japp.network.models.requests.LoginRequest;
 import com.example.Japp.network.models.requests.RegisterRequest;
 
@@ -17,9 +18,13 @@ import java.util.List;
 import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
+import retrofit2.http.Multipart;
 import retrofit2.http.POST;
+import retrofit2.http.Part;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
+import retrofit2.http.Url;
+import okhttp3.MultipartBody;
 
 public interface UserService {
 
@@ -38,11 +43,18 @@ public interface UserService {
     @POST("accounts/{id}/intro")
     Call<Result> updateIntro(@Path("id") int id, @Body IntroRequest request);
 
+    @POST("accounts/{id}/username")
+    Call<Result> updateUsername(@Path("id") int id, @Body UpdateUsernameRequest request);
+
     @GET("accounts/{id}/tagPrefs")
     Call<Result<List<AccountTagPref>>> getTagPrefs(@Path("id") int id);
 
     @POST("accounts/{id}/tagPrefs")
     Call<Result> updateTagPrefs(@Path("id") int id, @Body List<AccountTagPref> prefs);
+
+    @Multipart
+    @POST
+    Call<Result<String>> uploadAvatar(@Url String url, @Part MultipartBody.Part image);
 
     @GET("projects")
     Call<Result<List<Project>>> getProjects(@Query("accountId") int accountId,
