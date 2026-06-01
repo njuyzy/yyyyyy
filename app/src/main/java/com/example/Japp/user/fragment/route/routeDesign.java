@@ -47,6 +47,7 @@ import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 
 import com.example.Japp.network.models.requests.CreateProjectRequest;
+import com.example.Japp.network.models.requests.PlanRouteRequest;
 
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.RoutePlanHelper;
@@ -247,9 +248,11 @@ public class routeDesign extends Fragment {
 
 
         setSending(true);
-        String memoryId = RoutePlanHelper.buildMemoryId(SessionHelper.getAccountId(requireContext()));
+        int accountId = SessionHelper.getAccountId(requireContext());
+        String memoryId = RoutePlanHelper.buildMemoryId(accountId);
+        PlanRouteRequest request = new PlanRouteRequest(accountId, memoryId, text);
 
-        service.planRouteByAi(memoryId, text).enqueue(new Callback<Result<JsonElement>>() {
+        service.planRouteByAi(accountId, memoryId, text, request).enqueue(new Callback<Result<JsonElement>>() {
 
             @Override
             public void onResponse(Call<Result<JsonElement>> call, Response<Result<JsonElement>> response) {
@@ -262,9 +265,11 @@ public class routeDesign extends Fragment {
 
                 setSending(false);
 
+                Result<JsonElement> body = response.body();
+
                 if (response.code() == 401) {
 
-                    Toast.makeText(requireContext(), "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
+                    showPlanError("登录已失效，请重新登录");
 
                     SessionHelper.handleUnauthorized(requireContext());
 
@@ -272,21 +277,19 @@ public class routeDesign extends Fragment {
 
                 }
 
-                if (!response.isSuccessful() || response.body() == null || response.body().getCode() != 1) {
+                if (!response.isSuccessful() || body == null || body.getCode() != 1) {
 
-                    String msg = response.body() != null ? response.body().getMsg() : "路线规划失败";
-
-                    Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
+                    showPlanError(RoutePlanHelper.readErrorMessage(response, body));
 
                     return;
 
                 }
 
-                int routeId = RoutePlanHelper.parseRouteId(response.body().getData());
+                int routeId = RoutePlanHelper.parseRouteId(body.getData());
 
                 if (routeId <= 0) {
 
-                    Toast.makeText(requireContext(), "未获取到有效路线", Toast.LENGTH_SHORT).show();
+                    showPlanError("规划成功但未返回路线编号，请稍后重试");
 
                     return;
 
@@ -310,7 +313,7 @@ public class routeDesign extends Fragment {
 
                 setSending(false);
 
-                Toast.makeText(requireContext(), RoutePlanHelper.failureMessage(t), Toast.LENGTH_SHORT).show();
+                showPlanError(RoutePlanHelper.failureMessage(t));
 
             }
 
@@ -559,6 +562,19 @@ public class routeDesign extends Fragment {
     }
 
 
+
+    private void showPlanError(String message) {
+        if (!isAdded() || adapter == null) {
+            return;
+        }
+        String display = TextUtils.isEmpty(message) ? "路线规划失败" : message;
+        Toast.makeText(requireContext(), display, Toast.LENGTH_SHORT).show();
+        adapter.addItem(RouteChatItem.assistantRoute(
+                "规划失败：" + display + "\n\n请检查网络或登录状态后重试。",
+                new ArrayList<>(),
+                0));
+        scrollChatToBottom();
+    }
 
     private void setSending(boolean sending) {
 

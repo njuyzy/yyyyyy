@@ -11,6 +11,7 @@ import com.example.Japp.network.models.RouteNode;
 import com.google.gson.JsonElement;
 import com.example.Japp.network.models.requests.CreateProjectRequest;
 import com.example.Japp.network.models.requests.CreateSessionRequest;
+import com.example.Japp.network.models.requests.PlanRouteRequest;
 import com.example.Japp.network.models.requests.IntroRequest;
 import com.example.Japp.network.models.requests.UpdateUsernameRequest;
 import com.example.Japp.network.models.requests.LoginRequest;
@@ -78,8 +79,10 @@ public interface UserService {
     Call<Result> createProject(@Body CreateProjectRequest request);
 
     @POST("routes/plan")
-    Call<Result<JsonElement>> planRouteByAi(@Query("memoryId") String memoryId,
-                                            @Query("text") String text);
+    Call<Result<JsonElement>> planRouteByAi(@Query("accountId") int accountId,
+                                            @Query("memoryId") String memoryId,
+                                            @Query("text") String text,
+                                            @Body PlanRouteRequest request);
 
     @GET("routes/{id}")
     Call<Result<List<RouteNode>>> getRouteNodes(@Path("id") int routeId);
