@@ -1,26 +1,33 @@
 package com.example.Japp.leader;
 
 import android.content.Intent;
-import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.text.method.ScrollingMovementMethod;
 import android.view.View;
-import android.widget.Button;
-import android.widget.ImageView;
+import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.Japp.R;
-import com.example.Japp.data.RouteStop;
 import com.example.Japp.data.order;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
+import com.example.Japp.network.models.Account;
+import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.example.Japp.network.models.requests.AssignLeaderRequest;
+import com.example.Japp.user.fragment.route.RouteMapFullscreenActivity;
+import com.example.Japp.user.util.ProjectUiHelper;
+import com.example.Japp.user.util.SessionHelper;
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
@@ -34,270 +41,449 @@ import retrofit2.Response;
 
 public class orderDetailActivity extends AppCompatActivity {
 
+    public static final String EXTRA_PROJECT_JSON = "project_json";
+
     private UserService service;
-    private TextView txtCreatedAt;
-    private TextView txtRouteOverview;
+    private Project project;
+    private TextView txtTitle;
+    private TextView txtMeta;
+    private TextView txtOwner;
+    private TextView txtStatus;
     private TextView txtRouteDetail;
-    private order currentOrder;
+    private MaterialButton btnJoin;
+    @Nullable
+    private FrameLayout mapContainer;
+    @Nullable
+    private TextView mapTapHint;
+    @Nullable
+    private MaterialCardView walkPlanCard;
+    @Nullable
+    private View walkPlanContent;
+    @Nullable
+    private TextView txtWalkPlanStatus;
+    @Nullable
+    private TextView txtWalkPlanSummary;
+    @Nullable
+    private TextView txtWalkPlanHint;
+    @Nullable
+    private LeaderWalkRoutePlanner walkRoutePlanner;
     private List<RouteNode> cachedRouteNodes = new ArrayList<>();
+    private final ArrayList<String> walkInstructions = new ArrayList<>();
+    private String walkSummary = "";
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_order_detail);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().hide();
-        }
+        setContentView(R.layout.activity_leader_order_detail);
 
         service = ApiClient.getClient().create(UserService.class);
-        initialize(savedInstanceState);
-    }
+        walkRoutePlanner = new LeaderWalkRoutePlanner(this);
 
-    private void initialize(Bundle savedInstanceState){
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        toolbar.setNavigationOnClickListener(v -> finish());
 
-        Button btnAccept=findViewById(R.id.btnAccept);
-        btnAccept.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Accept_Order();
-            }
-        });
+        txtTitle = findViewById(R.id.txtTitle);
+        txtMeta = findViewById(R.id.txtMeta);
+        txtOwner = findViewById(R.id.txtOwner);
+        txtStatus = findViewById(R.id.txtStatus);
+        txtRouteDetail = findViewById(R.id.txtRouteDetail);
+        btnJoin = findViewById(R.id.btnJoin);
+        mapContainer = findViewById(R.id.mapContainer);
+        mapTapHint = findViewById(R.id.mapTapHint);
+        walkPlanCard = findViewById(R.id.walkPlanCard);
+        walkPlanContent = findViewById(R.id.walkPlanContent);
+        txtWalkPlanStatus = findViewById(R.id.txtWalkPlanStatus);
+        txtWalkPlanSummary = findViewById(R.id.txtWalkPlanSummary);
+        txtWalkPlanHint = findViewById(R.id.txtWalkPlanHint);
 
-        Button btnRouteDetail = findViewById(R.id.btnRouteDetail);
-        ImageView imageView=findViewById(R.id.imgRoute);
-        TextView price=findViewById(R.id.txtPrice);
-        TextView title=findViewById(R.id.txtTitle);
-        TextView meta=findViewById(R.id.txtMeta);
-        TextView tags=findViewById(R.id.txtTags);
-        txtCreatedAt=findViewById(R.id.txtCreatedAt);
-        txtRouteOverview=findViewById(R.id.txtRouteOverview);
-        txtRouteDetail=findViewById(R.id.txtRouteDetail);
-
-        txtRouteDetail.setMovementMethod(new ScrollingMovementMethod());
-        btnRouteDetail.setOnClickListener(v -> {
-            Intent intent = new Intent(orderDetailActivity.this, RouteMapActivity.class);
-            if (currentOrder != null) {
-                intent.putExtra(RouteMapActivity.EXTRA_ROUTE_ID, currentOrder.getRouteId());
-                intent.putExtra(RouteMapActivity.EXTRA_PROJECT_ID, currentOrder.getProjectId());
-            }
-            if (cachedRouteNodes != null && !cachedRouteNodes.isEmpty()) {
-                String nodesJson = new Gson().toJson(cachedRouteNodes);
-                intent.putExtra(RouteMapActivity.EXTRA_ROUTE_NODES_JSON, nodesJson);
-            }
-            startActivity(intent);
-        });
-
-        currentOrder = getOrderFromIntent();
-        if (currentOrder != null) {
-            String titleText = !currentOrder.getTitle().isEmpty() ? currentOrder.getTitle() : "研学项目";
-            title.setText(titleText);
-
-            String name = currentOrder.getCustomer().getUsername();
-            String city = currentOrder.getCity();
-            String date = currentOrder.getDepartureDate();
-            String metaText = (city.isEmpty() ? "未知城市" : city)
-                    + " · " + (name.isEmpty() ? "匿名" : name)
-                    + (date.isEmpty() ? "" : " · 出发:" + date);
-            meta.setText(metaText);
-
-            String tag = currentOrder.getTag();
-            String duration = currentOrder.getEstimatedDuration();
-            String tagsText = (tag.isEmpty() ? "偏好：暂无" : "偏好：" + tag)
-                    + (duration == null || duration.isEmpty() ? "" : " · 用时:" + duration);
-            tags.setText(tagsText);
-
-            String peopleText = "人数：" + currentOrder.getCurrentMembers() + "/" + currentOrder.getPeopleCnt();
-            price.setText(peopleText);
-
-            String createdAt = currentOrder.getCreatedAt();
-            txtCreatedAt.setText(createdAt.isEmpty() ? "订单创建时间：暂无" : "订单创建时间：" + createdAt);
-
-            if (!currentOrder.getRouteStops().isEmpty()) {
-                renderRouteStops(currentOrder.getRouteStops());
-                cacheNodesFromStops(currentOrder.getRouteStops(), currentOrder.getRouteId());
-                preloadRouteNodes(currentOrder.getRouteId());
-            } else {
-                loadRouteDetail(currentOrder.getRouteId());
-            }
+        View.OnClickListener openFullscreen = v -> openFullscreenRouteMap();
+        if (mapContainer != null) {
+            mapContainer.setOnClickListener(openFullscreen);
         }
-        // TODO: 设置路线图片（目前使用占位图）
-    }
+        if (mapTapHint != null) {
+            mapTapHint.setOnClickListener(openFullscreen);
+        }
+        if (walkPlanContent != null) {
+            walkPlanContent.setOnClickListener(v -> openWalkRouteDetail());
+        }
 
-    private void preloadRouteNodes(int routeId) {
-        if (routeId <= 0) return;
-        service.getRouteNodes(routeId).enqueue(new Callback<Result<List<RouteNode>>>() {
-            @Override
-            public void onResponse(Call<Result<List<RouteNode>>> call, Response<Result<List<RouteNode>>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
-                    List<RouteNode> nodes = response.body().getData();
-                    cachedRouteNodes = nodes != null ? nodes : new ArrayList<>();
-                }
-            }
-
-            @Override
-            public void onFailure(Call<Result<List<RouteNode>>> call, Throwable t) {
-                // Keep cachedRouteNodes as-is; map will fetch by routeId if needed.
-            }
-        });
-    }
-
-    private void renderRouteStops(List<RouteStop> stops) {
-        if (stops == null || stops.isEmpty()) {
-            txtRouteOverview.setText("具体路线：暂无");
-            txtRouteDetail.setText("路线详情：暂无");
+        project = parseProjectFromIntent();
+        if (project == null) {
+            Toast.makeText(this, "项目数据无效", Toast.LENGTH_SHORT).show();
+            finish();
             return;
         }
-        Collections.sort(stops, Comparator.comparingInt(RouteStop::getVisitOrder));
-        StringBuilder overview = new StringBuilder();
-        StringBuilder detail = new StringBuilder();
-        for (int i = 0; i < stops.size(); i++) {
-            RouteStop stop = stops.get(i);
-            String name = stop.getName();
-            if (!name.isEmpty()) {
-                if (overview.length() > 0) overview.append(" → ");
-                overview.append(name);
-            }
-            String visitTime = stop.getVisitTime();
-            String note = stop.getNotes();
-            String duration = stop.getRecommendedDuration() > 0
-                    ? stop.getRecommendedDuration() + "分钟" : "时长待定";
-            String line = (i + 1) + ". "
-                    + "参观时间：" + (TextUtils.isEmpty(visitTime) ? "待定" : visitTime)
-                    + "\n景点：" + (name.isEmpty() ? "未命名景点" : name)
-                    + "（" + duration + "）";
-            detail.append(line);
-            if (!TextUtils.isEmpty(note)) {
-                detail.append("\n备注：").append(note);
-            } else {
-                detail.append("\n备注：暂无");
-            }
-            if (i < stops.size() - 1) {
-                detail.append("\n\n");
-            }
-        }
-        txtRouteOverview.setText(overview.length() == 0 ? "具体路线：暂无" : "具体路线：" + overview);
-        txtRouteDetail.setText("路线详情：\n" + detail);
+
+        bindProjectHeader();
+        loadOwnerName();
+        loadRouteDetail();
+        setupAcceptButton();
+        refreshProjectDetail();
     }
 
-    private void cacheNodesFromStops(List<RouteStop> stops, int routeId) {
-        if (stops == null || stops.isEmpty()) return;
-        List<RouteNode> nodes = new ArrayList<>();
-        for (RouteStop stop : stops) {
-            RouteNode node = new RouteNode();
-            node.setRouteId(routeId);
-            node.setVisitOrder(stop.getVisitOrder());
-            node.setName(stop.getName());
-            node.setVisitTime(stop.getVisitTime());
-            node.setRecommendedDuration(stop.getRecommendedDuration());
-            node.setNotes(stop.getNotes());
-            node.setLocation(stop.getLocation());
-            node.setAddress(stop.getAddress());
-            node.setCityname(stop.getCityname());
-            nodes.add(node);
-        }
-        cachedRouteNodes = nodes;
-    }
-
-    private void loadRouteDetail(int routeId) {
-        if (routeId <= 0) {
-            txtRouteOverview.setText("具体路线：暂无");
-            txtRouteDetail.setText("路线详情：暂无");
-            return;
-        }
-        service.getRouteNodes(routeId).enqueue(new Callback<Result<List<RouteNode>>>() {
+    private void refreshProjectDetail() {
+        service.getProject(project.getId()).enqueue(new Callback<Result<Project>>() {
             @Override
-            public void onResponse(Call<Result<List<RouteNode>>> call, Response<Result<List<RouteNode>>> response) {
+            public void onResponse(@NonNull Call<Result<Project>> call, @NonNull Response<Result<Project>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
-                    List<RouteNode> nodes = response.body().getData();
-                    cachedRouteNodes = nodes != null ? nodes : new ArrayList<>();
-                    if (nodes == null || nodes.isEmpty()) {
-                        txtRouteOverview.setText("具体路线：暂无");
-                        txtRouteDetail.setText("路线详情：暂无");
-                        return;
+                    Project latest = response.body().getData();
+                    if (latest != null) {
+                        project = latest;
+                        bindProjectHeader();
                     }
-                    Collections.sort(nodes, Comparator.comparingInt(RouteNode::getVisitOrder));
-                    StringBuilder overview = new StringBuilder();
-                    StringBuilder detail = new StringBuilder();
-                    for (int i = 0; i < nodes.size(); i++) {
-                        RouteNode node = nodes.get(i);
-                        String name = node.getName() == null ? "" : node.getName();
-                        if (!name.isEmpty()) {
-                            if (overview.length() > 0) overview.append(" → ");
-                            overview.append(name);
-                        }
-                        String visitTime = node.getVisitTime();
-                        String note = node.getNotes();
-                        String duration = node.getRecommendedDuration() > 0
-                                ? node.getRecommendedDuration() + "分钟" : "时长待定";
-                        String line = (i + 1) + ". "
-                                + "参观时间：" + (TextUtils.isEmpty(visitTime) ? "待定" : visitTime)
-                                + "\n景点：" + (name.isEmpty() ? "未命名景点" : name)
-                                + "（" + duration + "）";
-                        detail.append(line);
-                        if (!TextUtils.isEmpty(note)) {
-                            detail.append("\n备注：").append(note);
-                        } else {
-                            detail.append("\n备注：暂无");
-                        }
-                        if (i < nodes.size() - 1) {
-                            detail.append("\n\n");
-                        }
-                    }
-                    txtRouteOverview.setText(overview.length() == 0 ? "具体路线：暂无" : "具体路线：" + overview);
-                    txtRouteDetail.setText("路线详情：\n" + detail);
-                } else {
-                    txtRouteOverview.setText("具体路线：加载失败");
-                    txtRouteDetail.setText("路线详情：加载失败");
                 }
+                setupAcceptButton();
             }
 
             @Override
-            public void onFailure(Call<Result<List<RouteNode>>> call, Throwable t) {
-                txtRouteOverview.setText("具体路线：加载失败");
-                txtRouteDetail.setText("路线详情：加载失败");
+            public void onFailure(@NonNull Call<Result<Project>> call, @NonNull Throwable t) {
+                setupAcceptButton();
             }
         });
     }
 
-    private order getOrderFromIntent() {
-        Intent intent = getIntent();
-        if (intent == null) return null;
-        String json = intent.getStringExtra("order_json");
-        if (!TextUtils.isEmpty(json)) {
-            try {
-                return new Gson().fromJson(json, order.class);
-            } catch (RuntimeException ignored) {
-            }
+    @Nullable
+    private Project parseProjectFromIntent() {
+        String projectJson = getIntent().getStringExtra(EXTRA_PROJECT_JSON);
+        if (!TextUtils.isEmpty(projectJson)) {
+            return new Gson().fromJson(projectJson, Project.class);
         }
-        Object extra = intent.getSerializableExtra("order_info");
-        if (extra instanceof order) {
-            return (order) extra;
+        String orderJson = getIntent().getStringExtra("order_json");
+        if (!TextUtils.isEmpty(orderJson)) {
+            order o = new Gson().fromJson(orderJson, order.class);
+            if (o != null) {
+                return orderToProject(o);
+            }
         }
         return null;
     }
-    private void Accept_Order(){
-        if (currentOrder == null) return;
-        SharedPreferences prefs = getSharedPreferences("user_pref", MODE_PRIVATE);
-        int leaderAccountId = prefs.getInt("account_id", -1);
-        if (leaderAccountId == -1) {
+
+    private Project orderToProject(order o) {
+        Project p = new Project();
+        p.setId(o.getProjectId());
+        p.setRouteId(o.getRouteId());
+        p.setTitle(o.getTitle());
+        p.setDepartureDate(o.getDepartureDate());
+        p.setCreatedAt(o.getCreatedAt());
+        p.setTag(o.getTag());
+        p.setMaxMembers(o.getMaxMembers());
+        p.setCurrentMembers(o.getCurrentMembers());
+        return p;
+    }
+
+    private void bindProjectHeader() {
+        String title = project.getTitle();
+        txtTitle.setText(title == null || title.isEmpty() ? "研学拼单" : title);
+
+        String city = ProjectUiHelper.regionAdcodeToCity(project.getRegionAdcode());
+        String date = project.getDepartureDate() != null ? project.getDepartureDate() : "待定";
+        txtMeta.setText((city.isEmpty() ? "未知城市" : city)
+                + " · 出发 " + date
+                + " · " + project.getCurrentMembers() + "/" + project.getMaxMembers() + " 人");
+
+        ProjectUiHelper.bindStatusBadge(txtStatus, project.getStatus());
+    }
+
+    private void loadOwnerName() {
+        service.getAccount(project.getOwnerAccountId()).enqueue(new Callback<Result<Account>>() {
+            @Override
+            public void onResponse(Call<Result<Account>> call, Response<Result<Account>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
+                    Account account = response.body().getData();
+                    if (account != null) {
+                        txtOwner.setText("发起人：" + account.getUsername());
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Result<Account>> call, Throwable t) {
+                txtOwner.setText("发起人：未知");
+            }
+        });
+    }
+
+    private void loadRouteDetail() {
+        service.getRouteNodes(project.getRouteId()).enqueue(new Callback<Result<List<RouteNode>>>() {
+            @Override
+            public void onResponse(Call<Result<List<RouteNode>>> call, Response<Result<List<RouteNode>>> response) {
+                if (!response.isSuccessful() || response.body() == null || response.body().getCode() != 1) {
+                    txtRouteDetail.setText("暂无路线详情");
+                    hideMapSection();
+                    return;
+                }
+                List<RouteNode> nodes = response.body().getData();
+                if (nodes == null || nodes.isEmpty()) {
+                    txtRouteDetail.setText("暂无路线详情");
+                    hideMapSection();
+                    return;
+                }
+                Collections.sort(nodes, Comparator.comparingInt(RouteNode::getVisitOrder));
+                cachedRouteNodes = nodes;
+                txtRouteDetail.setText(buildRouteText(nodes));
+                startRoutePlanning(nodes);
+            }
+
+            @Override
+            public void onFailure(Call<Result<List<RouteNode>>> call, Throwable t) {
+                txtRouteDetail.setText("路线加载失败");
+                hideMapSection();
+            }
+        });
+    }
+
+    private String buildRouteText(List<RouteNode> nodes) {
+        StringBuilder sb = new StringBuilder();
+        for (RouteNode node : nodes) {
+            sb.append(node.getVisitOrder()).append(". ")
+                    .append(node.getName() != null ? node.getName() : "未知景点");
+            if (node.getRecommendedDuration() > 0) {
+                sb.append("（约").append(node.getRecommendedDuration()).append("分钟）");
+            }
+            if (node.getNotes() != null && !node.getNotes().isEmpty()) {
+                sb.append("\n   ").append(node.getNotes());
+            }
+            sb.append("\n\n");
+        }
+        return sb.toString().trim();
+    }
+
+    private void startRoutePlanning(List<RouteNode> nodes) {
+        if (mapContainer == null || walkRoutePlanner == null) {
+            hideMapSection();
+            return;
+        }
+        if (!hasConfiguredAmapKey()) {
+            hideMapSection();
+            return;
+        }
+
+        mapContainer.setVisibility(View.VISIBLE);
+        showWalkPlanLoading();
+
+        walkRoutePlanner.planSummary(nodes, new LeaderWalkRoutePlanner.Callback() {
+            @Override
+            public void onPlanningStarted() {
+                runOnUiThread(() -> showWalkPlanLoading());
+            }
+
+            @Override
+            public void onPlanningFinished(@NonNull String summary,
+                                           @NonNull ArrayList<String> instructions,
+                                           boolean hadFailures) {
+                runOnUiThread(() -> {
+                    walkSummary = summary;
+                    walkInstructions.clear();
+                    walkInstructions.addAll(instructions);
+                    showWalkPlanResult(summary, !instructions.isEmpty());
+                    if (hadFailures) {
+                        Toast.makeText(orderDetailActivity.this,
+                                R.string.route_planning_partial_fail, Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+
+            @Override
+            public void onPlanningFailed(@NonNull String message) {
+                runOnUiThread(() -> {
+                    hideWalkPlanSection();
+                    Toast.makeText(orderDetailActivity.this, message, Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+    }
+
+    private void showWalkPlanLoading() {
+        if (walkPlanCard != null) {
+            walkPlanCard.setVisibility(View.VISIBLE);
+        }
+        if (txtWalkPlanStatus != null) {
+            txtWalkPlanStatus.setVisibility(View.VISIBLE);
+            txtWalkPlanStatus.setText(R.string.route_planning_in_progress);
+        }
+        if (txtWalkPlanSummary != null) {
+            txtWalkPlanSummary.setVisibility(View.GONE);
+        }
+        if (txtWalkPlanHint != null) {
+            txtWalkPlanHint.setVisibility(View.GONE);
+        }
+        if (walkPlanContent != null) {
+            walkPlanContent.setClickable(false);
+        }
+    }
+
+    private void showWalkPlanResult(String summary, boolean hasInstructions) {
+        if (walkPlanCard != null) {
+            walkPlanCard.setVisibility(View.VISIBLE);
+        }
+        if (txtWalkPlanStatus != null) {
+            txtWalkPlanStatus.setVisibility(View.GONE);
+        }
+        if (txtWalkPlanSummary != null) {
+            txtWalkPlanSummary.setVisibility(View.VISIBLE);
+            txtWalkPlanSummary.setText(summary);
+        }
+        if (txtWalkPlanHint != null) {
+            txtWalkPlanHint.setText(R.string.route_plan_tap_detail);
+            txtWalkPlanHint.setVisibility(hasInstructions ? View.VISIBLE : View.GONE);
+        }
+        if (walkPlanContent != null) {
+            walkPlanContent.setClickable(hasInstructions);
+        }
+    }
+
+    private void hideWalkPlanSection() {
+        if (walkPlanCard != null) {
+            walkPlanCard.setVisibility(View.GONE);
+        }
+    }
+
+    private void hideMapSection() {
+        if (mapContainer != null) {
+            mapContainer.setVisibility(View.GONE);
+        }
+        hideWalkPlanSection();
+    }
+
+    private void openFullscreenRouteMap() {
+        if (cachedRouteNodes.isEmpty()) {
+            Toast.makeText(this, R.string.route_map_no_coords, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        RouteMapFullscreenActivity.startWithNodes(this, cachedRouteNodes,
+                getString(R.string.leader_route_planning_title));
+    }
+
+    private void openWalkRouteDetail() {
+        if (walkInstructions.isEmpty()) {
+            return;
+        }
+        Intent intent = new Intent(this, WalkRouteDetailActivity.class);
+        intent.putStringArrayListExtra(WalkRouteDetailActivity.EXTRA_WALK_INSTRUCTIONS, walkInstructions);
+        intent.putExtra(WalkRouteDetailActivity.EXTRA_WALK_SUMMARY, walkSummary);
+        startActivity(intent);
+    }
+
+    private boolean hasConfiguredAmapKey() {
+        try {
+            if (getPackageManager() == null) {
+                return false;
+            }
+            android.content.pm.ApplicationInfo appInfo = getPackageManager()
+                    .getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
+            if (appInfo.metaData == null) {
+                return false;
+            }
+            String apiKey = appInfo.metaData.getString("com.amap.api.v2.apikey");
+            return !TextUtils.isEmpty(apiKey) && !apiKey.contains("${");
+        } catch (PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
+
+    private void setupAcceptButton() {
+        View bottomBar = findViewById(R.id.bottomBar);
+        if (bottomBar != null) {
+            bottomBar.setVisibility(View.VISIBLE);
+        }
+        btnJoin.setVisibility(View.VISIBLE);
+        btnJoin.setEnabled(true);
+        btnJoin.setOnClickListener(null);
+        btnJoin.setText("接单");
+
+        int accountId = SessionHelper.getAccountId(this);
+        Integer leaderId = project.getLeaderAccountId();
+        if (ProjectUiHelper.hasAssignedLeader(leaderId)) {
+            if (leaderId == accountId) {
+                btnJoin.setEnabled(false);
+                btnJoin.setText("已接单");
+            } else {
+                btnJoin.setEnabled(false);
+                btnJoin.setText("已有领队");
+            }
+            return;
+        }
+
+        String status = ProjectUiHelper.normalizeStatus(project.getStatus());
+        if (ProjectUiHelper.STATUS_CONFIRMED.equals(status)) {
+            btnJoin.setEnabled(false);
+            btnJoin.setText("已确认");
+            return;
+        }
+        if (ProjectUiHelper.STATUS_IN_PROGRESS.equals(status)) {
+            btnJoin.setEnabled(false);
+            btnJoin.setText("进行中");
+            return;
+        }
+        if (ProjectUiHelper.STATUS_DONE.equals(status)) {
+            btnJoin.setEnabled(false);
+            btnJoin.setText("已完成");
+            return;
+        }
+        if (ProjectUiHelper.STATUS_CANCELLED.equals(status)) {
+            btnJoin.setEnabled(false);
+            btnJoin.setText("已取消");
+            return;
+        }
+        if (!ProjectUiHelper.isLeaderAcceptableStatus(project.getStatus())) {
+            btnJoin.setEnabled(false);
+            btnJoin.setText("暂不可接");
+            return;
+        }
+
+        btnJoin.setOnClickListener(v -> acceptOrder());
+    }
+
+    private void acceptOrder() {
+        if (!SessionHelper.isLoggedIn(this)) {
+            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            SessionHelper.handleUnauthorized(this);
+            return;
+        }
+
+        int leaderAccountId = SessionHelper.getAccountId(this);
+        if (leaderAccountId <= 0) {
             Toast.makeText(this, "未登录，无法接单", Toast.LENGTH_SHORT).show();
             return;
         }
-        service.assignLeader(currentOrder.getProjectId(), new AssignLeaderRequest(leaderAccountId))
+
+        btnJoin.setEnabled(false);
+        service.assignLeader(project.getId(), new AssignLeaderRequest(leaderAccountId))
                 .enqueue(new Callback<Result>() {
                     @Override
                     public void onResponse(Call<Result> call, Response<Result> response) {
+                        if (response.code() == 401) {
+                            Toast.makeText(orderDetailActivity.this, "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
+                            SessionHelper.handleUnauthorized(orderDetailActivity.this);
+                            return;
+                        }
                         if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
                             Toast.makeText(orderDetailActivity.this, "接单成功", Toast.LENGTH_SHORT).show();
+                            btnJoin.setText("已接单");
+                            project.setLeaderAccountId(leaderAccountId);
+                            bindProjectHeader();
+                            setResult(RESULT_OK);
                         } else {
-                            Toast.makeText(orderDetailActivity.this, "接单失败", Toast.LENGTH_SHORT).show();
+                            btnJoin.setEnabled(true);
+                            String msg = response.body() != null ? response.body().getMsg() : "接单失败";
+                            Toast.makeText(orderDetailActivity.this, msg, Toast.LENGTH_SHORT).show();
                         }
                     }
 
                     @Override
                     public void onFailure(Call<Result> call, Throwable t) {
+                        btnJoin.setEnabled(true);
                         Toast.makeText(orderDetailActivity.this, "网络错误，接单失败", Toast.LENGTH_SHORT).show();
                     }
                 });
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (walkRoutePlanner != null) {
+            walkRoutePlanner.cancel();
+            walkRoutePlanner = null;
+        }
+        super.onDestroy();
     }
 }

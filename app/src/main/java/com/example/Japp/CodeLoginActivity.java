@@ -11,6 +11,7 @@ import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.TextView;
@@ -48,7 +49,7 @@ public class CodeLoginActivity extends AppCompatActivity {
     private TextInputEditText etPhone, etCode;
     private Button btnLogin, btnGetCode;
     private TextView btnRegister;
-    private MaterialButton passwordModeToggle;
+    private ImageButton btnBack;
     private CheckBox autoLogin;
 
     private int countdown = 60;
@@ -86,7 +87,7 @@ public class CodeLoginActivity extends AppCompatActivity {
         btnLogin = findViewById(R.id.btnLogin);
         btnGetCode = findViewById(R.id.btnGetCode);
         btnRegister = findViewById(R.id.btnRegister);
-        passwordModeToggle = findViewById(R.id.password_mode_toggle);
+        btnBack = findViewById(R.id.btnBack);
 
         autoLogin = findViewById(R.id.autoLogin);
         View autoLoginRow = findViewById(R.id.autoLoginRow);
@@ -175,11 +176,10 @@ public class CodeLoginActivity extends AppCompatActivity {
             }
         });
 
-        passwordModeToggle.setOnClickListener(new View.OnClickListener() {
+        btnBack.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(CodeLoginActivity.this, MainActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                Intent intent = new Intent(CodeLoginActivity.this, LoginEntryActivity.class);
                 startActivity(intent);
                 finish();
             }

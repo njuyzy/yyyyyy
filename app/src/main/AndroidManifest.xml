@@ -53,6 +53,10 @@
             android:name=".signup"
             android:exported="false" />
         <activity
+            android:name=".LoginEntryActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".RoleSelectionActivity"
             android:exported="false"
             android:screenOrientation="portrait"

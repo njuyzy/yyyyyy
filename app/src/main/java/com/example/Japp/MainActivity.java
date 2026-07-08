@@ -10,6 +10,7 @@ import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.TextView;
@@ -48,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
     private Button btnLogin;
     private TextInputEditText etPhone, etPassword;
     private TextView btnRegister;
-    private MaterialButton loginModeToggle;
+    private ImageButton btnBack;
     private CheckBox autoLogin;
 
     @Override
@@ -83,7 +84,7 @@ public class MainActivity extends AppCompatActivity {
 
         btnLogin = findViewById(R.id.btnLogin);
         btnRegister = findViewById(R.id.btnRegister);
-        loginModeToggle = findViewById(R.id.login_mode_toggle);
+        btnBack = findViewById(R.id.btnBack);
 
         autoLogin=findViewById(R.id.autoLogin);
         View autoLoginRow = findViewById(R.id.autoLoginRow);
@@ -179,10 +180,10 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        loginModeToggle.setOnClickListener(new View.OnClickListener() {
+        btnBack.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, CodeLoginActivity.class);
+                Intent intent = new Intent(MainActivity.this, LoginEntryActivity.class);
                 startActivity(intent);
                 finish();
             }

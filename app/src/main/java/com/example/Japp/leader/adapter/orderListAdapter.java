@@ -18,23 +18,28 @@ import java.util.List;
 public class orderListAdapter extends RecyclerView.Adapter<orderListAdapter.MyHolder> {
 
     static class MyHolder extends RecyclerView.ViewHolder {
-        TextView customerName, city, tag, route, duration, peopleCnt;
+        final TextView txtTitle;
+        final TextView txtCity;
+        final TextView txtTag;
+        final TextView txtRoute;
+        final TextView txtMeta;
+        final TextView txtStatus;
 
         public MyHolder(@NonNull View itemView) {
             super(itemView);
-            customerName = itemView.findViewById(R.id.txtCustomerName);
-            city = itemView.findViewById(R.id.txtCity);
-            tag = itemView.findViewById(R.id.txtTag);
-            route = itemView.findViewById(R.id.txtRoute);
-            duration = itemView.findViewById(R.id.txtTime);
-            peopleCnt = itemView.findViewById(R.id.txtPeople);
+            txtTitle = itemView.findViewById(R.id.txtTitle);
+            txtCity = itemView.findViewById(R.id.txtCity);
+            txtTag = itemView.findViewById(R.id.txtTag);
+            txtRoute = itemView.findViewById(R.id.txtRoute);
+            txtMeta = itemView.findViewById(R.id.txtMeta);
+            txtStatus = itemView.findViewById(R.id.txtStatus);
         }
     }
 
     private List<order> orderlist = new ArrayList<>();
 
     public void setListData(List<order> list) {
-        this.orderlist = list;
+        this.orderlist = list != null ? list : new ArrayList<>();
         notifyDataSetChanged();
     }
 
@@ -42,34 +47,41 @@ public class orderListAdapter extends RecyclerView.Adapter<orderListAdapter.MyHo
     @Override
     public MyHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.leader_activity_order_card, parent, false);
+                .inflate(R.layout.item_team_card, parent, false);
         return new MyHolder(view);
     }
 
+    @SuppressLint("SetTextI18n")
     @Override
     public void onBindViewHolder(@NonNull MyHolder holder, @SuppressLint("RecyclerView") int position) {
         order o = orderlist.get(position);
 
-        holder.customerName.setText(o.getCustomer().getUsername());
+        String title = o.getTitle();
+        holder.txtTitle.setText(title.isEmpty() ? "研学拼单" : title);
 
         String cityText = o.getCity();
-        holder.city.setText(cityText.isEmpty() ? "未知城市" : cityText);
+        holder.txtCity.setText(cityText.isEmpty() ? "未知城市" : cityText);
 
         String tagText = o.getTag();
         if (tagText.isEmpty()) {
-            holder.tag.setVisibility(View.GONE);
+            holder.txtTag.setVisibility(View.GONE);
         } else {
-            holder.tag.setVisibility(View.VISIBLE);
-            holder.tag.setText(tagText);
+            holder.txtTag.setVisibility(View.VISIBLE);
+            holder.txtTag.setText(tagText);
         }
 
         String routeText = o.getRoute().toString();
-        holder.route.setText(routeText.isEmpty() ? "途经：暂无景点信息" : "途经：" + routeText);
+        if (!routeText.isEmpty()) {
+            routeText = routeText.replace("→", " → ");
+        }
+        holder.txtRoute.setText(routeText.isEmpty() ? "途经：暂无景点信息" : "途经：" + routeText);
 
-        String dur = o.getEstimatedDuration();
-        holder.duration.setText(dur != null && !dur.isEmpty() ? "用时：" + dur : "用时：暂无");
+        String date = o.getDepartureDate().isEmpty() ? "待定" : o.getDepartureDate();
+        String duration = (o.getEstimatedDuration() == null || o.getEstimatedDuration().isEmpty()) ? "暂无" : o.getEstimatedDuration();
+        holder.txtMeta.setText("出发 " + date + " · 用时 " + duration + " · "
+                + o.getCurrentMembers() + "/" + o.getMaxMembers() + " 人");
 
-        holder.peopleCnt.setText(o.getPeopleCnt());
+        holder.txtStatus.setText("可接");
 
         holder.itemView.setOnClickListener(view -> {
             if (orderOnClickListener != null) {
@@ -93,3 +105,4 @@ public class orderListAdapter extends RecyclerView.Adapter<orderListAdapter.MyHo
         void onItemClick(int position);
     }
 }
+

@@ -40,4 +40,13 @@
 
     <color name="route_tag_chip_bg">#EDEFF5</color>
     <color name="route_tag_chip_text">#333333</color>
+
+    <!-- 项目状态颜色：招募中 → 已取消 -->
+    <color name="status_open">#43A047</color>
+    <color name="status_matching">#1976D2</color>
+    <color name="status_confirmed">#7B1FA2</color>
+    <color name="status_in_progress">#FB8C00</color>
+    <color name="status_done">#78909C</color>
+    <color name="status_cancelled">#E53935</color>
+    <color name="status_unknown">#9E9E9E</color>
 </resources>
