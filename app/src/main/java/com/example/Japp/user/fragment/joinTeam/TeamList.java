@@ -46,8 +46,10 @@ import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import retrofit2.Call;
@@ -71,7 +73,7 @@ public class TeamList extends Fragment {
     private String filterKeyword;
     private String filterRegionCode;
     private String filterRegionLabel;
-    private String filterTag;
+    private final Set<String> filterTags = new HashSet<>();
     private String filterStatus;
     private String filterStatusLabel;
     private String filterDateFrom;
@@ -159,10 +161,9 @@ public class TeamList extends Fragment {
         tagAdapter.setTags(java.util.Arrays.asList(tagNames));
 
         tagAdapter.setOnTagSelectedChangeListener(selectedTags -> {
-            if (selectedTags.isEmpty()) {
-                filterTag = null;
-            } else {
-                filterTag = selectedTags.iterator().next();
+            filterTags.clear();
+            if (selectedTags != null) {
+                filterTags.addAll(selectedTags);
             }
             loadTeams();
         });
@@ -217,7 +218,7 @@ public class TeamList extends Fragment {
                 Chip chip = new Chip(requireContext());
                 chip.setText(tag);
                 chip.setCheckable(true);
-                if (tag.equals(filterTag)) {
+                if (filterTags.contains(tag)) {
                     chip.setChecked(true);
                 }
                 chipGroupTags.addView(chip);
@@ -270,7 +271,8 @@ public class TeamList extends Fragment {
                 filterKeyword = null;
             }
 
-            filterTag = getSelectedTag(chipGroupTags);
+            filterTags.clear();
+            filterTags.addAll(getSelectedTags(chipGroupTags));
 
             int statusIndex = spinnerStatus.getSelectedItemPosition();
             if (statusIndex >= 0 && statusIndex < statusValues.length) {
@@ -441,17 +443,25 @@ public class TeamList extends Fragment {
         filterRegionLabel = province.getName() + " · " + city.getName();
     }
 
-    @Nullable
-    private String getSelectedTag(@Nullable ChipGroup chipGroupTags) {
+    @NonNull
+    private Set<String> getSelectedTags(@Nullable ChipGroup chipGroupTags) {
+        Set<String> selected = new HashSet<>();
         if (chipGroupTags == null) {
-            return null;
+            return selected;
         }
-        int checkedId = chipGroupTags.getCheckedChipId();
-        if (checkedId == View.NO_ID) {
-            return null;
+        for (int i = 0; i < chipGroupTags.getChildCount(); i++) {
+            View child = chipGroupTags.getChildAt(i);
+            if (child instanceof Chip) {
+                Chip chip = (Chip) child;
+                if (chip.isChecked() && chip.getText() != null) {
+                    String tag = chip.getText().toString().trim();
+                    if (!tag.isEmpty()) {
+                        selected.add(tag);
+                    }
+                }
+            }
         }
-        Chip chip = chipGroupTags.findViewById(checkedId);
-        return chip != null ? chip.getText().toString() : null;
+        return selected;
     }
 
     private void showDatePicker(DateCallback callback) {
@@ -475,7 +485,7 @@ public class TeamList extends Fragment {
         filterKeyword = null;
         filterRegionCode = null;
         filterRegionLabel = null;
-        filterTag = null;
+        filterTags.clear();
         filterStatus = null;
         filterStatusLabel = null;
         filterDateFrom = null;
@@ -490,11 +500,25 @@ public class TeamList extends Fragment {
     private boolean hasActiveFilters() {
         return !TextUtils.isEmpty(filterKeyword)
                 || !TextUtils.isEmpty(filterRegionCode)
-                || !TextUtils.isEmpty(filterTag)
+                || !filterTags.isEmpty()
                 || !TextUtils.isEmpty(filterStatus)
                 || !TextUtils.isEmpty(filterDateFrom)
                 || !TextUtils.isEmpty(filterDateTo)
                 || filterHasLeader != null;
+    }
+
+    private ProjectUiHelper.ProjectFilterCriteria buildFilterCriteria() {
+        ProjectUiHelper.ProjectFilterCriteria criteria = new ProjectUiHelper.ProjectFilterCriteria();
+        criteria.keyword = filterKeyword;
+        criteria.regionAdcode = filterRegionCode;
+        criteria.tags = new HashSet<>(filterTags);
+        criteria.status = filterStatus;
+        criteria.dateFrom = filterDateFrom;
+        criteria.dateTo = filterDateTo;
+        criteria.hasLeader = filterHasLeader;
+        // 拼单页「可加入」是业务硬性约束，不参与 OR；在本地结果上再裁剪
+        criteria.joinableOnly = null;
+        return criteria;
     }
 
     private void loadTeams() {
@@ -510,15 +534,8 @@ public class TeamList extends Fragment {
             swipeRefresh.setRefreshing(true);
         }
 
-        service.filterProjects(accountId, 1, 20,
-                filterKeyword,
-                filterRegionCode,
-                filterTag,
-                filterStatus,
-                filterDateFrom,
-                filterDateTo,
-                filterHasLeader,
-                Boolean.TRUE)
+        // 拉取较宽结果集，再按「任一条件命中」做本地 OR 筛选
+        service.getProjects(accountId, 1, 100)
                 .enqueue(new Callback<Result<List<Project>>>() {
                     @Override
                     public void onResponse(@NonNull Call<Result<List<Project>>> call,
@@ -538,7 +555,19 @@ public class TeamList extends Fragment {
                             return;
                         }
                         List<Project> projects = response.body().getData();
-                        if (projects == null || projects.isEmpty()) {
+                        if (projects == null) {
+                            projects = new ArrayList<>();
+                        }
+                        List<Project> filtered = ProjectUiHelper.filterProjectsByAnyMatch(
+                                projects, buildFilterCriteria());
+                        // 拼单页始终只展示可加入项目
+                        List<Project> joinable = new ArrayList<>();
+                        for (Project project : filtered) {
+                            if (ProjectUiHelper.isJoinable(project)) {
+                                joinable.add(project);
+                            }
+                        }
+                        if (joinable.isEmpty()) {
                             if (hasActiveFilters()) {
                                 showEmpty("暂无符合条件的拼单");
                             } else {
@@ -547,7 +576,7 @@ public class TeamList extends Fragment {
                             adapter.setItems(new ArrayList<>());
                             return;
                         }
-                        enrichProjects(projects);
+                        enrichProjects(joinable);
                     }
 
                     @Override

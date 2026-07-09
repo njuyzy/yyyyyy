@@ -48,8 +48,10 @@ import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import retrofit2.Call;
@@ -74,7 +76,7 @@ public class orderList extends Fragment {
     private String filterKeyword;
     private String filterRegionCode;
     private String filterRegionLabel;
-    private String filterTag;
+    private final Set<String> filterTags = new HashSet<>();
     private String filterStatus;
     private String filterStatusLabel;
     private String filterDateFrom;
@@ -164,11 +166,9 @@ public class orderList extends Fragment {
         tagAdapter.setTags(java.util.Arrays.asList(tagNames));
 
         tagAdapter.setOnTagSelectedChangeListener(selectedTags -> {
-            // API 只支持单个 tag，取第一个；无选中则不过滤 tag
-            if (selectedTags.isEmpty()) {
-                filterTag = null;
-            } else {
-                filterTag = selectedTags.iterator().next();
+            filterTags.clear();
+            if (selectedTags != null) {
+                filterTags.addAll(selectedTags);
             }
             loadOrders();
         });
@@ -215,7 +215,7 @@ public class orderList extends Fragment {
                 Chip chip = new Chip(requireContext());
                 chip.setText(tag);
                 chip.setCheckable(true);
-                if (tag.equals(filterTag)) {
+                if (filterTags.contains(tag)) {
                     chip.setChecked(true);
                 }
                 chipGroupTags.addView(chip);
@@ -272,7 +272,8 @@ public class orderList extends Fragment {
                 filterKeyword = null;
             }
 
-            filterTag = getSelectedTag(chipGroupTags);
+            filterTags.clear();
+            filterTags.addAll(getSelectedTags(chipGroupTags));
 
             int statusIndex = spinnerStatus.getSelectedItemPosition();
             if (statusIndex >= 0 && statusIndex < statusValues.length) {
@@ -446,17 +447,25 @@ public class orderList extends Fragment {
         filterRegionLabel = province.getName() + " · " + city.getName();
     }
 
-    @Nullable
-    private String getSelectedTag(@Nullable ChipGroup chipGroupTags) {
+    @NonNull
+    private Set<String> getSelectedTags(@Nullable ChipGroup chipGroupTags) {
+        Set<String> selected = new HashSet<>();
         if (chipGroupTags == null) {
-            return null;
+            return selected;
         }
-        int checkedId = chipGroupTags.getCheckedChipId();
-        if (checkedId == View.NO_ID) {
-            return null;
+        for (int i = 0; i < chipGroupTags.getChildCount(); i++) {
+            View child = chipGroupTags.getChildAt(i);
+            if (child instanceof Chip) {
+                Chip chip = (Chip) child;
+                if (chip.isChecked() && chip.getText() != null) {
+                    String tag = chip.getText().toString().trim();
+                    if (!tag.isEmpty()) {
+                        selected.add(tag);
+                    }
+                }
+            }
         }
-        Chip chip = chipGroupTags.findViewById(checkedId);
-        return chip != null ? chip.getText().toString() : null;
+        return selected;
     }
 
     private void showDatePicker(DateCallback callback) {
@@ -480,7 +489,7 @@ public class orderList extends Fragment {
         filterKeyword = null;
         filterRegionCode = null;
         filterRegionLabel = null;
-        filterTag = null;
+        filterTags.clear();
         filterStatus = null;
         filterStatusLabel = null;
         filterDateFrom = null;
@@ -491,6 +500,19 @@ public class orderList extends Fragment {
         if (tagAdapter != null) {
             tagAdapter.clearSelection();
         }
+    }
+
+    private ProjectUiHelper.ProjectFilterCriteria buildFilterCriteria() {
+        ProjectUiHelper.ProjectFilterCriteria criteria = new ProjectUiHelper.ProjectFilterCriteria();
+        criteria.keyword = filterKeyword;
+        criteria.regionAdcode = filterRegionCode;
+        criteria.tags = new HashSet<>(filterTags);
+        criteria.status = filterStatus;
+        criteria.dateFrom = filterDateFrom;
+        criteria.dateTo = filterDateTo;
+        criteria.hasLeader = filterHasLeader;
+        criteria.joinableOnly = Boolean.TRUE.equals(filterOnlyAvailable) ? Boolean.TRUE : null;
+        return criteria;
     }
 
     private void loadOrders() {
@@ -506,15 +528,8 @@ public class orderList extends Fragment {
             swipeRefresh.setRefreshing(true);
         }
 
-        service.filterProjects(accountId, 1, 20,
-                filterKeyword,
-                filterRegionCode,
-                filterTag,
-                filterStatus,
-                filterDateFrom,
-                filterDateTo,
-                filterHasLeader,
-                filterOnlyAvailable)
+        // 拉取较宽结果集，再按「任一条件命中」做本地 OR 筛选
+        service.getProjects(accountId, 1, 100)
                 .enqueue(new Callback<Result<List<Project>>>() {
                     @Override
                     public void onResponse(@NonNull Call<Result<List<Project>>> call,
@@ -534,12 +549,17 @@ public class orderList extends Fragment {
                             return;
                         }
                         List<Project> projects = response.body().getData();
-                        if (projects == null || projects.isEmpty()) {
+                        if (projects == null) {
+                            projects = new ArrayList<>();
+                        }
+                        List<Project> filtered = ProjectUiHelper.filterProjectsByAnyMatch(
+                                projects, buildFilterCriteria());
+                        if (filtered.isEmpty()) {
                             showEmpty("暂无符合条件的路线");
                             adapter.setItems(new ArrayList<>());
                             return;
                         }
-                        enrichProjects(projects);
+                        enrichProjects(filtered);
                     }
 
                     @Override

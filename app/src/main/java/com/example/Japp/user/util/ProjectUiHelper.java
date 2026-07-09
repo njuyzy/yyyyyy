@@ -2,14 +2,19 @@ package com.example.Japp.user.util;
 
 import android.widget.TextView;
 
+import android.text.TextUtils;
+
 import com.example.Japp.R;
 import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.RouteNode;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public final class ProjectUiHelper {
 
@@ -179,5 +184,176 @@ public final class ProjectUiHelper {
         return Integer.compare(
                 statusSortOrder(left != null ? left.getStatus() : null),
                 statusSortOrder(right != null ? right.getStatus() : null));
+    }
+
+    /**
+     * 筛选条件：用户已设置的属性之间为「或」关系——路线命中任意一项即保留。
+     * 多标签之间同样为「或」。
+     */
+    public static final class ProjectFilterCriteria {
+        public String keyword;
+        public String regionAdcode;
+        public Set<String> tags = new HashSet<>();
+        public String status;
+        public String dateFrom;
+        public String dateTo;
+        public Boolean hasLeader;
+        /** 作为普通筛选项参与 OR（如领队端「仅可接」） */
+        public Boolean joinableOnly;
+
+        public boolean hasUserFilters() {
+            return !TextUtils.isEmpty(keyword)
+                    || !TextUtils.isEmpty(regionAdcode)
+                    || (tags != null && !tags.isEmpty())
+                    || !TextUtils.isEmpty(status)
+                    || !TextUtils.isEmpty(dateFrom)
+                    || !TextUtils.isEmpty(dateTo)
+                    || hasLeader != null
+                    || joinableOnly != null;
+        }
+    }
+
+    public static List<Project> filterProjectsByAnyMatch(List<Project> projects,
+                                                         ProjectFilterCriteria criteria) {
+        if (projects == null) {
+            return new ArrayList<>();
+        }
+        if (criteria == null || !criteria.hasUserFilters()) {
+            return new ArrayList<>(projects);
+        }
+        List<Project> matched = new ArrayList<>();
+        for (Project project : projects) {
+            if (matchesAnyUserCriteria(project, criteria)) {
+                matched.add(project);
+            }
+        }
+        return matched;
+    }
+
+    public static boolean matchesAnyUserCriteria(Project project, ProjectFilterCriteria criteria) {
+        if (project == null || criteria == null || !criteria.hasUserFilters()) {
+            return project != null;
+        }
+
+        if (!TextUtils.isEmpty(criteria.keyword) && matchesKeyword(project, criteria.keyword)) {
+            return true;
+        }
+        if (!TextUtils.isEmpty(criteria.regionAdcode)
+                && matchesRegion(project.getRegionAdcode(), criteria.regionAdcode)) {
+            return true;
+        }
+        if (criteria.tags != null && !criteria.tags.isEmpty()
+                && matchesAnyTag(project.getTag(), criteria.tags)) {
+            return true;
+        }
+        if (!TextUtils.isEmpty(criteria.status)
+                && normalizeStatus(criteria.status).equals(normalizeStatus(project.getStatus()))) {
+            return true;
+        }
+        if ((!TextUtils.isEmpty(criteria.dateFrom) || !TextUtils.isEmpty(criteria.dateTo))
+                && matchesDateRange(project.getDepartureDate(), criteria.dateFrom, criteria.dateTo)) {
+            return true;
+        }
+        if (criteria.hasLeader != null && matchesHasLeader(project, criteria.hasLeader)) {
+            return true;
+        }
+        if (criteria.joinableOnly != null) {
+            boolean joinable = isJoinable(project);
+            if (Boolean.TRUE.equals(criteria.joinableOnly) && joinable) {
+                return true;
+            }
+            if (Boolean.FALSE.equals(criteria.joinableOnly) && !joinable) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesKeyword(Project project, String keyword) {
+        String needle = keyword.trim().toLowerCase(Locale.ROOT);
+        if (needle.isEmpty()) {
+            return false;
+        }
+        String title = project.getTitle() != null ? project.getTitle().toLowerCase(Locale.ROOT) : "";
+        String tag = project.getTag() != null ? project.getTag().toLowerCase(Locale.ROOT) : "";
+        return title.contains(needle) || tag.contains(needle);
+    }
+
+    private static boolean matchesRegion(String projectAdcode, String filterAdcode) {
+        if (TextUtils.isEmpty(projectAdcode) || TextUtils.isEmpty(filterAdcode)) {
+            return false;
+        }
+        String project = projectAdcode.trim();
+        String filter = filterAdcode.trim();
+        if (project.equals(filter)) {
+            return true;
+        }
+        // 选省时匹配该省下城市；选市时也可被省码前缀命中
+        int prefixLen = Math.min(filter.length(), project.length());
+        if (prefixLen >= 2) {
+            int compareLen = filter.length() >= 4 ? 4 : 2;
+            compareLen = Math.min(compareLen, prefixLen);
+            return project.regionMatches(0, filter, 0, compareLen);
+        }
+        return false;
+    }
+
+    private static boolean matchesAnyTag(String projectTag, Set<String> selectedTags) {
+        if (TextUtils.isEmpty(projectTag) || selectedTags == null || selectedTags.isEmpty()) {
+            return false;
+        }
+        String normalizedProject = projectTag.trim();
+        for (String selected : selectedTags) {
+            if (selected != null && selected.trim().equalsIgnoreCase(normalizedProject)) {
+                return true;
+            }
+        }
+        // 项目 tag 可能是逗号分隔多标签
+        String[] parts = normalizedProject.split("[,，、|/]");
+        for (String part : parts) {
+            String token = part.trim();
+            if (token.isEmpty()) {
+                continue;
+            }
+            for (String selected : selectedTags) {
+                if (selected != null && selected.trim().equalsIgnoreCase(token)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesDateRange(String departureDate, String from, String to) {
+        if (TextUtils.isEmpty(departureDate)) {
+            return false;
+        }
+        String date = departureDate.trim();
+        if (date.length() >= 10) {
+            date = date.substring(0, 10);
+        }
+        if (!TextUtils.isEmpty(from) && date.compareTo(from.trim()) < 0) {
+            return false;
+        }
+        if (!TextUtils.isEmpty(to) && date.compareTo(to.trim()) > 0) {
+            return false;
+        }
+        return !TextUtils.isEmpty(from) || !TextUtils.isEmpty(to);
+    }
+
+    private static boolean matchesHasLeader(Project project, boolean wantHasLeader) {
+        boolean hasLeader = project.getLeaderAccountId() != null && project.getLeaderAccountId() > 0;
+        return wantHasLeader == hasLeader;
+    }
+
+    public static boolean isJoinable(Project project) {
+        if (project == null) {
+            return false;
+        }
+        String status = normalizeStatus(project.getStatus());
+        if (!STATUS_OPEN.equals(status) && !STATUS_MATCHING.equals(status)) {
+            return false;
+        }
+        return project.getMaxMembers() <= 0 || project.getCurrentMembers() < project.getMaxMembers();
     }
 }
