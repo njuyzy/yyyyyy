@@ -6,7 +6,6 @@ import com.example.Japp.network.models.AccountTagPref;
 import com.example.Japp.network.models.ChatSession;
 import com.example.Japp.network.models.LoginResponse;
 import com.example.Japp.network.models.Project;
-import com.example.Japp.network.models.Region;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.google.gson.JsonElement;
@@ -70,23 +69,11 @@ public interface UserService {
     Call<Result<List<Project>>> filterProjects(@Query("accountId") int accountId,
                                               @Query("pageNum") int pageNum,
                                               @Query("pageSize") int pageSize,
-                                              @Query("keyword") String keyword,
-                                              @Query("regionCode") String regionCode,
+                                              @Query("regionAdcode") String regionAdcode,
                                               @Query("tag") String tag,
                                               @Query("status") String status,
-                                              @Query("departureDateFrom") String departureDateFrom,
-                                              @Query("departureDateTo") String departureDateTo,
-                                              @Query("hasLeader") Boolean hasLeader,
-                                              @Query("onlyAvailable") Boolean onlyAvailable);
-
-    @GET("projects/{id}")
-    Call<Result<Project>> getProject(@Path("id") int id);
-
-    @GET("regions/provinces")
-    Call<Result<List<Region>>> getProvinces();
-
-    @GET("regions/children")
-    Call<Result<List<Region>>> getRegionChildren(@Query("parentAdcode") String parentAdcode);
+                                              @Query("departureDate") String departureDate,
+                                              @Query("joinableOnly") boolean joinableOnly);
 
     @POST("projects")
     Call<Result> createProject(@Body CreateProjectRequest request);

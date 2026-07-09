@@ -108,7 +108,7 @@ public class TeamList extends Fragment {
             swipeRefresh.setRefreshing(true);
         }
 
-        service.filterProjects(accountId, 1, 20, null, null, null, null, null, null, null, true)
+        service.filterProjects(accountId, 1, 20, null, null, null, null, true)
                 .enqueue(new Callback<Result<List<Project>>>() {
                     @Override
                     public void onResponse(Call<Result<List<Project>>> call,
@@ -149,7 +149,6 @@ public class TeamList extends Fragment {
     }
 
     private void enrichProjects(List<Project> projects) {
-        ProjectUiHelper.sortProjectsByStatus(projects);
         teamItems.clear();
         List<TeamCardItem> temp = new ArrayList<>();
         for (Project project : projects) {
@@ -210,11 +209,7 @@ public class TeamList extends Fragment {
 
     private void checkRefresh(AtomicInteger done, int total) {
         if (done.incrementAndGet() == total && isAdded()) {
-            requireActivity().runOnUiThread(() -> {
-                teamItems.sort((left, right) -> ProjectUiHelper.compareProjectsByStatus(
-                        left.getProject(), right.getProject()));
-                adapter.setItems(new ArrayList<>(teamItems));
-            });
+            requireActivity().runOnUiThread(() -> adapter.setItems(new ArrayList<>(teamItems)));
         }
     }
 

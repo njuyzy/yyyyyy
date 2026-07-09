@@ -142,7 +142,7 @@ public class TeamDetailActivity extends AppCompatActivity {
                 + " · 出发 " + date
                 + " · " + project.getCurrentMembers() + "/" + project.getMaxMembers() + " 人");
 
-        ProjectUiHelper.bindStatusBadge(txtStatus, project.getStatus());
+        txtStatus.setText(ProjectUiHelper.statusLabel(project.getStatus()));
     }
 
     private void loadOwnerName() {

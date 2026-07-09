@@ -106,7 +106,6 @@ public class historyRoute extends Fragment {
     }
 
     private void enrichProjects(List<Project> projects) {
-        ProjectUiHelper.sortProjectsByStatus(projects);
         items.clear();
         List<TeamCardItem> temp = new ArrayList<>();
         for (Project project : projects) {
@@ -164,11 +163,7 @@ public class historyRoute extends Fragment {
 
     private void checkDone(AtomicInteger done, int total) {
         if (done.incrementAndGet() == total && isAdded()) {
-            requireActivity().runOnUiThread(() -> {
-                items.sort((left, right) -> ProjectUiHelper.compareProjectsByStatus(
-                        left.getProject(), right.getProject()));
-                adapter.setItems(new ArrayList<>(items));
-            });
+            requireActivity().runOnUiThread(() -> adapter.setItems(new ArrayList<>(items)));
         }
     }
 

@@ -92,7 +92,7 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
         holder.txtMeta.setText("出发 " + date + " · 用时 " + duration + " · "
                 + project.getCurrentMembers() + "/" + project.getMaxMembers() + " 人");
 
-        ProjectUiHelper.bindStatusBadge(holder.txtStatus, project.getStatus());
+        holder.txtStatus.setText(ProjectUiHelper.statusLabel(project.getStatus()));
 
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) {

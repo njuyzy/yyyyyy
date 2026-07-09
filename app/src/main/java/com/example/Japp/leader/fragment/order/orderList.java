@@ -1,6 +1,5 @@
 package com.example.Japp.leader.fragment.order;
 
-import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -11,7 +10,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -50,10 +48,8 @@ import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import retrofit2.Call;
@@ -78,7 +74,7 @@ public class orderList extends Fragment {
     private String filterKeyword;
     private String filterRegionCode;
     private String filterRegionLabel;
-    private Set<String> filterTags = new HashSet<>();
+    private String filterTag;
     private String filterStatus;
     private String filterStatusLabel;
     private String filterDateFrom;
@@ -135,7 +131,10 @@ public class orderList extends Fragment {
 
         // 搜索按钮
         if (btnSearch != null) {
-            btnSearch.setOnClickListener(v -> showSearchDialog());
+            btnSearch.setOnClickListener(v -> {
+                // TODO: 跳转到搜索界面
+                Toast.makeText(requireContext(), "搜索功能开发中", Toast.LENGTH_SHORT).show();
+            });
         }
 
         return view;
@@ -155,31 +154,6 @@ public class orderList extends Fragment {
         dialog.show();
     }
 
-    private void showSearchDialog() {
-        EditText editSearch = new EditText(requireContext());
-        editSearch.setHint("输入项目名称搜索");
-        editSearch.setText(filterKeyword != null ? filterKeyword : "");
-        editSearch.setSelectAllOnFocus(true);
-
-        int padding = (int) (16 * getResources().getDisplayMetrics().density);
-        editSearch.setPadding(padding, padding, padding, padding);
-
-        new AlertDialog.Builder(requireContext())
-                .setTitle("搜索项目")
-                .setView(editSearch)
-                .setPositiveButton("搜索", (dialog, which) -> {
-                    String keyword = editSearch.getText().toString().trim();
-                    filterKeyword = keyword.isEmpty() ? null : keyword;
-                    loadOrders();
-                })
-                .setNegativeButton("取消", null)
-                .setNeutralButton("清除", (dialog, which) -> {
-                    filterKeyword = null;
-                    loadOrders();
-                })
-                .show();
-    }
-
     private void setupTagGrid() {
         if (tagGrid == null) return;
         tagAdapter = new TagGridAdapter();
@@ -190,8 +164,12 @@ public class orderList extends Fragment {
         tagAdapter.setTags(java.util.Arrays.asList(tagNames));
 
         tagAdapter.setOnTagSelectedChangeListener(selectedTags -> {
-            // 支持多个 tag 过滤
-            filterTags = new HashSet<>(selectedTags);
+            // API 只支持单个 tag，取第一个；无选中则不过滤 tag
+            if (selectedTags.isEmpty()) {
+                filterTag = null;
+            } else {
+                filterTag = selectedTags.iterator().next();
+            }
             loadOrders();
         });
     }
@@ -237,7 +215,7 @@ public class orderList extends Fragment {
                 Chip chip = new Chip(requireContext());
                 chip.setText(tag);
                 chip.setCheckable(true);
-                if (filterTags.contains(tag)) {
+                if (tag.equals(filterTag)) {
                     chip.setChecked(true);
                 }
                 chipGroupTags.addView(chip);
@@ -294,7 +272,7 @@ public class orderList extends Fragment {
                 filterKeyword = null;
             }
 
-            filterTags = getSelectedTags(chipGroupTags);
+            filterTag = getSelectedTag(chipGroupTags);
 
             int statusIndex = spinnerStatus.getSelectedItemPosition();
             if (statusIndex >= 0 && statusIndex < statusValues.length) {
@@ -469,18 +447,16 @@ public class orderList extends Fragment {
     }
 
     @Nullable
-    private Set<String> getSelectedTags(@Nullable ChipGroup chipGroupTags) {
-        Set<String> selected = new HashSet<>();
+    private String getSelectedTag(@Nullable ChipGroup chipGroupTags) {
         if (chipGroupTags == null) {
-            return selected;
+            return null;
         }
-        for (int i = 0; i < chipGroupTags.getChildCount(); i++) {
-            Chip chip = (Chip) chipGroupTags.getChildAt(i);
-            if (chip.isChecked()) {
-                selected.add(chip.getText().toString());
-            }
+        int checkedId = chipGroupTags.getCheckedChipId();
+        if (checkedId == View.NO_ID) {
+            return null;
         }
-        return selected;
+        Chip chip = chipGroupTags.findViewById(checkedId);
+        return chip != null ? chip.getText().toString() : null;
     }
 
     private void showDatePicker(DateCallback callback) {
@@ -504,7 +480,7 @@ public class orderList extends Fragment {
         filterKeyword = null;
         filterRegionCode = null;
         filterRegionLabel = null;
-        filterTags.clear();
+        filterTag = null;
         filterStatus = null;
         filterStatusLabel = null;
         filterDateFrom = null;
@@ -530,115 +506,52 @@ public class orderList extends Fragment {
             swipeRefresh.setRefreshing(true);
         }
 
-        // 多 tag 查询：分别查询每个 tag，再合并结果（OR 逻辑）
-        if (filterTags.size() > 1) {
-            final Set<Integer> seenIds = new HashSet<>();
-            final List<Project> mergedProjects = new ArrayList<>();
-            AtomicInteger pending = new AtomicInteger(filterTags.size());
-
-            for (String tag : filterTags) {
-                service.filterProjects(accountId, 1, 100,
-                        filterKeyword,
-                        filterRegionCode,
-                        tag,
-                        filterStatus,
-                        filterDateFrom,
-                        filterDateTo,
-                        filterHasLeader,
-                        filterOnlyAvailable)
-                        .enqueue(new Callback<Result<List<Project>>>() {
-                            @Override
-                            public void onResponse(@NonNull Call<Result<List<Project>>> call,
-                                                   @NonNull Response<Result<List<Project>>> response) {
-                                if (!isAdded()) return;
-                                if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
-                                    List<Project> projects = response.body().getData();
-                                    if (projects != null) {
-                                        synchronized (mergedProjects) {
-                                            for (Project p : projects) {
-                                                if (seenIds.add(p.getId())) {
-                                                    mergedProjects.add(p);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                if (pending.decrementAndGet() == 0) {
-                                    onMultiTagResultsReady(mergedProjects);
-                                }
-                            }
-
-                            @Override
-                            public void onFailure(@NonNull Call<Result<List<Project>>> call, @NonNull Throwable t) {
-                                if (!isAdded()) return;
-                                if (pending.decrementAndGet() == 0) {
-                                    onMultiTagResultsReady(mergedProjects);
-                                }
-                            }
-                        });
-            }
-        } else {
-            // 单 tag 或无 tag 查询
-            String singleTag = filterTags.isEmpty() ? null : filterTags.iterator().next();
-            service.filterProjects(accountId, 1, 20,
-                    filterKeyword,
-                    filterRegionCode,
-                    singleTag,
-                    filterStatus,
-                    filterDateFrom,
-                    filterDateTo,
-                    filterHasLeader,
-                    filterOnlyAvailable)
-                    .enqueue(new Callback<Result<List<Project>>>() {
-                        @Override
-                        public void onResponse(@NonNull Call<Result<List<Project>>> call,
-                                               @NonNull Response<Result<List<Project>>> response) {
-                            if (!isAdded()) {
-                                return;
-                            }
-                            stopRefreshing();
-                            if (response.code() == 401) {
-                                Toast.makeText(requireContext(), "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
-                                SessionHelper.handleUnauthorized(requireContext());
-                                return;
-                            }
-                            if (!response.isSuccessful() || response.body() == null || response.body().getCode() != 1) {
-                                showEmpty("加载失败，下拉刷新重试");
-                                adapter.setItems(new ArrayList<>());
-                                return;
-                            }
-                            List<Project> projects = response.body().getData();
-                            if (projects == null || projects.isEmpty()) {
-                                showEmpty("暂无符合条件的路线");
-                                adapter.setItems(new ArrayList<>());
-                                return;
-                            }
-                            enrichProjects(projects);
+        service.filterProjects(accountId, 1, 20,
+                filterKeyword,
+                filterRegionCode,
+                filterTag,
+                filterStatus,
+                filterDateFrom,
+                filterDateTo,
+                filterHasLeader,
+                filterOnlyAvailable)
+                .enqueue(new Callback<Result<List<Project>>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<Result<List<Project>>> call,
+                                           @NonNull Response<Result<List<Project>>> response) {
+                        if (!isAdded()) {
+                            return;
                         }
-
-                        @Override
-                        public void onFailure(@NonNull Call<Result<List<Project>>> call, @NonNull Throwable t) {
-                            if (!isAdded()) {
-                                return;
-                            }
-                            stopRefreshing();
-                            showEmpty("网络错误，下拉刷新重试");
+                        stopRefreshing();
+                        if (response.code() == 401) {
+                            Toast.makeText(requireContext(), "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
+                            SessionHelper.handleUnauthorized(requireContext());
+                            return;
+                        }
+                        if (!response.isSuccessful() || response.body() == null || response.body().getCode() != 1) {
+                            showEmpty("加载失败，下拉刷新重试");
                             adapter.setItems(new ArrayList<>());
+                            return;
                         }
-                    });
-        }
-    }
+                        List<Project> projects = response.body().getData();
+                        if (projects == null || projects.isEmpty()) {
+                            showEmpty("暂无符合条件的路线");
+                            adapter.setItems(new ArrayList<>());
+                            return;
+                        }
+                        enrichProjects(projects);
+                    }
 
-    private void onMultiTagResultsReady(List<Project> projects) {
-        requireActivity().runOnUiThread(() -> {
-            stopRefreshing();
-            if (projects.isEmpty()) {
-                showEmpty("暂无符合条件的路线");
-                adapter.setItems(new ArrayList<>());
-            } else {
-                enrichProjects(projects);
-            }
-        });
+                    @Override
+                    public void onFailure(@NonNull Call<Result<List<Project>>> call, @NonNull Throwable t) {
+                        if (!isAdded()) {
+                            return;
+                        }
+                        stopRefreshing();
+                        showEmpty("网络错误，下拉刷新重试");
+                        adapter.setItems(new ArrayList<>());
+                    }
+                });
     }
 
     private void enrichProjects(List<Project> projects) {

@@ -7,16 +7,15 @@
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="0dp"
-        android:layout_height="@dimen/wide_toolbar_height"
+        android:layout_height="wrap_content"
         android:background="@color/accent_dark"
-        android:minHeight="@dimen/wide_toolbar_height"
+        android:minHeight="?attr/actionBarSize"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:navigationIcon="@drawable/ic_arrow_back"
         app:navigationIconTint="@color/white"
-        app:title="@string/leader_route_planning_title"
-        app:titleCentered="true"
+        app:title="路线地图"
         app:titleTextColor="@color/white" />
 
     <com.amap.api.maps.MapView
@@ -27,34 +26,4 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/toolbar" />
-
-    <LinearLayout
-        android:id="@+id/bottom_layout"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:background="#CCFFFFFF"
-        android:orientation="vertical"
-        android:padding="14dp"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent">
-
-        <TextView
-            android:id="@+id/firstline"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/accent"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/secondline"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/route_plan_tap_detail"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp" />
-    </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>
