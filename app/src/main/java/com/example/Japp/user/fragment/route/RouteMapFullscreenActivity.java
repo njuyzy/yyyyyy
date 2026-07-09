@@ -17,6 +17,7 @@ import com.amap.api.maps.MapView;
 import com.amap.api.maps.MapsInitializer;
 import com.amap.api.maps.model.LatLng;
 import com.example.Japp.R;
+import com.example.Japp.network.models.RouteNode;
 import com.google.android.material.appbar.MaterialToolbar;
 
 import java.util.ArrayList;
@@ -27,16 +28,34 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
 
     private static final String EXTRA_LATS = "route_lats";
     private static final String EXTRA_LNGS = "route_lngs";
+    private static final String EXTRA_WAYPOINT_LATS = "waypoint_lats";
+    private static final String EXTRA_WAYPOINT_LNGS = "waypoint_lngs";
+    private static final String EXTRA_TITLE = "route_title";
 
     private MapView mapView;
     @Nullable
     private AMap aMap;
     @Nullable
     private List<LatLng> routePoints;
+    @Nullable
+    private List<LatLng> waypointPoints;
     private boolean mapCreated;
 
     public static void start(@NonNull Context context, @Nullable List<LatLng> points) {
-        List<LatLng> safePoints = points;
+        start(context, points, null);
+    }
+
+    public static void startWithNodes(@NonNull Context context,
+                                      @Nullable List<RouteNode> nodes,
+                                      @Nullable String title) {
+        start(context, RouteMapDrawHelper.extractPointsFromNodes(nodes), title);
+    }
+
+    public static void start(@NonNull Context context,
+                             @Nullable List<LatLng> roadPoints,
+                             @Nullable List<LatLng> waypoints,
+                             @Nullable String title) {
+        List<LatLng> safePoints = roadPoints;
         if (safePoints == null || safePoints.isEmpty()) {
             safePoints = RouteSampleData.getMockPolyline();
         }
@@ -49,10 +68,29 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
         Intent intent = new Intent(context, RouteMapFullscreenActivity.class);
         intent.putExtra(EXTRA_LATS, lats);
         intent.putExtra(EXTRA_LNGS, lngs);
+        if (waypoints != null && !waypoints.isEmpty()) {
+            double[] wLats = new double[waypoints.size()];
+            double[] wLngs = new double[waypoints.size()];
+            for (int i = 0; i < waypoints.size(); i++) {
+                wLats[i] = waypoints.get(i).latitude;
+                wLngs[i] = waypoints.get(i).longitude;
+            }
+            intent.putExtra(EXTRA_WAYPOINT_LATS, wLats);
+            intent.putExtra(EXTRA_WAYPOINT_LNGS, wLngs);
+        }
+        if (!TextUtils.isEmpty(title)) {
+            intent.putExtra(EXTRA_TITLE, title);
+        }
         if (!(context instanceof android.app.Activity)) {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         }
         context.startActivity(intent);
+    }
+
+    public static void start(@NonNull Context context,
+                             @Nullable List<LatLng> points,
+                             @Nullable String title) {
+        start(context, points, null, title);
     }
 
     @Override
@@ -72,6 +110,10 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
             toolbar.setNavigationOnClickListener(v -> finish());
+            String title = getIntent().getStringExtra(EXTRA_TITLE);
+            if (!TextUtils.isEmpty(title)) {
+                toolbar.setTitle(title);
+            }
         }
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -82,6 +124,7 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
         });
 
         routePoints = readPointsFromIntent();
+        waypointPoints = readWaypointsFromIntent();
         mapView = findViewById(R.id.mapView);
         if (mapView == null) {
             Toast.makeText(this, "地图加载失败", Toast.LENGTH_SHORT).show();
@@ -111,17 +154,28 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
             return;
         }
         try {
-            RouteMapDrawHelper.drawRoute(aMap, routePoints);
+            RouteMapDrawHelper.drawRoute(aMap, routePoints, waypointPoints);
         } catch (Exception ignored) {
             // 地图尚未就绪时忽略，等待 onMapLoaded 再次绘制
         }
     }
 
     private List<LatLng> readPointsFromIntent() {
-        double[] lats = getIntent().getDoubleArrayExtra(EXTRA_LATS);
-        double[] lngs = getIntent().getDoubleArrayExtra(EXTRA_LNGS);
+        return readLatLngExtra(EXTRA_LATS, EXTRA_LNGS, true);
+    }
+
+    @Nullable
+    private List<LatLng> readWaypointsFromIntent() {
+        List<LatLng> points = readLatLngExtra(EXTRA_WAYPOINT_LATS, EXTRA_WAYPOINT_LNGS, false);
+        return points.isEmpty() ? null : points;
+    }
+
+    @NonNull
+    private List<LatLng> readLatLngExtra(String latKey, String lngKey, boolean fallbackMock) {
+        double[] lats = getIntent().getDoubleArrayExtra(latKey);
+        double[] lngs = getIntent().getDoubleArrayExtra(lngKey);
         if (lats == null || lngs == null || lats.length == 0 || lats.length != lngs.length) {
-            return RouteSampleData.getMockPolyline();
+            return fallbackMock ? RouteSampleData.getMockPolyline() : new ArrayList<>();
         }
         List<LatLng> list = new ArrayList<>(lats.length);
         for (int i = 0; i < lats.length; i++) {

@@ -1,85 +1,115 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/conversationCard"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="8dp"
-    android:elevation="4dp"
-    app:cardCornerRadius="16dp"
-    app:cardBackgroundColor="@color/card_background"
-    android:id="@+id/conversationCard">
+    android:layout_marginBottom="10dp"
+    app:cardBackgroundColor="@color/white"
+    app:cardCornerRadius="18dp"
+    app:cardElevation="2dp"
+    app:strokeColor="#E8EEF7"
+    app:strokeWidth="1dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
-        android:padding="16dp"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:paddingStart="14dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="14dp">
 
-        <ImageView
-            android:id="@+id/avatar"
+        <FrameLayout
+            android:id="@+id/avatarContainer"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:layout_marginEnd="16dp"
-            android:background="@drawable/shape_avatar"
-            android:contentDescription="@string/avatar"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
+            android:background="@drawable/bg_chat_avatar_peer"
             app:layout_constraintBottom_toBottomOf="parent"
-            android:src="@drawable/ic_default_avatar" />
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <!-- 保留旧 id，兼容现有代码；默认隐藏 -->
+            <ImageView
+                android:id="@+id/avatar"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/avatar"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/txtAvatar"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:textColor="@color/white"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                tools:text="张" />
+        </FrameLayout>
 
         <TextView
             android:id="@+id/txtName"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Name"
-            android:textColor="@color/text_primary"
+            android:layout_marginStart="12dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#12263A"
             android:textSize="16sp"
             android:textStyle="bold"
-            app:layout_constraintStart_toEndOf="@id/avatar"
+            app:layout_constraintEnd_toStartOf="@id/txtTime"
+            app:layout_constraintStart_toEndOf="@id/avatarContainer"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/txtTime"/>
+            tools:text="张三" />
 
         <TextView
             android:id="@+id/txtTime"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="10:30"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp"
+            android:textColor="@color/chat_time"
+            android:textSize="11sp"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"/>
+            tools:text="10:30" />
 
         <TextView
             android:id="@+id/txtLast"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
             android:layout_marginTop="4dp"
-            android:text="Last message"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp"
-            android:maxLines="1"
+            android:layout_marginEnd="8dp"
             android:ellipsize="end"
-            app:layout_constraintStart_toEndOf="@id/avatar"
+            android:maxLines="1"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/txtUnread"
+            app:layout_constraintStart_toEndOf="@id/avatarContainer"
             app:layout_constraintTop_toBottomOf="@id/txtName"
-            app:layout_constraintEnd_toStartOf="@id/txtTime"/>
+            tools:text="你好，我想咨询一下路线" />
 
         <TextView
             android:id="@+id/txtUnread"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="16dp"
+            android:background="@drawable/bg_chat_unread"
             android:gravity="center"
             android:minWidth="20dp"
             android:minHeight="20dp"
             android:paddingHorizontal="6dp"
             android:paddingVertical="2dp"
-            android:text="0"
-            android:textColor="@color/unread_text"
+            android:textColor="@color/white"
             android:textSize="10sp"
-            android:background="@drawable/shape_unread_badge"
-            app:layout_constraintEnd_toStartOf="@id/avatar"
-            app:layout_constraintTop_toBottomOf="@id/txtTime"
-            app:layout_constraintBottom_toBottomOf="parent" />
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@id/txtLast"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/txtLast"
+            tools:text="2"
+            tools:visibility="visible" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>

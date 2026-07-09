@@ -6,12 +6,12 @@ import com.example.Japp.network.models.AccountTagPref;
 import com.example.Japp.network.models.ChatSession;
 import com.example.Japp.network.models.LoginResponse;
 import com.example.Japp.network.models.Project;
+import com.example.Japp.network.models.Region;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.google.gson.JsonElement;
 import com.example.Japp.network.models.requests.CreateProjectRequest;
 import com.example.Japp.network.models.requests.CreateSessionRequest;
-import com.example.Japp.network.models.requests.PlanRouteRequest;
 import com.example.Japp.network.models.requests.IntroRequest;
 import com.example.Japp.network.models.requests.UpdateUsernameRequest;
 import com.example.Japp.network.models.requests.LoginRequest;
@@ -65,24 +65,36 @@ public interface UserService {
                                             @Query("pageNum") int pageNum,
                                             @Query("pageSize") int pageSize);
 
+    @GET("projects/{id}")
+    Call<Result<Project>> getProject(@Path("id") int projectId);
+
+    @GET("regions/provinces")
+    Call<Result<List<Region>>> getProvinces();
+
+    @GET("regions/{adcode}/children")
+    Call<Result<List<Region>>> getRegionChildren(@Path("adcode") String adcode);
+
     @GET("projects/filter")
     Call<Result<List<Project>>> filterProjects(@Query("accountId") int accountId,
                                               @Query("pageNum") int pageNum,
                                               @Query("pageSize") int pageSize,
+                                              @Query("keyword") String keyword,
                                               @Query("regionAdcode") String regionAdcode,
                                               @Query("tag") String tag,
                                               @Query("status") String status,
-                                              @Query("departureDate") String departureDate,
-                                              @Query("joinableOnly") boolean joinableOnly);
+                                              @Query("departureDateFrom") String departureDateFrom,
+                                              @Query("departureDateTo") String departureDateTo,
+                                              @Query("hasLeader") Boolean hasLeader,
+                                              @Query("joinableOnly") Boolean joinableOnly);
 
     @POST("projects")
     Call<Result> createProject(@Body CreateProjectRequest request);
 
-    @POST("routes/plan")
-    Call<Result<JsonElement>> planRouteByAi(@Query("accountId") int accountId,
-                                            @Query("memoryId") String memoryId,
-                                            @Query("text") String text,
-                                            @Body PlanRouteRequest request);
+    // 后端约定：POST /routes/ai/{memoryId}?message=...
+    // 成功时 data 为路线 ID（数字）
+    @POST("routes/ai/{memoryId}")
+    Call<Result<JsonElement>> planRouteByAi(@Path("memoryId") String memoryId,
+                                            @Query("message") String message);
 
     @GET("routes/{id}")
     Call<Result<List<RouteNode>>> getRouteNodes(@Path("id") int routeId);

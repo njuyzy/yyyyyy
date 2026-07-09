@@ -10,8 +10,9 @@
         <item name="colorSecondary">@color/accent</item>
         <item name="colorOnSecondary">#FFFFFF</item>
 
-        <!-- Status bar color. -->
-        <item name="android:statusBarColor" tools:targetApi="l">?attr/colorPrimaryVariant</item>
+        <!-- 透明状态栏，由 DisplayCutoutAdapter 给内容加顶部安全区，避免被电量/时间挡住 -->
+        <item name="android:statusBarColor" tools:targetApi="l">@android:color/transparent</item>
+        <item name="android:navigationBarColor" tools:targetApi="l">@android:color/transparent</item>
 
         <!-- Customize your theme here. -->
         <item name="android:windowLightStatusBar">true</item>

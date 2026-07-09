@@ -10,14 +10,18 @@ public class RouteChatItem {
 
     public static final int TYPE_USER = 0;
     public static final int TYPE_ASSISTANT_ROUTE = 1;
+    /** 路线助手状态/等待反馈（无地图、不可发布） */
+    public static final int TYPE_ASSISTANT_STATUS = 2;
 
     private final int type;
-    private final String text;
+    private String text;
     private final long timestamp;
     private final int routeId;
     private final List<LatLng> polylinePoints;
+    private final List<LatLng> waypointPoints;
 
-    private RouteChatItem(int type, String text, long timestamp, int routeId, List<LatLng> polylinePoints) {
+    private RouteChatItem(int type, String text, long timestamp, int routeId,
+                          List<LatLng> polylinePoints, List<LatLng> waypointPoints) {
         this.type = type;
         this.text = text;
         this.timestamp = timestamp;
@@ -25,10 +29,17 @@ public class RouteChatItem {
         this.polylinePoints = polylinePoints != null
                 ? new ArrayList<>(polylinePoints)
                 : new ArrayList<>();
+        this.waypointPoints = waypointPoints != null
+                ? new ArrayList<>(waypointPoints)
+                : new ArrayList<>();
     }
 
     public static RouteChatItem user(String text) {
-        return new RouteChatItem(TYPE_USER, text, System.currentTimeMillis(), 0, null);
+        return new RouteChatItem(TYPE_USER, text, System.currentTimeMillis(), 0, null, null);
+    }
+
+    public static RouteChatItem assistantStatus(String text) {
+        return new RouteChatItem(TYPE_ASSISTANT_STATUS, text, System.currentTimeMillis(), 0, null, null);
     }
 
     public static RouteChatItem assistantRoute(String text, List<LatLng> points) {
@@ -36,7 +47,19 @@ public class RouteChatItem {
     }
 
     public static RouteChatItem assistantRoute(String text, List<LatLng> points, int routeId) {
-        return new RouteChatItem(TYPE_ASSISTANT_ROUTE, text, System.currentTimeMillis(), routeId, points);
+        return assistantRoute(text, points, null, routeId);
+    }
+
+    public static RouteChatItem assistantRoute(String text,
+                                               List<LatLng> roadPolyline,
+                                               List<LatLng> waypoints,
+                                               int routeId) {
+        return new RouteChatItem(TYPE_ASSISTANT_ROUTE, text, System.currentTimeMillis(),
+                routeId, roadPolyline, waypoints);
+    }
+
+    public void setText(String text) {
+        this.text = text != null ? text : "";
     }
 
     public int getType() {
@@ -59,8 +82,16 @@ public class RouteChatItem {
         return Collections.unmodifiableList(polylinePoints);
     }
 
+    public List<LatLng> getWaypointPoints() {
+        return Collections.unmodifiableList(waypointPoints);
+    }
+
     public int getRouteId() {
         return routeId;
+    }
+
+    public boolean isStatus() {
+        return type == TYPE_ASSISTANT_STATUS;
     }
 
     public boolean canPublish() {

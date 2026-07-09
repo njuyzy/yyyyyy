@@ -1,15 +1,73 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# Built application files
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+build/
+*/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
+
+# Local configuration (machine-specific / secrets) — never commit
 local.properties
+**/local.properties
+*.local
+*.local.*
+.env
+.env.*
+!.env.example
+secrets.properties
+**/secrets.properties
+keystore.properties
+**/keystore.properties
+*.jks
+*.keystore
+*.p12
+google-services.json
+**/google-services.json
+agconnect-services.json
+**/agconnect-services.json
+
+# IDE / editor
+*.iml
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs & temp
+*.log
+*.tmp
+*.temp
+.cache/
+
+# Native / NDK
+obj/
+
+# Kotlin / Android Studio
+.kotlin/
+*.hprof
+
+# Signing / release local overrides
+signing.properties
+**/signing.properties
+release/
+!app/release/

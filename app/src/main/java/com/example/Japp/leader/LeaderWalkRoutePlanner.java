@@ -41,6 +41,17 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
                                 @NonNull ArrayList<String> instructions,
                                 boolean hadFailures);
 
+        /**
+         * 带道路折线的完成回调。默认转调三参数版本，兼容旧调用方。
+         * @param roadPolyline 沿道路的折线点；失败回退时可能是站点直连
+         */
+        default void onPlanningFinished(@NonNull String summary,
+                                        @NonNull ArrayList<String> instructions,
+                                        @NonNull List<LatLng> roadPolyline,
+                                        boolean hadFailures) {
+            onPlanningFinished(summary, instructions, hadFailures);
+        }
+
         void onPlanningFailed(@NonNull String message);
     }
 
@@ -125,7 +136,7 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
         }
 
         if (routePoints.size() < 2) {
-            cb.onPlanningFinished("单点路线", new ArrayList<>(), false);
+            cb.onPlanningFinished("单点路线", new ArrayList<>(), new ArrayList<>(routePoints), false);
             return;
         }
 
@@ -193,7 +204,11 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
         if (totalWalkDuration <= 0 && totalWalkDistance <= 0) {
             summary = "已用直线连接各站点";
         }
-        callback.onPlanningFinished(summary, new ArrayList<>(walkInstructions), hadFailures);
+        List<LatLng> roadPolyline = plannedPolylinePoints.size() >= 2
+                ? new ArrayList<>(plannedPolylinePoints)
+                : new ArrayList<>(routePoints);
+        callback.onPlanningFinished(summary, new ArrayList<>(walkInstructions),
+                roadPolyline, hadFailures);
     }
 
     private void drawPlannedPolyline() {

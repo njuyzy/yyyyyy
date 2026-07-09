@@ -36,20 +36,45 @@ public final class RouteMapDrawHelper {
 
     @Nullable
     public static Polyline drawRoute(@Nullable AMap aMap, @NonNull List<LatLng> points) {
-        if (aMap == null || points.size() < 2) {
+        return drawRoute(aMap, points, null);
+    }
+
+    /**
+     * @param roadPoints 沿道路折线（可很密）
+     * @param waypoints  站点坐标，用于打标记；为空时用折线首尾打点
+     */
+    @Nullable
+    public static Polyline drawRoute(@Nullable AMap aMap,
+                                     @NonNull List<LatLng> roadPoints,
+                                     @Nullable List<LatLng> waypoints) {
+        if (aMap == null || roadPoints.size() < 2) {
             return null;
         }
         aMap.clear();
         Polyline polyline = aMap.addPolyline(new PolylineOptions()
-                .addAll(points)
+                .addAll(roadPoints)
                 .width(ROUTE_LINE_WIDTH)
                 .color(ROUTE_LINE_COLOR)
-                .geodesic(true));
+                .geodesic(false));
 
-        aMap.addMarker(new MarkerOptions().position(points.get(0)).title("起点"));
-        aMap.addMarker(new MarkerOptions().position(points.get(points.size() - 1)).title("终点"));
+        List<LatLng> markers = (waypoints != null && !waypoints.isEmpty()) ? waypoints : roadPoints;
+        if (markers.size() == 1) {
+            aMap.addMarker(new MarkerOptions().position(markers.get(0)).title("地点"));
+        } else {
+            for (int i = 0; i < markers.size(); i++) {
+                String title;
+                if (i == 0) {
+                    title = "起点";
+                } else if (i == markers.size() - 1) {
+                    title = "终点";
+                } else {
+                    title = "途经" + i;
+                }
+                aMap.addMarker(new MarkerOptions().position(markers.get(i)).title(title));
+            }
+        }
 
-        fitCamera(aMap, points, 48);
+        fitCamera(aMap, roadPoints, 48);
         return polyline;
     }
 

@@ -1,12 +1,24 @@
 package com.example.Japp.user.util;
 
+import android.widget.TextView;
+
+import com.example.Japp.R;
+import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.RouteNode;
 
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 public final class ProjectUiHelper {
+
+    public static final String STATUS_OPEN = "OPEN";
+    public static final String STATUS_MATCHING = "MATCHING";
+    public static final String STATUS_CONFIRMED = "CONFIRMED";
+    public static final String STATUS_IN_PROGRESS = "IN_PROGRESS";
+    public static final String STATUS_DONE = "DONE";
+    public static final String STATUS_CANCELLED = "CANCELLED";
 
     private ProjectUiHelper() {}
 
@@ -88,17 +100,84 @@ public final class ProjectUiHelper {
     }
 
     public static String statusLabel(String status) {
-        if (status == null) {
-            return "未知";
+        switch (normalizeStatus(status)) {
+            case STATUS_OPEN: return "招募中";
+            case STATUS_MATCHING: return "匹配中";
+            case STATUS_CONFIRMED: return "已确认";
+            case STATUS_IN_PROGRESS: return "进行中";
+            case STATUS_DONE: return "已完成";
+            case STATUS_CANCELLED: return "已取消";
+            default: return status == null || status.isEmpty() ? "未知" : status;
         }
-        switch (status) {
-            case "OPEN": return "招募中";
-            case "MATCHING": return "匹配中";
-            case "CONFIRMED": return "已确认";
-            case "IN_PROGRESS": return "进行中";
-            case "DONE": return "已完成";
-            case "CANCELLED": return "已取消";
-            default: return status;
+    }
+
+    public static String normalizeStatus(String status) {
+        return status == null ? "" : status.trim().toUpperCase(Locale.ROOT);
+    }
+
+    public static boolean hasAssignedLeader(Integer leaderAccountId) {
+        return leaderAccountId != null && leaderAccountId > 0;
+    }
+
+    public static boolean isLeaderAcceptableStatus(String status) {
+        String normalized = normalizeStatus(status);
+        return STATUS_OPEN.equals(normalized) || STATUS_MATCHING.equals(normalized);
+    }
+
+    public static void bindStatusBadge(TextView view, String status) {
+        if (view == null) {
+            return;
         }
+        view.setText(statusLabel(status));
+        int background;
+        switch (normalizeStatus(status)) {
+            case STATUS_OPEN:
+                background = R.drawable.tag_status_open;
+                break;
+            case STATUS_MATCHING:
+                background = R.drawable.tag_status_matching;
+                break;
+            case STATUS_CONFIRMED:
+                background = R.drawable.tag_status_confirmed;
+                break;
+            case STATUS_IN_PROGRESS:
+                background = R.drawable.tag_status_in_progress;
+                break;
+            case STATUS_DONE:
+                background = R.drawable.tag_status_done;
+                break;
+            case STATUS_CANCELLED:
+                background = R.drawable.tag_status_cancelled;
+                break;
+            default:
+                background = R.drawable.tag_status_unknown;
+                break;
+        }
+        view.setBackgroundResource(background);
+    }
+
+    private static int statusSortOrder(String status) {
+        switch (normalizeStatus(status)) {
+            case STATUS_OPEN: return 0;
+            case STATUS_MATCHING: return 1;
+            case STATUS_CONFIRMED: return 2;
+            case STATUS_IN_PROGRESS: return 3;
+            case STATUS_DONE: return 4;
+            case STATUS_CANCELLED: return 5;
+            default: return 99;
+        }
+    }
+
+    public static void sortProjectsByStatus(List<Project> projects) {
+        if (projects == null) {
+            return;
+        }
+        projects.sort(Comparator.comparingInt(p -> statusSortOrder(p.getStatus())));
+    }
+
+    public static int compareProjectsByStatus(Project left, Project right) {
+        return Integer.compare(
+                statusSortOrder(left != null ? left.getStatus() : null),
+                statusSortOrder(right != null ? right.getStatus() : null));
     }
 }

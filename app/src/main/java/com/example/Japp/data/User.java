@@ -77,8 +77,8 @@ public class User implements Serializable {
     public String toString(){
         return "id:"+id+" Username:"+name+" phoneNumber:"+Phone+" password:"+password;
     }
-    public String setId(String id) {
-        return id;
+    public void setId(String id) {
+        this.id = id;
     }
     // ID转换方法
     public static User fromServerAccount(Account account) {

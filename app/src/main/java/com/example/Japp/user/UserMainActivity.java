@@ -12,6 +12,7 @@ import com.example.Japp.Chat.fragment.ConversationList;
 import com.example.Japp.user.fragment.joinTeam.TeamList;
 import com.example.Japp.user.fragment.profile.profile;
 import com.example.Japp.user.fragment.route.routeDesign;
+import com.example.Japp.util.DisplayCutoutAdapter;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class UserMainActivity extends AppCompatActivity {
@@ -28,6 +29,7 @@ public class UserMainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
         setContentView(R.layout.user_activity_main);
+        DisplayCutoutAdapter.apply(this);
 
         bottomNavigationView = findViewById(R.id.UserBottomNav);
 

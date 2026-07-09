@@ -11,6 +11,7 @@ import com.example.Japp.R;
 import com.example.Japp.Chat.fragment.ConversationList;
 import com.example.Japp.leader.fragment.order.orderList;
 import com.example.Japp.leader.fragment.profile.profile;
+import com.example.Japp.util.DisplayCutoutAdapter;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class LeaderMainActivity extends AppCompatActivity {
@@ -25,6 +26,7 @@ public class LeaderMainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
         setContentView(R.layout.leader_activity_main);
+        DisplayCutoutAdapter.apply(this);
         if (getSupportActionBar() != null) {
             getSupportActionBar().hide();
         }

@@ -3,103 +3,92 @@ package com.example.Japp.user.fragment.route;
 
 
 import android.os.Bundle;
-
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
-
 import android.view.LayoutInflater;
-
 import android.view.View;
-
 import android.view.ViewGroup;
-
 import android.widget.Button;
-
 import android.widget.EditText;
-
 import android.widget.Toast;
 
-
-
 import androidx.annotation.NonNull;
-
 import androidx.annotation.Nullable;
-
 import androidx.fragment.app.Fragment;
-
 import androidx.recyclerview.widget.LinearLayoutManager;
-
 import androidx.recyclerview.widget.RecyclerView;
 
-
-
 import com.amap.api.maps.MapsInitializer;
-
 import com.amap.api.maps.model.LatLng;
-
 import com.example.Japp.R;
-
+import com.example.Japp.leader.LeaderWalkRoutePlanner;
 import com.example.Japp.network.ApiClient;
-
 import com.example.Japp.network.api.UserService;
-
 import com.example.Japp.network.models.Result;
-
 import com.example.Japp.network.models.RouteNode;
-
 import com.example.Japp.network.models.requests.CreateProjectRequest;
-import com.example.Japp.network.models.requests.PlanRouteRequest;
-
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.RoutePlanHelper;
 import com.example.Japp.user.util.SessionHelper;
-
+import com.google.android.material.chip.Chip;
 import com.google.gson.JsonElement;
 
-
-
 import java.text.SimpleDateFormat;
-
 import java.util.ArrayList;
-
 import java.util.Calendar;
-
 import java.util.Collections;
-
 import java.util.Comparator;
-
 import java.util.List;
-
 import java.util.Locale;
 
-
-
 import retrofit2.Call;
-
 import retrofit2.Callback;
-
 import retrofit2.Response;
 
-
-
 /**
-
  * 用户端智能路线：对话式输入 + AI 规划 + 发布拼单。
-
  */
-
 public class routeDesign extends Fragment {
 
-
+    private static final String[] WAITING_TIPS = {
+            "路线助手正在理解你的需求…",
+            "正在检索合适的研学景点…",
+            "正在生成行程顺序与时长…",
+            "AI 规划通常需要约 1 分钟，请稍候…",
+            "马上就好，正在完善路线细节…"
+    };
 
     private RecyclerView chatRecyclerView;
-
     private EditText editMessage;
-
     private Button btnSend;
-
+    private View welcomePanel;
     private RouteChatAdapter adapter;
-
     private UserService service;
+    private LeaderWalkRoutePlanner walkRoutePlanner;
+
+    private final Handler waitingHandler = new Handler(Looper.getMainLooper());
+    private int waitingStatusPosition = -1;
+    private int waitingTipIndex = 0;
+    private boolean waitingActive;
+
+    private final Runnable waitingTipRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!waitingActive || !isAdded() || adapter == null || waitingStatusPosition < 0) {
+                return;
+            }
+            // 顺序播放到最后一条后停住，不再从头循环
+            if (waitingTipIndex >= WAITING_TIPS.length - 1) {
+                return;
+            }
+            waitingTipIndex++;
+            adapter.updateItemText(waitingStatusPosition, WAITING_TIPS[waitingTipIndex]);
+            if (waitingTipIndex < WAITING_TIPS.length - 1) {
+                waitingHandler.postDelayed(this, 4500);
+            }
+        }
+    };
 
 
 
@@ -126,16 +115,14 @@ public class routeDesign extends Fragment {
         View root = inflater.inflate(R.layout.user_fragment_route_design, container, false);
 
         service = ApiClient.getClient().create(UserService.class);
-
-
+        walkRoutePlanner = new LeaderWalkRoutePlanner(requireContext());
 
         chatRecyclerView = root.findViewById(R.id.chatRecyclerView);
 
         editMessage = root.findViewById(R.id.editMessage);
 
         btnSend = root.findViewById(R.id.btnSend);
-
-
+        welcomePanel = root.findViewById(R.id.welcomePanel);
 
         adapter = new RouteChatAdapter();
 
@@ -158,37 +145,22 @@ public class routeDesign extends Fragment {
             @Override
 
             public void onMapClick(RouteChatItem item) {
-
                 if (!isAdded() || adapter == null) {
-
                     return;
-
                 }
-
                 adapter.releaseMapsForFullscreen();
-
-                List<LatLng> points = item.getPolylinePoints();
-
+                List<LatLng> road = item.getPolylinePoints();
+                List<LatLng> waypoints = item.getWaypointPoints();
                 Runnable openFullscreen = () -> {
-
                     if (isAdded()) {
-
-                        RouteMapFullscreenActivity.start(requireActivity(), points);
-
+                        RouteMapFullscreenActivity.start(requireActivity(), road, waypoints, null);
                     }
-
                 };
-
                 if (chatRecyclerView != null) {
-
                     chatRecyclerView.postDelayed(openFullscreen, 200);
-
                 } else {
-
                     openFullscreen.run();
-
                 }
-
             }
 
         });
@@ -200,11 +172,39 @@ public class routeDesign extends Fragment {
         chatRecyclerView.setAdapter(adapter);
 
         btnSend.setOnClickListener(v -> sendRouteRequest());
-
-
+        setupSuggestionChips(root);
+        updateWelcomeVisibility();
 
         return root;
 
+    }
+
+    private void setupSuggestionChips(View root) {
+        bindSuggestionChip(root.findViewById(R.id.chipNanjing), R.string.route_chip_nanjing);
+        bindSuggestionChip(root.findViewById(R.id.chipBeijing), R.string.route_chip_beijing);
+        bindSuggestionChip(root.findViewById(R.id.chipSuzhou), R.string.route_chip_suzhou);
+        bindSuggestionChip(root.findViewById(R.id.chipShanghai), R.string.route_chip_shanghai);
+    }
+
+    private void bindSuggestionChip(@Nullable Chip chip, int textRes) {
+        if (chip == null) {
+            return;
+        }
+        chip.setOnClickListener(v -> {
+            if (editMessage == null) {
+                return;
+            }
+            editMessage.setText(getString(textRes));
+            editMessage.setSelection(editMessage.getText() != null ? editMessage.getText().length() : 0);
+            sendRouteRequest();
+        });
+    }
+
+    private void updateWelcomeVisibility() {
+        if (welcomePanel == null || adapter == null) {
+            return;
+        }
+        welcomePanel.setVisibility(adapter.getItemCount() == 0 ? View.VISIBLE : View.GONE);
     }
 
 
@@ -240,183 +240,213 @@ public class routeDesign extends Fragment {
 
 
         adapter.addItem(RouteChatItem.user(text));
-
+        updateWelcomeVisibility();
         editMessage.setText("");
-
         scrollChatToBottom();
 
-
-
         setSending(true);
+        startWaitingFeedback();
+
         int accountId = SessionHelper.getAccountId(requireContext());
         String memoryId = RoutePlanHelper.buildMemoryId(accountId);
-        PlanRouteRequest request = new PlanRouteRequest(accountId, memoryId, text);
 
-        service.planRouteByAi(accountId, memoryId, text, request).enqueue(new Callback<Result<JsonElement>>() {
+        // 后端约定：POST /routes/ai/{memoryId}?message=... ，data 返回路线 ID
+        service.planRouteByAi(memoryId, text).enqueue(new Callback<Result<JsonElement>>() {
 
             @Override
             public void onResponse(Call<Result<JsonElement>> call, Response<Result<JsonElement>> response) {
-
                 if (!isAdded()) {
-
                     return;
-
                 }
-
-                setSending(false);
 
                 Result<JsonElement> body = response.body();
 
                 if (response.code() == 401) {
-
+                    stopWaitingFeedback();
+                    setSending(false);
                     showPlanError("登录已失效，请重新登录");
-
                     SessionHelper.handleUnauthorized(requireContext());
-
                     return;
-
                 }
 
                 if (!response.isSuccessful() || body == null || body.getCode() != 1) {
-
+                    stopWaitingFeedback();
+                    setSending(false);
                     showPlanError(RoutePlanHelper.readErrorMessage(response, body));
-
                     return;
-
                 }
 
                 int routeId = RoutePlanHelper.parseRouteId(body.getData());
-
                 if (routeId <= 0) {
-
+                    stopWaitingFeedback();
+                    setSending(false);
                     showPlanError("规划成功但未返回路线编号，请稍后重试");
-
                     return;
-
                 }
 
+                updateWaitingFeedback("路线已生成，正在匹配道路路径…");
                 loadRouteAndShow(routeId, text);
-
             }
-
-
 
             @Override
-
             public void onFailure(Call<Result<JsonElement>> call, Throwable t) {
-
                 if (!isAdded()) {
-
                     return;
-
                 }
-
+                stopWaitingFeedback();
                 setSending(false);
-
                 showPlanError(RoutePlanHelper.failureMessage(t));
-
             }
-
         });
-
     }
 
-
-
     private void loadRouteAndShow(int routeId, String userRequirement) {
-
         service.getRouteNodes(routeId).enqueue(new Callback<Result<List<RouteNode>>>() {
-
             @Override
-
             public void onResponse(Call<Result<List<RouteNode>>> call, Response<Result<List<RouteNode>>> response) {
-
                 if (!isAdded() || adapter == null) {
-
                     return;
-
                 }
 
                 List<RouteNode> nodes = null;
-
                 if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
-
                     nodes = response.body().getData();
-
                 }
 
-                List<LatLng> points = extractPolyline(nodes);
-
-                String description = buildDescription(userRequirement, nodes, routeId);
-
-                adapter.addItem(RouteChatItem.assistantRoute(description, points, routeId));
-
-                scrollChatToBottom();
-
-                if (chatRecyclerView != null) {
-
-                    chatRecyclerView.postDelayed(() -> adapter.refreshLastAssistantMap(), 400);
-
+                if (nodes == null || nodes.isEmpty()) {
+                    String fallbackText = "根据你的描述「" + userRequirement
+                            + "」已生成路线（ID: " + routeId + "），但暂无景点详情。";
+                    finishWithRoute(fallbackText, null, routeId,
+                            RouteSampleData.getMockPolyline(), RouteSampleData.getMockPolyline(), null);
+                    return;
                 }
 
+                updateWaitingFeedback("正在按真实道路规划步行路线…");
+                final List<RouteNode> orderedNodes = new ArrayList<>(nodes);
+                Collections.sort(orderedNodes, Comparator.comparingInt(RouteNode::getVisitOrder));
+                List<LatLng> waypoints = RouteMapDrawHelper.extractPointsFromNodes(orderedNodes);
+
+                if (waypoints.size() < 2 || walkRoutePlanner == null) {
+                    finishWithRoute(userRequirement, orderedNodes, routeId, waypoints, waypoints, null);
+                    return;
+                }
+
+                walkRoutePlanner.planSummary(orderedNodes, new LeaderWalkRoutePlanner.Callback() {
+                    @Override
+                    public void onPlanningStarted() {
+                        // already showing waiting tip
+                    }
+
+                    @Override
+                    public void onPlanningFinished(@NonNull String summary,
+                                                   @NonNull ArrayList<String> instructions,
+                                                   boolean hadFailures) {
+                        // unused; prefer 4-arg overload
+                    }
+
+                    @Override
+                    public void onPlanningFinished(@NonNull String summary,
+                                                   @NonNull ArrayList<String> instructions,
+                                                   @NonNull List<LatLng> roadPolyline,
+                                                   boolean hadFailures) {
+                        if (!isAdded()) {
+                            return;
+                        }
+                        List<LatLng> road = (roadPolyline != null && roadPolyline.size() >= 2)
+                                ? roadPolyline : waypoints;
+                        finishWithRoute(userRequirement, orderedNodes, routeId, road, waypoints, summary);
+                    }
+
+                    @Override
+                    public void onPlanningFailed(@NonNull String message) {
+                        if (!isAdded()) {
+                            return;
+                        }
+                        finishWithRoute(userRequirement, orderedNodes, routeId, waypoints, waypoints, null);
+                    }
+                });
             }
-
-
 
             @Override
-
             public void onFailure(Call<Result<List<RouteNode>>> call, Throwable t) {
-
                 if (!isAdded() || adapter == null) {
-
                     return;
-
                 }
-
-                adapter.addItem(RouteChatItem.assistantRoute(
-
-                        "路线已生成（ID: " + routeId + "），但节点加载失败，请稍后重试发布。",
-
-                        RouteSampleData.getMockPolyline(), routeId));
-
-                scrollChatToBottom();
-
+                String fallbackText = "路线已生成（ID: " + routeId + "），但节点加载失败，请稍后重试发布。";
+                finishWithRoute(fallbackText, null, routeId, RouteSampleData.getMockPolyline(),
+                        RouteSampleData.getMockPolyline(), null);
             }
-
         });
-
     }
 
+    private void finishWithRoute(String userRequirementOrText,
+                                 @Nullable List<RouteNode> nodes,
+                                 int routeId,
+                                 @NonNull List<LatLng> roadPolyline,
+                                 @NonNull List<LatLng> waypoints,
+                                 @Nullable String walkSummary) {
+        stopWaitingFeedback();
+        setSending(false);
+        if (!isAdded() || adapter == null) {
+            return;
+        }
 
+        String description;
+        if (nodes != null) {
+            description = buildDescription(userRequirementOrText, nodes, routeId);
+            if (!TextUtils.isEmpty(walkSummary)) {
+                description = description + "\n\n步行参考：" + walkSummary;
+            }
+        } else {
+            description = userRequirementOrText;
+        }
+
+        List<LatLng> road = roadPolyline.size() >= 2 ? roadPolyline : waypoints;
+        List<LatLng> marks = waypoints.size() >= 1 ? waypoints : road;
+        int statusPos = waitingStatusPosition;
+        RouteChatItem item = RouteChatItem.assistantRoute(description, road, marks, routeId);
+        if (statusPos >= 0 && statusPos < adapter.getItemCount()) {
+            adapter.replaceItem(statusPos, item);
+        } else {
+            adapter.addItem(item);
+        }
+        waitingStatusPosition = -1;
+        scrollChatToBottom();
+        if (chatRecyclerView != null) {
+            chatRecyclerView.postDelayed(() -> adapter.refreshLastAssistantMap(), 400);
+        }
+    }
+
+    private void startWaitingFeedback() {
+        stopWaitingFeedback();
+        waitingActive = true;
+        waitingTipIndex = 0;
+        adapter.addItem(RouteChatItem.assistantStatus(WAITING_TIPS[0]));
+        waitingStatusPosition = adapter.getLastItemPosition();
+        scrollChatToBottom();
+        if (WAITING_TIPS.length > 1) {
+            waitingHandler.postDelayed(waitingTipRunnable, 4500);
+        }
+    }
+
+    private void updateWaitingFeedback(String text) {
+        if (!isAdded() || adapter == null || waitingStatusPosition < 0) {
+            return;
+        }
+        // 阶段提示覆盖轮播，并停止继续切换
+        stopWaitingFeedback();
+        adapter.updateItemText(waitingStatusPosition, text);
+        scrollChatToBottom();
+    }
+
+    private void stopWaitingFeedback() {
+        waitingActive = false;
+        waitingHandler.removeCallbacks(waitingTipRunnable);
+    }
 
     private List<LatLng> extractPolyline(List<RouteNode> nodes) {
-
-        List<LatLng> points = new ArrayList<>();
-
-        if (nodes == null || nodes.isEmpty()) {
-
-            return RouteSampleData.getMockPolyline();
-
-        }
-
-        List<RouteNode> ordered = new ArrayList<>(nodes);
-
-        Collections.sort(ordered, Comparator.comparingInt(RouteNode::getVisitOrder));
-
-        for (RouteNode node : ordered) {
-
-            LatLng point = RouteMapDrawHelper.parseLocation(node.getLocation());
-
-            if (point != null) {
-
-                points.add(point);
-
-            }
-
-        }
-
+        List<LatLng> points = RouteMapDrawHelper.extractPointsFromNodes(nodes);
         return points.size() >= 2 ? points : RouteSampleData.getMockPolyline();
-
     }
 
 
@@ -564,34 +594,35 @@ public class routeDesign extends Fragment {
 
 
     private void showPlanError(String message) {
+        stopWaitingFeedback();
+        setSending(false);
         if (!isAdded() || adapter == null) {
             return;
         }
         String display = TextUtils.isEmpty(message) ? "路线规划失败" : message;
         Toast.makeText(requireContext(), display, Toast.LENGTH_SHORT).show();
-        adapter.addItem(RouteChatItem.assistantRoute(
-                "规划失败：" + display + "\n\n请检查网络或登录状态后重试。",
-                new ArrayList<>(),
-                0));
+        RouteChatItem item = RouteChatItem.assistantStatus(
+                "规划失败：" + display + "\n\n请检查网络或登录状态后重试。");
+        if (waitingStatusPosition >= 0 && waitingStatusPosition < adapter.getItemCount()) {
+            adapter.replaceItem(waitingStatusPosition, item);
+        } else {
+            adapter.addItem(item);
+        }
+        waitingStatusPosition = -1;
         scrollChatToBottom();
     }
 
     private void setSending(boolean sending) {
-
         if (btnSend != null) {
-
+            // 布局是圆形图标按钮，不要改文字，否则会撑破 44dp 圆按钮
             btnSend.setEnabled(!sending);
-
-            btnSend.setText(sending ? "AI规划中..." : "发送");
-
+            btnSend.setAlpha(sending ? 0.45f : 1f);
+            btnSend.setContentDescription(sending ? "AI规划中" : getString(R.string.route_send_desc));
         }
-
         if (editMessage != null) {
-
             editMessage.setEnabled(!sending);
-
+            editMessage.setHint(sending ? "AI 正在规划路线…" : getString(R.string.route_input_hint));
         }
-
     }
 
 
@@ -657,6 +688,11 @@ public class routeDesign extends Fragment {
     public void onDestroyView() {
 
         super.onDestroyView();
+
+        stopWaitingFeedback();
+        if (walkRoutePlanner != null) {
+            walkRoutePlanner.cancel();
+        }
 
         if (adapter != null) {
 

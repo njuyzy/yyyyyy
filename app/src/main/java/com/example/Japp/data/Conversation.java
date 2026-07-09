@@ -9,6 +9,47 @@ public class Conversation implements Serializable {
     private User user_opposite;
     private List<String> messages;
     private int unRead_num;
+    private boolean isGroup;
+    private String groupName;
+    private List<String> memberNames;
+
+    public boolean isGroup() {
+        return isGroup;
+    }
+
+    public void setGroup(boolean group) {
+        isGroup = group;
+    }
+
+    public String getGroupName() {
+        return groupName;
+    }
+
+    public void setGroupName(String groupName) {
+        this.groupName = groupName;
+    }
+
+    public List<String> getMemberNames() {
+        if (memberNames == null) {
+            memberNames = new ArrayList<>();
+        }
+        return memberNames;
+    }
+
+    public void setMemberNames(List<String> memberNames) {
+        this.memberNames = memberNames;
+    }
+
+    /** 列表展示名称：群聊用群名，私聊用对方昵称 */
+    public String getDisplayName() {
+        if (isGroup && groupName != null && !groupName.isEmpty()) {
+            return groupName;
+        }
+        if (user_opposite != null && user_opposite.getUsername() != null) {
+            return user_opposite.getUsername();
+        }
+        return "未知用户";
+    }
 
     public User getUser_me() {
         return user_me;

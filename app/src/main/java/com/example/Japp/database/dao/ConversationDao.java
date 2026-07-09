@@ -102,6 +102,16 @@ public class ConversationDao {
             conversation.setUser_opposite(oppositeUser);
             conversation.setUnRead_num(cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseManager.COL_UNREAD_COUNT)));
 
+            String lastMessage = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseManager.COL_LAST_MESSAGE));
+            if (lastMessage != null && !lastMessage.isEmpty()) {
+                conversation.addMessage(lastMessage);
+            }
+
+            if (oppositeUserId != null && oppositeUserId.startsWith("group_")) {
+                conversation.setGroup(true);
+                conversation.setGroupName(oppositeUserName);
+            }
+
             conversations.add(conversation);
         }
 

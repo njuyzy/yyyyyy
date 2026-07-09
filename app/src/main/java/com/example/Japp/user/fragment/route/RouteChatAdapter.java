@@ -4,7 +4,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -59,6 +58,26 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     public void addItem(RouteChatItem item) {
         items.add(item);
         notifyItemInserted(items.size() - 1);
+    }
+
+    public void updateItemText(int position, String text) {
+        if (position < 0 || position >= items.size()) {
+            return;
+        }
+        items.get(position).setText(text);
+        notifyItemChanged(position);
+    }
+
+    public void replaceItem(int position, RouteChatItem item) {
+        if (position < 0 || position >= items.size()) {
+            return;
+        }
+        items.set(position, item);
+        notifyItemChanged(position);
+    }
+
+    public int getLastItemPosition() {
+        return items.isEmpty() ? -1 : items.size() - 1;
     }
 
     public void refreshLastAssistantMap() {
@@ -132,7 +151,8 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
 
     @Override
     public int getItemViewType(int position) {
-        return items.get(position).getType() == RouteChatItem.TYPE_USER ? TYPE_USER : TYPE_ASSISTANT;
+        int type = items.get(position).getType();
+        return type == RouteChatItem.TYPE_USER ? TYPE_USER : TYPE_ASSISTANT;
     }
 
     @NonNull
@@ -204,7 +224,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         final TextView message;
         final TextView time;
         final MaterialButton publish;
-        final FrameLayout mapContainer;
+        final View mapContainer;
         final MapView routeMapView;
         final TextView mapTapHint;
 
@@ -216,6 +236,8 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         private Polyline polyline;
         @Nullable
         private List<LatLng> pendingPoints;
+        @Nullable
+        private List<LatLng> pendingWaypoints;
         @Nullable
         private Bundle lastMapBundle;
         private boolean mapCreated;
@@ -239,8 +261,10 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
                 time.setText(timeText);
             }
             if (publish != null) {
+                boolean canPublish = item.canPublish();
+                publish.setVisibility(canPublish ? View.VISIBLE : View.GONE);
                 publish.setOnClickListener(v -> {
-                    if (listener != null) {
+                    if (listener != null && canPublish) {
                         int pos = getAdapterPosition();
                         if (pos != RecyclerView.NO_POSITION) {
                             listener.onPublishClick(item, pos);
@@ -253,11 +277,14 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
                 if (mapContainer != null) {
                     mapContainer.setVisibility(View.GONE);
                 }
+                pendingPoints = null;
+                pendingWaypoints = null;
                 return;
             }
 
             mapContainer.setVisibility(View.VISIBLE);
             pendingPoints = item.getPolylinePoints();
+            pendingWaypoints = item.getWaypointPoints();
             lastMapBundle = mapBundle;
             ensureMapCreated(mapBundle);
             setupMapClick(item);
@@ -304,7 +331,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             if (!mapCreated || aMap == null || pendingPoints == null || pendingPoints.size() < 2) {
                 return;
             }
-            polyline = RouteMapDrawHelper.drawRoute(aMap, pendingPoints);
+            polyline = RouteMapDrawHelper.drawRoute(aMap, pendingPoints, pendingWaypoints);
         }
 
         void mapResume() {

@@ -26,6 +26,10 @@ public final class RoutePlanHelper {
         if (data == null || data.isJsonNull()) {
             return -1;
         }
+        // 兼容后端多种返回：纯数字 / {"routeId":n} / {"id":n} / {"data":{...}}
+        if (data.isJsonPrimitive()) {
+            return parsePrimitiveInt(data.getAsJsonPrimitive());
+        }
         if (data.isJsonObject()) {
             JsonObject obj = data.getAsJsonObject();
             int fromRouteId = readIntField(obj, "routeId");
@@ -36,10 +40,16 @@ public final class RoutePlanHelper {
             if (fromId > 0) {
                 return fromId;
             }
-            return readIntField(obj, "route_id");
-        }
-        if (data.isJsonPrimitive()) {
-            return parsePrimitiveInt(data.getAsJsonPrimitive());
+            int fromSnake = readIntField(obj, "route_id");
+            if (fromSnake > 0) {
+                return fromSnake;
+            }
+            if (obj.has("data") && !obj.get("data").isJsonNull()) {
+                return parseRouteId(obj.get("data"));
+            }
+            if (obj.has("route") && obj.get("route").isJsonObject()) {
+                return parseRouteId(obj.get("route"));
+            }
         }
         return -1;
     }
@@ -89,7 +99,7 @@ public final class RoutePlanHelper {
     public static String readErrorMessage(@Nullable Response<?> response,
                                           @Nullable Result<?> body) {
         if (body != null && !TextUtils.isEmpty(body.getMsg())) {
-            return body.getMsg();
+            return normalizeServerMessage(body.getMsg());
         }
         if (response != null && response.errorBody() != null) {
             try {
@@ -97,7 +107,10 @@ public final class RoutePlanHelper {
                 if (!TextUtils.isEmpty(raw)) {
                     JsonElement element = JsonParser.parseString(raw);
                     if (element.isJsonObject() && element.getAsJsonObject().has("msg")) {
-                        return element.getAsJsonObject().get("msg").getAsString();
+                        String msg = element.getAsJsonObject().get("msg").getAsString();
+                        if (!TextUtils.isEmpty(msg)) {
+                            return normalizeServerMessage(msg);
+                        }
                     }
                 }
             } catch (Exception ignored) {
@@ -111,12 +124,23 @@ public final class RoutePlanHelper {
                 return "规划接口不存在，请联系管理员";
             }
             if (response.code() >= 500) {
-                return "服务器繁忙，请稍后再试";
+                return "路线规划服务暂时不可用，请稍后再试或联系后端同学检查 AI 规划服务";
             }
             if (!response.isSuccessful()) {
                 return "路线规划失败(" + response.code() + ")";
             }
         }
         return "路线规划失败";
+    }
+
+    private static String normalizeServerMessage(String msg) {
+        if (msg == null) {
+            return "路线规划失败";
+        }
+        String trimmed = msg.trim();
+        if (trimmed.contains("系统繁忙") || trimmed.contains("服务器繁忙")) {
+            return "路线规划服务暂时不可用（后端返回：系统繁忙），请稍后重试或检查 AI 规划服务";
+        }
+        return trimmed;
     }
 }

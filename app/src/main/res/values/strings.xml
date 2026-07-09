@@ -1,6 +1,13 @@
 <resources>
     <string name="app_name">研学导览</string>
     <string name="login">登录</string>
+    <string name="back">返回</string>
+    <string name="login_top_banner_desc">登录页顶部插画</string>
+    <string name="login_slogan">探索研学新方式</string>
+    <string name="login_password_mode">密码登录</string>
+    <string name="login_code_mode">验证码登录</string>
+    <string name="login_register_hint">没有账号？点此注册</string>
+    <string name="login_agreement">登录即表示同意《用户协议》和《隐私政策》</string>
     <string name="phone_number">手机号</string>
     <string name="password">密码</string>
     <string name="verification_code">验证码</string>
@@ -52,8 +59,41 @@
     <string name="settings_about_message">研学导览\n版本 %1$s\n\n专注研学路线规划与导览服务</string>
 
     <string name="route_toolbar_title">智能路线</string>
-    <string name="route_input_hint">描述你的研学路线需求…</string>
+    <string name="route_toolbar_subtitle">AI 研学助手</string>
+    <string name="route_input_hint">描述城市、天数、主题…</string>
     <string name="route_send_desc">发送</string>
     <string name="route_map_tap_fullscreen">点击查看全屏地图</string>
     <string name="route_map_no_coords">暂无坐标，无法展示地图</string>
+    <string name="route_welcome_title">你好，我是路线助手</string>
+    <string name="route_welcome_subtitle">告诉我城市、天数和兴趣，我来帮你规划研学行程</string>
+    <string name="route_chip_nanjing">南京 2 日历史文化</string>
+    <string name="route_chip_beijing">北京 3 日科技研学</string>
+    <string name="route_chip_suzhou">苏州 亲子自然探索</string>
+    <string name="route_chip_shanghai">上海 博物馆一日游</string>
+    <string name="route_publish">发布拼单</string>
+    <string name="route_assistant_name">路线助手</string>
+
+    <!-- Order filter -->
+    <string name="order_filter_title">筛选路线</string>
+    <string name="order_filter_keyword_hint">搜索标题或关键词</string>
+    <string name="order_filter_region">地区</string>
+    <string name="order_filter_no_region">不限省份</string>
+    <string name="order_filter_no_city">不限城市</string>
+    <string name="order_filter_tag">研学标签</string>
+    <string name="order_filter_status">项目状态</string>
+    <string name="order_filter_departure_date">出发日期</string>
+    <string name="order_filter_date_from">开始日期</string>
+    <string name="order_filter_date_to">结束日期</string>
+    <string name="order_filter_has_leader">领队情况</string>
+    <string name="order_filter_only_available">仅显示可接路线</string>
+    <string name="order_filter_preference_hint">筛选条件会结合您的偏好推荐</string>
+    <string name="order_filter_reset">重置</string>
+    <string name="order_filter_confirm">确定</string>
+
+    <!-- Leader route planning -->
+    <string name="leader_route_planning_title">步行路线规划</string>
+    <string name="leader_route_map_tap_fullscreen">点击查看全屏地图</string>
+    <string name="route_planning_in_progress">正在规划步行路线…</string>
+    <string name="route_plan_tap_detail">点击查看详细步行指引</string>
+    <string name="route_planning_partial_fail">部分路段规划失败，已显示可用结果</string>
 </resources>

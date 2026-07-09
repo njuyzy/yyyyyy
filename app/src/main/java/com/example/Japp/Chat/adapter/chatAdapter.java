@@ -49,10 +49,15 @@ public class chatAdapter extends RecyclerView.Adapter<chatAdapter.ViewHolder> {
         }
 
         if (holder.txtAvatar != null) {
-            String initial = (name != null && !name.isEmpty())
-                    ? String.valueOf(name.charAt(0)).toUpperCase(Locale.getDefault())
-                    : "?";
-            holder.txtAvatar.setText(initial);
+            boolean isSelf = getItemViewType(position) == 1;
+            if (isSelf) {
+                holder.txtAvatar.setText("我");
+            } else {
+                String initial = (name != null && !name.isEmpty())
+                        ? String.valueOf(name.charAt(0)).toUpperCase(Locale.getDefault())
+                        : "?";
+                holder.txtAvatar.setText(initial);
+            }
         }
     }
 

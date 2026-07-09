@@ -1,39 +1,53 @@
 package com.example.Japp.user.fragment.joinTeam;
 
+import android.app.DatePickerDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.ImageButton;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.Japp.R;
+import com.example.Japp.leader.adapter.TagGridAdapter;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.Project;
+import com.example.Japp.network.models.Region;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.example.Japp.user.TeamDetailActivity;
 import com.example.Japp.user.UserMainActivity;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.Calendar;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import retrofit2.Call;
@@ -45,9 +59,27 @@ public class TeamList extends Fragment {
     private RecyclerView recycler;
     private SwipeRefreshLayout swipeRefresh;
     private TextView txtEmpty;
+    private ImageButton btnSearch;
     private TeamListAdapter adapter;
     private UserService service;
     private final List<TeamCardItem> teamItems = new ArrayList<>();
+
+    private RecyclerView tagGrid;
+    private TextView txtCurrentCity;
+    private TagGridAdapter tagAdapter;
+
+    private String filterKeyword;
+    private String filterRegionCode;
+    private String filterRegionLabel;
+    private String filterTag;
+    private String filterStatus;
+    private String filterStatusLabel;
+    private String filterDateFrom;
+    private String filterDateTo;
+    private Boolean filterHasLeader;
+
+    private List<Region> provinces = new ArrayList<>();
+    private List<Region> cities = new ArrayList<>();
 
     private final ActivityResultLauncher<Intent> detailLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -64,6 +96,9 @@ public class TeamList extends Fragment {
         recycler = view.findViewById(R.id.recycler);
         swipeRefresh = view.findViewById(R.id.swipeRefresh);
         txtEmpty = view.findViewById(R.id.txtEmpty);
+        btnSearch = view.findViewById(R.id.btnSearch);
+        tagGrid = view.findViewById(R.id.tagGrid);
+        txtCurrentCity = view.findViewById(R.id.txtCurrentCity);
         ImageButton add = view.findViewById(R.id.add);
 
         service = ApiClient.getClient().create(UserService.class);
@@ -80,11 +115,20 @@ public class TeamList extends Fragment {
         if (swipeRefresh != null) {
             swipeRefresh.setOnRefreshListener(this::loadTeams);
         }
-        add.setOnClickListener(v -> {
-            if (requireActivity() instanceof UserMainActivity) {
-                ((UserMainActivity) requireActivity()).switchToRouteTab();
-            }
-        });
+        if (btnSearch != null) {
+            btnSearch.setOnClickListener(v -> showFilterSheet());
+        }
+
+        setupTagGrid();
+        loadCurrentCity();
+
+        if (add != null) {
+            add.setOnClickListener(v -> {
+                if (requireActivity() instanceof UserMainActivity) {
+                    ((UserMainActivity) requireActivity()).switchToRouteTab();
+                }
+            });
+        }
 
         return view;
     }
@@ -93,6 +137,364 @@ public class TeamList extends Fragment {
     public void onResume() {
         super.onResume();
         loadTeams();
+    }
+
+    private void showFilterSheet() {
+        BottomSheetDialog dialog = new BottomSheetDialog(requireContext());
+        View content = LayoutInflater.from(requireContext()).inflate(R.layout.popup_filter_menu, null);
+        dialog.setContentView(content);
+        setupFilterSheet(content, dialog);
+        dialog.show();
+    }
+
+    private void setupTagGrid() {
+        if (tagGrid == null) {
+            return;
+        }
+        tagAdapter = new TagGridAdapter();
+        tagGrid.setLayoutManager(new GridLayoutManager(requireContext(), 5));
+        tagGrid.setAdapter(tagAdapter);
+
+        String[] tagNames = getResources().getStringArray(R.array.route_tag_names);
+        tagAdapter.setTags(java.util.Arrays.asList(tagNames));
+
+        tagAdapter.setOnTagSelectedChangeListener(selectedTags -> {
+            if (selectedTags.isEmpty()) {
+                filterTag = null;
+            } else {
+                filterTag = selectedTags.iterator().next();
+            }
+            loadTeams();
+        });
+    }
+
+    private void loadCurrentCity() {
+        if (txtCurrentCity == null) {
+            return;
+        }
+        SharedPreferences prefs = requireContext().getSharedPreferences("user_pref",
+                android.content.Context.MODE_PRIVATE);
+        String regionCode = prefs.getString("region_code", "");
+        String city = ProjectUiHelper.regionAdcodeToCity(regionCode);
+        if (city.isEmpty() || city.equals(regionCode)) {
+            txtCurrentCity.setText("全国");
+        } else {
+            txtCurrentCity.setText(city);
+        }
+    }
+
+    private void setupFilterSheet(View content, BottomSheetDialog dialog) {
+        TextInputEditText etKeyword = content.findViewById(R.id.etKeyword);
+        Spinner spinnerProvince = content.findViewById(R.id.spinnerProvince);
+        Spinner spinnerCity = content.findViewById(R.id.spinnerCity);
+        ChipGroup chipGroupTags = content.findViewById(R.id.chipGroupTags);
+        Spinner spinnerStatus = content.findViewById(R.id.spinnerStatus);
+        Spinner spinnerHasLeader = content.findViewById(R.id.spinnerHasLeader);
+        View cbOnlyAvailable = content.findViewById(R.id.cbOnlyAvailable);
+        TextInputEditText etDateFrom = content.findViewById(R.id.etDateFrom);
+        TextInputEditText etDateTo = content.findViewById(R.id.etDateTo);
+        View btnReset = content.findViewById(R.id.btnReset);
+        View btnConfirm = content.findViewById(R.id.btnConfirm);
+
+        // 用户端始终只看可加入拼单，不展示该开关
+        if (cbOnlyAvailable != null) {
+            cbOnlyAvailable.setVisibility(View.GONE);
+        }
+
+        if (etKeyword != null && filterKeyword != null) {
+            etKeyword.setText(filterKeyword);
+        }
+        if (etDateFrom != null && filterDateFrom != null) {
+            etDateFrom.setText(filterDateFrom);
+        }
+        if (etDateTo != null && filterDateTo != null) {
+            etDateTo.setText(filterDateTo);
+        }
+
+        String[] tagNames = getResources().getStringArray(R.array.route_tag_names);
+        if (chipGroupTags != null) {
+            for (String tag : tagNames) {
+                Chip chip = new Chip(requireContext());
+                chip.setText(tag);
+                chip.setCheckable(true);
+                if (tag.equals(filterTag)) {
+                    chip.setChecked(true);
+                }
+                chipGroupTags.addView(chip);
+            }
+        }
+
+        String[] statusLabels = getResources().getStringArray(R.array.order_filter_status_labels);
+        String[] statusValues = getResources().getStringArray(R.array.order_filter_status_values);
+        ArrayAdapter<String> statusAdapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, statusLabels);
+        statusAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerStatus.setAdapter(statusAdapter);
+        if (filterStatus != null) {
+            for (int i = 0; i < statusValues.length; i++) {
+                if (filterStatus.equals(statusValues[i])) {
+                    spinnerStatus.setSelection(i);
+                    break;
+                }
+            }
+        }
+
+        String[] hasLeaderLabels = getResources().getStringArray(R.array.order_filter_has_leader_labels);
+        ArrayAdapter<String> hasLeaderAdapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, hasLeaderLabels);
+        hasLeaderAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerHasLeader.setAdapter(hasLeaderAdapter);
+        if (filterHasLeader == null) {
+            spinnerHasLeader.setSelection(0);
+        } else if (Boolean.FALSE.equals(filterHasLeader)) {
+            spinnerHasLeader.setSelection(1);
+        } else {
+            spinnerHasLeader.setSelection(2);
+        }
+
+        loadProvinceSpinner(spinnerProvince, spinnerCity);
+
+        etDateFrom.setOnClickListener(v -> showDatePicker(date -> etDateFrom.setText(date)));
+        etDateTo.setOnClickListener(v -> showDatePicker(date -> etDateTo.setText(date)));
+
+        btnReset.setOnClickListener(v -> {
+            resetFilters();
+            loadTeams();
+            dialog.dismiss();
+        });
+
+        btnConfirm.setOnClickListener(v -> {
+            filterKeyword = etKeyword != null && etKeyword.getText() != null
+                    ? etKeyword.getText().toString().trim() : "";
+            if (filterKeyword.isEmpty()) {
+                filterKeyword = null;
+            }
+
+            filterTag = getSelectedTag(chipGroupTags);
+
+            int statusIndex = spinnerStatus.getSelectedItemPosition();
+            if (statusIndex >= 0 && statusIndex < statusValues.length) {
+                String value = statusValues[statusIndex];
+                filterStatus = TextUtils.isEmpty(value) ? null : value;
+                filterStatusLabel = statusLabels[statusIndex];
+                if (TextUtils.isEmpty(value)) {
+                    filterStatusLabel = null;
+                }
+            }
+
+            filterDateFrom = etDateFrom.getText() != null ? etDateFrom.getText().toString().trim() : "";
+            filterDateTo = etDateTo.getText() != null ? etDateTo.getText().toString().trim() : "";
+            if (filterDateFrom.isEmpty()) {
+                filterDateFrom = null;
+            }
+            if (filterDateTo.isEmpty()) {
+                filterDateTo = null;
+            }
+
+            resolveRegionFromSpinners(spinnerProvince, spinnerCity);
+
+            int hasLeaderIndex = spinnerHasLeader.getSelectedItemPosition();
+            if (hasLeaderIndex == 1) {
+                filterHasLeader = false;
+            } else if (hasLeaderIndex == 2) {
+                filterHasLeader = true;
+            } else {
+                filterHasLeader = null;
+            }
+
+            loadTeams();
+            dialog.dismiss();
+        });
+    }
+
+    private void loadProvinceSpinner(Spinner spinnerProvince, Spinner spinnerCity) {
+        List<String> provinceNames = new ArrayList<>();
+        provinceNames.add(getString(R.string.order_filter_no_region));
+
+        service.getProvinces().enqueue(new Callback<Result<List<Region>>>() {
+            @Override
+            public void onResponse(@NonNull Call<Result<List<Region>>> call,
+                                   @NonNull Response<Result<List<Region>>> response) {
+                if (!isAdded()) {
+                    return;
+                }
+                if (!response.isSuccessful() || response.body() == null || response.body().getCode() != 1) {
+                    return;
+                }
+                provinces = response.body().getData() != null ? response.body().getData() : new ArrayList<>();
+                provinceNames.clear();
+                provinceNames.add(getString(R.string.order_filter_no_region));
+                for (Region region : provinces) {
+                    provinceNames.add(region.getName());
+                }
+                ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+                        android.R.layout.simple_spinner_item, provinceNames);
+                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                spinnerProvince.setAdapter(adapter);
+
+                if (filterRegionCode != null && !provinces.isEmpty()) {
+                    restoreProvinceSelection(spinnerProvince, spinnerCity);
+                }
+
+                spinnerProvince.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                        if (position == 0) {
+                            cities.clear();
+                            bindCitySpinner(spinnerCity, new ArrayList<>(), false);
+                        } else {
+                            loadCitySpinner(spinnerCity, provinces.get(position - 1).getAdcode());
+                        }
+                    }
+
+                    @Override
+                    public void onNothingSelected(AdapterView<?> parent) {
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Result<List<Region>>> call, @NonNull Throwable t) {
+            }
+        });
+    }
+
+    private void restoreProvinceSelection(Spinner spinnerProvince, Spinner spinnerCity) {
+        for (int i = 0; i < provinces.size(); i++) {
+            Region province = provinces.get(i);
+            if (filterRegionCode.startsWith(province.getAdcode().substring(0, 2))) {
+                spinnerProvince.setSelection(i + 1);
+                loadCitySpinner(spinnerCity, province.getAdcode(), () -> {
+                    for (int j = 0; j < cities.size(); j++) {
+                        if (filterRegionCode.equals(cities.get(j).getAdcode())) {
+                            spinnerCity.setSelection(j + 1);
+                            break;
+                        }
+                    }
+                });
+                break;
+            }
+        }
+    }
+
+    private void loadCitySpinner(Spinner spinnerCity, String provinceAdcode) {
+        loadCitySpinner(spinnerCity, provinceAdcode, null);
+    }
+
+    private void loadCitySpinner(Spinner spinnerCity, String provinceAdcode, @Nullable Runnable onLoaded) {
+        service.getRegionChildren(provinceAdcode).enqueue(new Callback<Result<List<Region>>>() {
+            @Override
+            public void onResponse(@NonNull Call<Result<List<Region>>> call,
+                                   @NonNull Response<Result<List<Region>>> response) {
+                if (!isAdded()) {
+                    return;
+                }
+                cities = response.isSuccessful() && response.body() != null && response.body().getCode() == 1
+                        && response.body().getData() != null
+                        ? response.body().getData() : new ArrayList<>();
+                bindCitySpinner(spinnerCity, cities, true);
+                if (onLoaded != null) {
+                    onLoaded.run();
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Result<List<Region>>> call, @NonNull Throwable t) {
+                if (isAdded()) {
+                    bindCitySpinner(spinnerCity, new ArrayList<>(), false);
+                }
+            }
+        });
+    }
+
+    private void bindCitySpinner(Spinner spinnerCity, List<Region> cityList, boolean enabled) {
+        List<String> names = new ArrayList<>();
+        names.add(getString(R.string.order_filter_no_city));
+        for (Region city : cityList) {
+            names.add(city.getName());
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, names);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerCity.setAdapter(adapter);
+        spinnerCity.setEnabled(enabled && !cityList.isEmpty());
+    }
+
+    private void resolveRegionFromSpinners(Spinner spinnerProvince, Spinner spinnerCity) {
+        int provinceIndex = spinnerProvince.getSelectedItemPosition();
+        if (provinceIndex <= 0 || provinces.isEmpty()) {
+            filterRegionCode = null;
+            filterRegionLabel = null;
+            return;
+        }
+
+        Region province = provinces.get(provinceIndex - 1);
+        int cityIndex = spinnerCity.getSelectedItemPosition();
+        if (cityIndex <= 0 || cities.isEmpty()) {
+            filterRegionCode = province.getAdcode();
+            filterRegionLabel = province.getName();
+            return;
+        }
+
+        Region city = cities.get(cityIndex - 1);
+        filterRegionCode = city.getAdcode();
+        filterRegionLabel = province.getName() + " · " + city.getName();
+    }
+
+    @Nullable
+    private String getSelectedTag(@Nullable ChipGroup chipGroupTags) {
+        if (chipGroupTags == null) {
+            return null;
+        }
+        int checkedId = chipGroupTags.getCheckedChipId();
+        if (checkedId == View.NO_ID) {
+            return null;
+        }
+        Chip chip = chipGroupTags.findViewById(checkedId);
+        return chip != null ? chip.getText().toString() : null;
+    }
+
+    private void showDatePicker(DateCallback callback) {
+        Calendar calendar = Calendar.getInstance();
+        new DatePickerDialog(requireContext(),
+                (view, year, month, dayOfMonth) -> {
+                    String date = String.format(Locale.getDefault(), "%04d-%02d-%02d",
+                            year, month + 1, dayOfMonth);
+                    callback.onDateSelected(date);
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)).show();
+    }
+
+    private interface DateCallback {
+        void onDateSelected(String date);
+    }
+
+    private void resetFilters() {
+        filterKeyword = null;
+        filterRegionCode = null;
+        filterRegionLabel = null;
+        filterTag = null;
+        filterStatus = null;
+        filterStatusLabel = null;
+        filterDateFrom = null;
+        filterDateTo = null;
+        filterHasLeader = null;
+        cities.clear();
+        if (tagAdapter != null) {
+            tagAdapter.clearSelection();
+        }
+    }
+
+    private boolean hasActiveFilters() {
+        return !TextUtils.isEmpty(filterKeyword)
+                || !TextUtils.isEmpty(filterRegionCode)
+                || !TextUtils.isEmpty(filterTag)
+                || !TextUtils.isEmpty(filterStatus)
+                || !TextUtils.isEmpty(filterDateFrom)
+                || !TextUtils.isEmpty(filterDateTo)
+                || filterHasLeader != null;
     }
 
     private void loadTeams() {
@@ -108,11 +510,19 @@ public class TeamList extends Fragment {
             swipeRefresh.setRefreshing(true);
         }
 
-        service.filterProjects(accountId, 1, 20, null, null, null, null, true)
+        service.filterProjects(accountId, 1, 20,
+                filterKeyword,
+                filterRegionCode,
+                filterTag,
+                filterStatus,
+                filterDateFrom,
+                filterDateTo,
+                filterHasLeader,
+                Boolean.TRUE)
                 .enqueue(new Callback<Result<List<Project>>>() {
                     @Override
-                    public void onResponse(Call<Result<List<Project>>> call,
-                                           Response<Result<List<Project>>> response) {
+                    public void onResponse(@NonNull Call<Result<List<Project>>> call,
+                                           @NonNull Response<Result<List<Project>>> response) {
                         if (!isAdded()) {
                             return;
                         }
@@ -129,7 +539,11 @@ public class TeamList extends Fragment {
                         }
                         List<Project> projects = response.body().getData();
                         if (projects == null || projects.isEmpty()) {
-                            showEmpty("暂无可加入的拼单，点击右上角 + 去设计路线并发布");
+                            if (hasActiveFilters()) {
+                                showEmpty("暂无符合条件的拼单");
+                            } else {
+                                showEmpty("暂无可加入的拼单，点击右上角 + 去设计路线并发布");
+                            }
                             adapter.setItems(new ArrayList<>());
                             return;
                         }
@@ -137,7 +551,7 @@ public class TeamList extends Fragment {
                     }
 
                     @Override
-                    public void onFailure(Call<Result<List<Project>>> call, Throwable t) {
+                    public void onFailure(@NonNull Call<Result<List<Project>>> call, @NonNull Throwable t) {
                         if (!isAdded()) {
                             return;
                         }
@@ -149,6 +563,7 @@ public class TeamList extends Fragment {
     }
 
     private void enrichProjects(List<Project> projects) {
+        ProjectUiHelper.sortProjectsByStatus(projects);
         teamItems.clear();
         List<TeamCardItem> temp = new ArrayList<>();
         for (Project project : projects) {
@@ -170,7 +585,8 @@ public class TeamList extends Fragment {
 
             service.getAccount(project.getOwnerAccountId()).enqueue(new Callback<Result<Account>>() {
                 @Override
-                public void onResponse(Call<Result<Account>> call, Response<Result<Account>> response) {
+                public void onResponse(@NonNull Call<Result<Account>> call,
+                                       @NonNull Response<Result<Account>> response) {
                     if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
                         Account account = response.body().getData();
                         if (account != null) {
@@ -181,7 +597,7 @@ public class TeamList extends Fragment {
                 }
 
                 @Override
-                public void onFailure(Call<Result<Account>> call, Throwable t) {
+                public void onFailure(@NonNull Call<Result<Account>> call, @NonNull Throwable t) {
                     fetchRoute(item, project.getRouteId(), done, total);
                 }
             });
@@ -191,7 +607,8 @@ public class TeamList extends Fragment {
     private void fetchRoute(TeamCardItem item, int routeId, AtomicInteger done, int total) {
         service.getRouteNodes(routeId).enqueue(new Callback<Result<List<RouteNode>>>() {
             @Override
-            public void onResponse(Call<Result<List<RouteNode>>> call, Response<Result<List<RouteNode>>> response) {
+            public void onResponse(@NonNull Call<Result<List<RouteNode>>> call,
+                                   @NonNull Response<Result<List<RouteNode>>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
                     List<RouteNode> nodes = response.body().getData();
                     item.setRouteSummary(ProjectUiHelper.buildRouteSummary(nodes));
@@ -201,7 +618,7 @@ public class TeamList extends Fragment {
             }
 
             @Override
-            public void onFailure(Call<Result<List<RouteNode>>> call, Throwable t) {
+            public void onFailure(@NonNull Call<Result<List<RouteNode>>> call, @NonNull Throwable t) {
                 checkRefresh(done, total);
             }
         });
@@ -209,7 +626,11 @@ public class TeamList extends Fragment {
 
     private void checkRefresh(AtomicInteger done, int total) {
         if (done.incrementAndGet() == total && isAdded()) {
-            requireActivity().runOnUiThread(() -> adapter.setItems(new ArrayList<>(teamItems)));
+            requireActivity().runOnUiThread(() -> {
+                teamItems.sort((left, right) -> ProjectUiHelper.compareProjectsByStatus(
+                        left.getProject(), right.getProject()));
+                adapter.setItems(new ArrayList<>(teamItems));
+            });
         }
     }
 

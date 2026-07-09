@@ -4,7 +4,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
+import android.view.View;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -20,8 +22,10 @@ import com.example.Japp.database.DatabaseManager;
 import com.example.Japp.database.dao.ConversationDao;
 import com.example.Japp.database.dao.MessageDao;
 import com.example.Japp.database.dao.UserDao;
-import com.google.android.material.appbar.MaterialToolbar;
+import com.example.Japp.util.DisplayCutoutAdapter;
 import com.google.android.material.button.MaterialButton;
+
+import java.util.Locale;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,6 +55,7 @@ public class chatActivity extends AppCompatActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
+        DisplayCutoutAdapter.apply(this);
 
         conversation = (Conversation) getIntent().getSerializableExtra("conversation_info");
         if (conversation == null) {
@@ -66,15 +71,12 @@ public class chatActivity extends AppCompatActivity {
                 conversation.getUser_opposite().getId()
         );
 
-        setOppositeName();
         initViews();
+        setupToolbar();
         setupRecyclerView();
         loadMessagesFromDatabase();
 
         btnSend.setOnClickListener(v -> sendMessage());
-
-        MaterialToolbar toolbar = findViewById(R.id.toolbar);
-        toolbar.setNavigationOnClickListener(v -> finish());
     }
 
     private void initDatabase() {
@@ -112,9 +114,47 @@ public class chatActivity extends AppCompatActivity {
         recycler.setAdapter(adapter);
     }
 
-    private void setOppositeName() {
-        MaterialToolbar toolbar = findViewById(R.id.toolbar);
-        toolbar.setTitle(conversation.getUser_opposite().getUsername());
+    private void setupToolbar() {
+        View btnBack = findViewById(R.id.btnBack);
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> finish());
+        }
+
+        String title = conversation.getDisplayName();
+        TextView titleView = findViewById(R.id.txtToolbarTitle);
+        if (titleView != null) {
+            titleView.setText(title);
+        }
+
+        TextView subtitleView = findViewById(R.id.txtToolbarSubtitle);
+        if (subtitleView != null) {
+            if (conversation.isGroup()) {
+                int memberCount = conversation.getMemberNames().size();
+                subtitleView.setText(memberCount > 0 ? ("群聊 · " + memberCount + " 人") : "群聊");
+            } else {
+                subtitleView.setText("私聊");
+            }
+        }
+
+        TextView avatarView = findViewById(R.id.txtToolbarAvatar);
+        View avatarContainer = avatarView != null ? (View) avatarView.getParent() : null;
+        if (avatarView != null) {
+            avatarView.setText(initialOf(title));
+        }
+        if (avatarContainer != null) {
+            avatarContainer.setBackgroundResource(
+                    conversation.isGroup()
+                            ? R.drawable.bg_chat_avatar_group
+                            : R.drawable.bg_chat_avatar_peer
+            );
+        }
+    }
+
+    private String initialOf(String name) {
+        if (TextUtils.isEmpty(name)) {
+            return "?";
+        }
+        return String.valueOf(name.charAt(0)).toUpperCase(Locale.getDefault());
     }
 
     private void loadMessagesFromDatabase() {
@@ -126,20 +166,16 @@ public class chatActivity extends AppCompatActivity {
             );
 
             mainHandler.post(() -> {
-                if (!dbMessages.isEmpty()) {
-                    messages.clear();
+                messages.clear();
+                if (dbMessages != null && !dbMessages.isEmpty()) {
                     messages.addAll(dbMessages);
-                    adapter.notifyDataSetChanged();
-
-                    // 更新Conversation的消息列表
-                    updateConversationMessages();
-
-                    if (!messages.isEmpty()) {
-                        recycler.scrollToPosition(messages.size() - 1);
-                    }
-
-                    markMessagesAsRead();
                 }
+                adapter.notifyDataSetChanged();
+                updateConversationMessages();
+                if (!messages.isEmpty()) {
+                    recycler.scrollToPosition(messages.size() - 1);
+                }
+                markConversationAsRead();
             });
         });
     }
@@ -152,7 +188,9 @@ public class chatActivity extends AppCompatActivity {
         }
     }
 
-    private void markMessagesAsRead() {
+    private void markConversationAsRead() {
+        conversation.setUnRead_num(0);
+        conversation.resetUnRead_num();
         executorService.execute(() -> {
             messageDao.markMessagesAsRead(conversationId, currentUser.getId());
             conversationDao.resetUnreadCount(conversationId);
@@ -202,25 +240,36 @@ public class chatActivity extends AppCompatActivity {
     }
 
     private void simulateReply() {
-        new Handler().postDelayed(() -> {
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (isFinishing() || isDestroyed()) {
+                return;
+            }
             User oppositeUser = conversation.getUser_opposite();
-            String replyContent = getAutoReply(edtInput.getText().toString());
+            // 用用户刚发的最后一条内容生成回复，避免输入框已清空
+            String lastUserText = "";
+            for (int i = messages.size() - 1; i >= 0; i--) {
+                Message m = messages.get(i);
+                if (m.getSender() != null && currentUser.getId().equals(m.getSender().getId())) {
+                    lastUserText = m.getContent();
+                    break;
+                }
+            }
+            String replyContent = getAutoReply(lastUserText);
             Message replyMessage = new Message(oppositeUser, replyContent, System.currentTimeMillis());
             messages.add(replyMessage);
             adapter.notifyItemInserted(messages.size() - 1);
             recycler.scrollToPosition(messages.size() - 1);
-
-            // 更新Conversation的消息列表
             updateConversationMessages();
 
-            // 保存回复消息到数据库
+            // 用户正在聊天页看消息，不增加未读
+            conversation.setUnRead_num(0);
             executorService.execute(() -> {
                 try {
                     messageDao.insertMessage(replyMessage, conversationId);
                     conversationDao.updateLastMessage(conversationId, replyContent, replyMessage.getTimestamp());
                     conversationDao.insertOrUpdateConversation(conversation, currentUser.getId());
-                    // 增加未读计数（对方发来的消息）
-                    conversationDao.incrementUnreadCount(conversationId, currentUser.getId());
+                    conversationDao.resetUnreadCount(conversationId);
+                    messageDao.markMessagesAsRead(conversationId, currentUser.getId());
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -248,6 +297,8 @@ public class chatActivity extends AppCompatActivity {
             executorService.execute(() -> conversationDao.saveDraft(conversationId, draft));
         }
         updateConversationMessages();
+        // 退出/切走时清未读，避免已读消息仍显示红点
+        markConversationAsRead();
     }
 
     @Override
