@@ -2,6 +2,7 @@ package com.example.Japp;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -17,7 +18,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.example.Japp.leader.LeaderMainActivity;
 import com.example.Japp.network.ApiClient;
+import com.example.Japp.user.UserMainActivity;
 
 public class SplashActivity extends AppCompatActivity {
 
@@ -113,7 +116,21 @@ public class SplashActivity extends AppCompatActivity {
 
     private void navigateToMainActivity() {
         try {
-            Intent intent = new Intent(SplashActivity.this, MainActivity.class);
+            SharedPreferences prefs = getSharedPreferences("user_pref", MODE_PRIVATE);
+            boolean autoLoginEnabled = prefs.getBoolean("autoLogin", false);
+            boolean loggedIn = prefs.getBoolean("is_logged_in", false);
+
+            Intent intent;
+            if (autoLoginEnabled && loggedIn) {
+                String mode = prefs.getString("Mode", "USER");
+                if ("USER".equalsIgnoreCase(mode)) {
+                    intent = new Intent(SplashActivity.this, UserMainActivity.class);
+                } else {
+                    intent = new Intent(SplashActivity.this, LeaderMainActivity.class);
+                }
+            } else {
+                intent = new Intent(SplashActivity.this, LoginEntryActivity.class);
+            }
             startActivity(intent);
             overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
             finish();

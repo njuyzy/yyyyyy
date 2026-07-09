@@ -1,9 +1,126 @@
 <resources>
-    <string name="app_name">踏学</string>
+    <string name="app_name">研学导览</string>
+    <string name="login">登录</string>
+    <string name="phone_number">手机号</string>
+    <string name="password">密码</string>
+    <string name="verification_code">验证码</string>
+    <string name="get_verification_code">获取验证码</string>
+    <string name="login_button">登录</string>
+    <string name="register">没有账号？点此注册</string>
+    <string name="auto_login">自动登录</string>
+    <string name="invalid_phone">请输入正确的11位手机号</string>
+    <string name="empty_phone">手机号不能为空</string>
+    <string name="empty_password">密码不能为空</string>
+    <string name="empty_verification_code">验证码不能为空</string>
+    <string name="user_not_found">用户不存在</string>
+    <string name="verification_code_error">验证码错误</string>
+    <string name="password_error">密码错误</string>
+    <string name="login_success">登录成功！欢迎</string>
+    <string name="send_verification_code">验证码已发送到</string>
+    <string name="enter_leader">进入领队端</string>
+    <string name="enter_user">进入用户端</string>
+    <string name="choose_identity">选择身份进入</string>
     <string name="avatar">Avatar</string>
+    <string name="settings_title">设置</string>
+    <string name="settings_section_account">账号</string>
+    <string name="settings_section_general">通用</string>
+    <string name="settings_section_privacy">隐私与存储</string>
+    <string name="settings_section_about">关于</string>
+    <string name="settings_account_security">账号与安全</string>
+    <string name="settings_account_security_summary">手机号、登录设备</string>
+    <string name="settings_change_password">修改密码</string>
+    <string name="settings_change_password_summary">定期更换密码更安全</string>
+    <string name="settings_notification">消息通知</string>
+    <string name="settings_notification_summary">接收订单与聊天提醒</string>
+    <string name="settings_auto_login">自动登录</string>
+    <string name="settings_auto_login_summary">下次启动时自动进入应用</string>
+    <string name="settings_privacy">隐私设置</string>
+    <string name="settings_privacy_summary">个人信息与权限管理</string>
+    <string name="settings_clear_cache">清除缓存</string>
+    <string name="settings_about">关于研学导览</string>
+    <string name="settings_user_agreement">用户协议</string>
+    <string name="settings_privacy_policy">隐私政策</string>
+    <string name="settings_logout">退出登录</string>
+    <string name="settings_logout_confirm_title">退出登录</string>
+    <string name="settings_logout_confirm_message">确定要退出当前账号吗？</string>
+    <string name="settings_confirm">确定</string>
+    <string name="settings_cancel">取消</string>
+    <string name="settings_cache_cleared">缓存已清除</string>
+    <string name="settings_coming_soon">功能开发中，敬请期待</string>
+    <string name="settings_not_logged_in">未登录</string>
+    <string name="settings_version_format">研学导览 v%1$s</string>
+    <string name="settings_about_message">研学导览\n版本 %1$s\n\n专注研学路线规划与导览服务</string>
+
     <string name="route_toolbar_title">智能路线</string>
-    <string name="route_input_hint">描述你的路线需求，例如：从南京大学鼓楼校区到夫子庙，少换乘…</string>
-    <string name="route_send_desc">发送路线需求</string>
-    <!-- 在高德开放平台创建应用后替换为 Web 服务端 Key 或 Android 平台 Key（与 manifest 中 meta-data 一致） -->
-    <string name="amap_api_key">请替换为你的高德地图Key</string>
+    <string name="route_input_hint">描述你的研学路线需求…</string>
+    <string name="route_send_desc">发送</string>
+    <string name="route_map_tap_fullscreen">点击查看全屏地图</string>
+    <string name="route_map_no_coords">暂无坐标，无法展示地图</string>
+
+    <string name="leader_route_planning_title">路线规划</string>
+    <string name="leader_route_map_tap_fullscreen">点击查看全屏路线规划</string>
+    <string name="route_planning_in_progress">正在规划步行路线…</string>
+    <string name="route_plan_tap_detail">点击查看步行导航详情</string>
+    <string name="route_planning_partial_fail">部分路段规划失败，已用直线连接</string>
+
+    <string name="order_filter_title">筛选路线</string>
+    <string name="order_filter_keyword_hint">关键字（标题/标签/状态）</string>
+    <string name="order_filter_region">地区</string>
+    <string name="order_filter_tag">研学标签</string>
+    <string name="order_filter_status">项目状态</string>
+    <string name="order_filter_departure_date">出发日期</string>
+    <string name="order_filter_date_from">起始日期</string>
+    <string name="order_filter_date_to">结束日期</string>
+    <string name="order_filter_reset">重置</string>
+    <string name="order_filter_confirm">确认</string>
+    <string name="order_filter_all">全部</string>
+    <string name="order_filter_no_region">不限地区</string>
+    <string name="order_filter_no_city">不限城市</string>
+    <string name="order_filter_chip_keyword">关键字:%1$s</string>
+    <string name="order_filter_chip_tag">标签:%1$s</string>
+    <string name="order_filter_chip_status">状态:%1$s</string>
+    <string name="order_filter_chip_region">地区:%1$s</string>
+    <string name="order_filter_chip_date_range">日期:%1$s至%2$s</string>
+    <string name="order_filter_chip_date_from">日期:%1$s起</string>
+    <string name="order_filter_chip_date_to">日期:至%1$s</string>
+    <string name="order_filter_has_leader">领队情况</string>
+    <string name="order_filter_only_available">仅看可报名项目</string>
+    <string name="order_filter_chip_has_leader_no">领队:无领队</string>
+    <string name="order_filter_chip_has_leader_yes">领队:已有领队</string>
+    <string name="order_filter_chip_only_available">可报名</string>
+    <string name="order_filter_preference_hint">未设置筛选时，按账号地区与标签偏好排序</string>
+    <string name="login_top_banner_desc">登录页顶部图片</string>
+    <string name="login_bottom_pic_desc">登录页底部图片</string>
+    <string name="back">返回</string>
+    <string name="login_slogan">一起去踏学吧~</string>
+    <string name="login_password_mode">密码登录</string>
+    <string name="login_code_mode">验证码登录</string>
+    <string name="login_register_hint">还没登录？点击注册</string>
+    <string name="login_agreement">我已阅读并同意踏学《用户注册协议》和隐私政策</string>
+
+    <string-array name="order_filter_status_labels">
+        <item>全部状态</item>
+        <item>招募中</item>
+        <item>匹配中</item>
+        <item>已确认</item>
+        <item>进行中</item>
+        <item>已完成</item>
+        <item>已取消</item>
+    </string-array>
+
+    <string-array name="order_filter_status_values">
+        <item></item>
+        <item>OPEN</item>
+        <item>MATCHING</item>
+        <item>CONFIRMED</item>
+        <item>IN_PROGRESS</item>
+        <item>DONE</item>
+        <item>CANCELLED</item>
+    </string-array>
+
+    <string-array name="order_filter_has_leader_labels">
+        <item>不限</item>
+        <item>无领队</item>
+        <item>已有领队</item>
+    </string-array>
 </resources>

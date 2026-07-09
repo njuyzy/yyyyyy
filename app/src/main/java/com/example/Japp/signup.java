@@ -46,9 +46,7 @@ public class signup extends AppCompatActivity {
     private TextInputLayout tilName, tilPhone, tilPassword, tilConfirmPassword, tilCode;
     private Button getCode, Signup, cancel;
     private CheckBox autoLogin;
-    private MaterialButton signupModeToggle;
-
-    private int countdown = 60;
+private int countdown = 60;
     private Handler handler = new Handler();
     private Runnable countdownRunnable;
 
@@ -162,7 +160,6 @@ public class signup extends AppCompatActivity {
         Signup = findViewById(R.id.register);
         cancel = findViewById(R.id.cancel);
 
-        signupModeToggle = findViewById(R.id.signup_mode_toggle);
         autoLogin = findViewById(R.id.autoLogin);
     }
 
@@ -311,14 +308,6 @@ public class signup extends AppCompatActivity {
     }
 
     private void setupListeners() {
-
-        signupModeToggle.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startActivity(new Intent(signup.this, MainActivity.class));
-                finish();
-            }
-        });
 
         autoLogin.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
             @Override

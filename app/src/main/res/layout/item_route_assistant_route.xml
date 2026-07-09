@@ -85,6 +85,18 @@
                         android:id="@+id/routeMapView"
                         android:layout_width="match_parent"
                         android:layout_height="176dp"/>
+
+                    <TextView
+                        android:id="@+id/mapTapHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom|center_horizontal"
+                        android:background="#99000000"
+                        android:gravity="center"
+                        android:padding="6dp"
+                        android:text="点击查看全屏地图"
+                        android:textColor="#FFFFFF"
+                        android:textSize="11sp" />
                 </FrameLayout>
 
                 <com.google.android.material.button.MaterialButton

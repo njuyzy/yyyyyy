@@ -29,6 +29,10 @@ public class order implements Serializable {
         return peopleCnt+"人";
     }
 
+    public int getMaxMembers() {
+        return peopleCnt;
+    }
+
     private int peopleCnt;
     public static enum OrderStatus{AVAILABLE, TAKEN_BY_OTHER, EXPIRED, ACCEPTED_BY_ME}
 

@@ -3,6 +3,8 @@ package com.example.Japp.network;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import java.util.concurrent.TimeUnit;
+
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import retrofit2.Retrofit;
@@ -40,6 +42,9 @@ public class ApiClient {
             synchronized (ApiClient.class) {
                 if (retrofit == null) {
                     OkHttpClient client = new OkHttpClient.Builder()
+                            .connectTimeout(30, TimeUnit.SECONDS)
+                            .readTimeout(120, TimeUnit.SECONDS)
+                            .writeTimeout(30, TimeUnit.SECONDS)
                             .addInterceptor(chain -> {
                                 Request.Builder builder = chain.request().newBuilder();
                                 String token = getToken();

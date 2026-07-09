@@ -1,313 +1,726 @@
 package com.example.Japp.leader.fragment.order;
 
+import android.app.AlertDialog;
+import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.util.Log;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.Japp.R;
-import com.example.Japp.MainActivity;
-import com.example.Japp.data.Route;
-import com.example.Japp.data.User;
-import com.example.Japp.data.order;
-import com.example.Japp.leader.adapter.orderListAdapter;
+import com.example.Japp.leader.adapter.TagGridAdapter;
 import com.example.Japp.leader.orderDetailActivity;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.Project;
+import com.example.Japp.network.models.Region;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
-import com.example.Japp.data.RouteStop;
+import com.example.Japp.user.fragment.joinTeam.TeamCardItem;
+import com.example.Japp.user.fragment.joinTeam.TeamListAdapter;
+import com.example.Japp.user.util.ProjectUiHelper;
+import com.example.Japp.user.util.SessionHelper;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.checkbox.MaterialCheckBox;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.Calendar;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-import static android.content.Context.MODE_PRIVATE;
-
 public class orderList extends Fragment {
 
     private RecyclerView recycler;
-    private orderListAdapter adapter;
-    private List<order> order_list;
+    private SwipeRefreshLayout swipeRefresh;
+    private TextView txtEmpty;
+    private ImageButton btnFilter;
+    private TeamListAdapter adapter;
     private UserService service;
+    private final List<TeamCardItem> teamItems = new ArrayList<>();
+
+    private RecyclerView tagGrid;
+    private TextView txtCurrentCity;
+    private ImageButton btnSearch;
+    private TagGridAdapter tagAdapter;
+
+    private String filterKeyword;
+    private String filterRegionCode;
+    private String filterRegionLabel;
+    private Set<String> filterTags = new HashSet<>();
+    private String filterStatus;
+    private String filterStatusLabel;
+    private String filterDateFrom;
+    private String filterDateTo;
+    private Boolean filterHasLeader;
+    private Boolean filterOnlyAvailable;
+
+    private List<Region> provinces = new ArrayList<>();
+    private List<Region> cities = new ArrayList<>();
+
+    private final ActivityResultLauncher<Intent> detailLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == android.app.Activity.RESULT_OK) {
+                    loadOrders();
+                }
+            });
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.leader_fragment_order_list, container, false);
 
         recycler = view.findViewById(R.id.recycler);
-        order_list = new ArrayList<>();
+        swipeRefresh = view.findViewById(R.id.swipeRefresh);
+        txtEmpty = view.findViewById(R.id.txtEmpty);
+        btnFilter = view.findViewById(R.id.btnFilter);
+        tagGrid = view.findViewById(R.id.tagGrid);
+        txtCurrentCity = view.findViewById(R.id.txtCurrentCity);
+        btnSearch = view.findViewById(R.id.btnSearch);
 
-        adapter = new orderListAdapter();
-        adapter.setListData(order_list);
-        adapter.setOrderOnClickListener(position -> {
+        service = ApiClient.getClient().create(UserService.class);
+        adapter = new TeamListAdapter();
+        adapter.setOnTeamClickListener(item -> {
             Intent intent = new Intent(requireContext(), orderDetailActivity.class);
-            intent.putExtra("order_json", new Gson().toJson(order_list.get(position)));
-            startActivity(intent);
+            intent.putExtra(orderDetailActivity.EXTRA_PROJECT_JSON, new Gson().toJson(item.getProject()));
+            detailLauncher.launch(intent);
         });
 
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         recycler.setAdapter(adapter);
 
-        service = ApiClient.getClient().create(UserService.class);
-        loadOrders();
+        if (swipeRefresh != null) {
+            swipeRefresh.setOnRefreshListener(this::loadOrders);
+        }
+        if (btnFilter != null) {
+            btnFilter.setOnClickListener(v -> showFilterSheet());
+        }
+
+        // 初始化标签网格
+        setupTagGrid();
+
+        // 设置当前城市
+        loadCurrentCity();
+
+        // 搜索按钮
+        if (btnSearch != null) {
+            btnSearch.setOnClickListener(v -> showSearchDialog());
+        }
 
         return view;
     }
 
-    private void loadOrders() {
-        SharedPreferences prefs = requireContext().getSharedPreferences("user_pref", MODE_PRIVATE);
-        int accountId = prefs.getInt("account_id", -1);
-        if (accountId == -1) return;
+    @Override
+    public void onResume() {
+        super.onResume();
+        loadOrders();
+    }
 
-        String token = ApiClient.getToken();
-        if (token == null || token.trim().isEmpty()) {
-            Toast.makeText(requireContext(), "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
-            handleUnauthorized();
+    private void showFilterSheet() {
+        BottomSheetDialog dialog = new BottomSheetDialog(requireContext());
+        View content = LayoutInflater.from(requireContext()).inflate(R.layout.popup_filter_menu, null);
+        dialog.setContentView(content);
+        setupFilterSheet(content, dialog);
+        dialog.show();
+    }
+
+    private void showSearchDialog() {
+        EditText editSearch = new EditText(requireContext());
+        editSearch.setHint("输入项目名称搜索");
+        editSearch.setText(filterKeyword != null ? filterKeyword : "");
+        editSearch.setSelectAllOnFocus(true);
+
+        int padding = (int) (16 * getResources().getDisplayMetrics().density);
+        editSearch.setPadding(padding, padding, padding, padding);
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("搜索项目")
+                .setView(editSearch)
+                .setPositiveButton("搜索", (dialog, which) -> {
+                    String keyword = editSearch.getText().toString().trim();
+                    filterKeyword = keyword.isEmpty() ? null : keyword;
+                    loadOrders();
+                })
+                .setNegativeButton("取消", null)
+                .setNeutralButton("清除", (dialog, which) -> {
+                    filterKeyword = null;
+                    loadOrders();
+                })
+                .show();
+    }
+
+    private void setupTagGrid() {
+        if (tagGrid == null) return;
+        tagAdapter = new TagGridAdapter();
+        tagGrid.setLayoutManager(new GridLayoutManager(requireContext(), 5));
+        tagGrid.setAdapter(tagAdapter);
+
+        String[] tagNames = getResources().getStringArray(R.array.route_tag_names);
+        tagAdapter.setTags(java.util.Arrays.asList(tagNames));
+
+        tagAdapter.setOnTagSelectedChangeListener(selectedTags -> {
+            // 支持多个 tag 过滤
+            filterTags = new HashSet<>(selectedTags);
+            loadOrders();
+        });
+    }
+
+    private void loadCurrentCity() {
+        if (txtCurrentCity == null) return;
+        SharedPreferences prefs = requireContext().getSharedPreferences("user_pref", android.content.Context.MODE_PRIVATE);
+        String regionCode = prefs.getString("region_code", "");
+        String city = ProjectUiHelper.regionAdcodeToCity(regionCode);
+        if (city.isEmpty() || city.equals(regionCode)) {
+            txtCurrentCity.setText("全国");
+        } else {
+            txtCurrentCity.setText(city);
+        }
+    }
+
+    private void setupFilterSheet(View content, BottomSheetDialog dialog) {
+        TextInputEditText etKeyword = content.findViewById(R.id.etKeyword);
+        Spinner spinnerProvince = content.findViewById(R.id.spinnerProvince);
+        Spinner spinnerCity = content.findViewById(R.id.spinnerCity);
+        ChipGroup chipGroupTags = content.findViewById(R.id.chipGroupTags);
+        Spinner spinnerStatus = content.findViewById(R.id.spinnerStatus);
+        Spinner spinnerHasLeader = content.findViewById(R.id.spinnerHasLeader);
+        MaterialCheckBox cbOnlyAvailable = content.findViewById(R.id.cbOnlyAvailable);
+        TextInputEditText etDateFrom = content.findViewById(R.id.etDateFrom);
+        TextInputEditText etDateTo = content.findViewById(R.id.etDateTo);
+        View btnReset = content.findViewById(R.id.btnReset);
+        View btnConfirm = content.findViewById(R.id.btnConfirm);
+
+        if (etKeyword != null && filterKeyword != null) {
+            etKeyword.setText(filterKeyword);
+        }
+        if (etDateFrom != null && filterDateFrom != null) {
+            etDateFrom.setText(filterDateFrom);
+        }
+        if (etDateTo != null && filterDateTo != null) {
+            etDateTo.setText(filterDateTo);
+        }
+
+        String[] tagNames = getResources().getStringArray(R.array.route_tag_names);
+        if (chipGroupTags != null) {
+            for (String tag : tagNames) {
+                Chip chip = new Chip(requireContext());
+                chip.setText(tag);
+                chip.setCheckable(true);
+                if (filterTags.contains(tag)) {
+                    chip.setChecked(true);
+                }
+                chipGroupTags.addView(chip);
+            }
+        }
+
+        String[] statusLabels = getResources().getStringArray(R.array.order_filter_status_labels);
+        String[] statusValues = getResources().getStringArray(R.array.order_filter_status_values);
+        ArrayAdapter<String> statusAdapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, statusLabels);
+        statusAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerStatus.setAdapter(statusAdapter);
+        if (filterStatus != null) {
+            for (int i = 0; i < statusValues.length; i++) {
+                if (filterStatus.equals(statusValues[i])) {
+                    spinnerStatus.setSelection(i);
+                    break;
+                }
+            }
+        }
+
+        String[] hasLeaderLabels = getResources().getStringArray(R.array.order_filter_has_leader_labels);
+        ArrayAdapter<String> hasLeaderAdapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, hasLeaderLabels);
+        hasLeaderAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerHasLeader.setAdapter(hasLeaderAdapter);
+        if (filterHasLeader == null) {
+            spinnerHasLeader.setSelection(0);
+        } else if (Boolean.FALSE.equals(filterHasLeader)) {
+            spinnerHasLeader.setSelection(1);
+        } else {
+            spinnerHasLeader.setSelection(2);
+        }
+
+        if (cbOnlyAvailable != null) {
+            cbOnlyAvailable.setChecked(Boolean.TRUE.equals(filterOnlyAvailable));
+        }
+
+        loadProvinceSpinner(spinnerProvince, spinnerCity);
+
+        etDateFrom.setOnClickListener(v -> showDatePicker(date -> etDateFrom.setText(date)));
+        etDateTo.setOnClickListener(v -> showDatePicker(date -> etDateTo.setText(date)));
+
+        btnReset.setOnClickListener(v -> {
+            resetFilters();
+            loadOrders();
+            dialog.dismiss();
+        });
+
+        btnConfirm.setOnClickListener(v -> {
+            filterKeyword = etKeyword != null && etKeyword.getText() != null
+                    ? etKeyword.getText().toString().trim() : "";
+            if (filterKeyword.isEmpty()) {
+                filterKeyword = null;
+            }
+
+            filterTags = getSelectedTags(chipGroupTags);
+
+            int statusIndex = spinnerStatus.getSelectedItemPosition();
+            if (statusIndex >= 0 && statusIndex < statusValues.length) {
+                String value = statusValues[statusIndex];
+                filterStatus = TextUtils.isEmpty(value) ? null : value;
+                filterStatusLabel = statusLabels[statusIndex];
+                if (TextUtils.isEmpty(value)) {
+                    filterStatusLabel = null;
+                }
+            }
+
+            filterDateFrom = etDateFrom.getText() != null ? etDateFrom.getText().toString().trim() : "";
+            filterDateTo = etDateTo.getText() != null ? etDateTo.getText().toString().trim() : "";
+            if (filterDateFrom.isEmpty()) {
+                filterDateFrom = null;
+            }
+            if (filterDateTo.isEmpty()) {
+                filterDateTo = null;
+            }
+
+            resolveRegionFromSpinners(spinnerProvince, spinnerCity);
+
+            int hasLeaderIndex = spinnerHasLeader.getSelectedItemPosition();
+            if (hasLeaderIndex == 1) {
+                filterHasLeader = false;
+            } else if (hasLeaderIndex == 2) {
+                filterHasLeader = true;
+            } else {
+                filterHasLeader = null;
+            }
+
+            filterOnlyAvailable = cbOnlyAvailable != null && cbOnlyAvailable.isChecked()
+                    ? Boolean.TRUE : null;
+
+            loadOrders();
+            dialog.dismiss();
+        });
+    }
+
+    private void loadProvinceSpinner(Spinner spinnerProvince, Spinner spinnerCity) {
+        List<String> provinceNames = new ArrayList<>();
+        provinceNames.add(getString(R.string.order_filter_no_region));
+
+        service.getProvinces().enqueue(new Callback<Result<List<Region>>>() {
+            @Override
+            public void onResponse(@NonNull Call<Result<List<Region>>> call,
+                                   @NonNull Response<Result<List<Region>>> response) {
+                if (!isAdded()) {
+                    return;
+                }
+                if (!response.isSuccessful() || response.body() == null || response.body().getCode() != 1) {
+                    return;
+                }
+                provinces = response.body().getData() != null ? response.body().getData() : new ArrayList<>();
+                provinceNames.clear();
+                provinceNames.add(getString(R.string.order_filter_no_region));
+                for (Region region : provinces) {
+                    provinceNames.add(region.getName());
+                }
+                ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+                        android.R.layout.simple_spinner_item, provinceNames);
+                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                spinnerProvince.setAdapter(adapter);
+
+                if (filterRegionCode != null && !provinces.isEmpty()) {
+                    restoreProvinceSelection(spinnerProvince, spinnerCity);
+                }
+
+                spinnerProvince.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                        if (position == 0) {
+                            cities.clear();
+                            bindCitySpinner(spinnerCity, new ArrayList<>(), false);
+                        } else {
+                            loadCitySpinner(spinnerCity, provinces.get(position - 1).getAdcode());
+                        }
+                    }
+
+                    @Override
+                    public void onNothingSelected(AdapterView<?> parent) {
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Result<List<Region>>> call, @NonNull Throwable t) {
+            }
+        });
+    }
+
+    private void restoreProvinceSelection(Spinner spinnerProvince, Spinner spinnerCity) {
+        for (int i = 0; i < provinces.size(); i++) {
+            Region province = provinces.get(i);
+            if (filterRegionCode.startsWith(province.getAdcode().substring(0, 2))) {
+                spinnerProvince.setSelection(i + 1);
+                loadCitySpinner(spinnerCity, province.getAdcode(), () -> {
+                    for (int j = 0; j < cities.size(); j++) {
+                        if (filterRegionCode.equals(cities.get(j).getAdcode())) {
+                            spinnerCity.setSelection(j + 1);
+                            break;
+                        }
+                    }
+                });
+                break;
+            }
+        }
+    }
+
+    private void loadCitySpinner(Spinner spinnerCity, String provinceAdcode) {
+        loadCitySpinner(spinnerCity, provinceAdcode, null);
+    }
+
+    private void loadCitySpinner(Spinner spinnerCity, String provinceAdcode, @Nullable Runnable onLoaded) {
+        service.getRegionChildren(provinceAdcode).enqueue(new Callback<Result<List<Region>>>() {
+            @Override
+            public void onResponse(@NonNull Call<Result<List<Region>>> call,
+                                   @NonNull Response<Result<List<Region>>> response) {
+                if (!isAdded()) {
+                    return;
+                }
+                cities = response.isSuccessful() && response.body() != null && response.body().getCode() == 1
+                        && response.body().getData() != null
+                        ? response.body().getData() : new ArrayList<>();
+                bindCitySpinner(spinnerCity, cities, true);
+                if (onLoaded != null) {
+                    onLoaded.run();
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Result<List<Region>>> call, @NonNull Throwable t) {
+                if (isAdded()) {
+                    bindCitySpinner(spinnerCity, new ArrayList<>(), false);
+                }
+            }
+        });
+    }
+
+    private void bindCitySpinner(Spinner spinnerCity, List<Region> cityList, boolean enabled) {
+        List<String> names = new ArrayList<>();
+        names.add(getString(R.string.order_filter_no_city));
+        for (Region city : cityList) {
+            names.add(city.getName());
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, names);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerCity.setAdapter(adapter);
+        spinnerCity.setEnabled(enabled && !cityList.isEmpty());
+    }
+
+    private void resolveRegionFromSpinners(Spinner spinnerProvince, Spinner spinnerCity) {
+        int provinceIndex = spinnerProvince.getSelectedItemPosition();
+        if (provinceIndex <= 0 || provinces.isEmpty()) {
+            filterRegionCode = null;
+            filterRegionLabel = null;
             return;
         }
 
-        final int finalAccountId = accountId;
-        service.getProjects(finalAccountId, 1, 20).enqueue(new Callback<Result<List<Project>>>() {
-            @Override
-            public void onResponse(Call<Result<List<Project>>> call, Response<Result<List<Project>>> response) {
-                if (!isAdded()) return;
-                if (!response.isSuccessful()) {
-                    if (response.code() == 401) {
-                        Toast.makeText(requireContext(), "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
-                        handleUnauthorized();
-                        return;
-                    }
-                    Toast.makeText(requireContext(), "获取订单失败：" + response.code(), Toast.LENGTH_SHORT).show();
-                    order_list.clear();
-                    adapter.setListData(order_list);
-                    return;
-                }
-                if (response.body() == null || response.body().getCode() != 1) {
-                    Toast.makeText(requireContext(), "获取订单失败：服务器返回异常", Toast.LENGTH_SHORT).show();
-                    order_list.clear();
-                    adapter.setListData(order_list);
-                    return;
-                }
-                List<Project> projects = response.body().getData();
-                if (projects == null || projects.isEmpty()) {
-                    Toast.makeText(requireContext(), "暂无项目数据", Toast.LENGTH_SHORT).show();
-                    order_list.clear();
-                    adapter.setListData(order_list);
-                    return;
-                }
-                // 只显示状态为 OPEN 的项目（可接单）
-                List<Project> available = new ArrayList<>();
-                for (Project p : projects) {
-                    if ("OPEN".equals(p.getStatus())) {
-                        available.add(p);
-                    }
-                }
-                if (available.isEmpty()) {
-                    Toast.makeText(requireContext(), "暂无可接订单", Toast.LENGTH_SHORT).show();
-                    order_list.clear();
-                    adapter.setListData(order_list);
-                    return;
-                }
+        Region province = provinces.get(provinceIndex - 1);
+        int cityIndex = spinnerCity.getSelectedItemPosition();
+        if (cityIndex <= 0 || cities.isEmpty()) {
+            filterRegionCode = province.getAdcode();
+            filterRegionLabel = province.getName();
+            return;
+        }
 
-                List<order> tempList = new ArrayList<>();
-                for (int i = 0; i < available.size(); i++) {
-                    tempList.add(null);
-                }
-                AtomicInteger done = new AtomicInteger(0);
-                int total = available.size();
-
-                for (int i = 0; i < total; i++) {
-                    final int idx = i;
-                    Project project = available.get(i);
-                    order o = new order();
-                    o.setProjectId(project.getId());
-                    o.setRouteId(project.getRouteId());
-                    o.setTitle(project.getTitle());
-                    o.setDepartureDate(project.getDepartureDate());
-                    o.setCreatedAt(project.getCreatedAt());
-                    o.setTag(project.getTag() != null ? project.getTag() : "");
-                    o.set_peopleCnt(project.getMaxMembers());
-                    o.setCurrentMembers(project.getCurrentMembers());
-                    tempList.set(idx, o);
-
-                    // 获取客户姓名
-                    fetchAccountAndRoute(o, project, tempList, idx, done, total);
-                }
-            }
-
-            @Override
-            public void onFailure(Call<Result<List<Project>>> call, Throwable t) {
-                if (isAdded()) {
-                    String reason = t != null ? t.getMessage() : "unknown";
-                    Log.e("orderList", "loadOrders failed: " + reason, t);
-                    Toast.makeText(requireContext(), "网络错误，无法加载订单（" + reason + "）", Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
+        Region city = cities.get(cityIndex - 1);
+        filterRegionCode = city.getAdcode();
+        filterRegionLabel = province.getName() + " · " + city.getName();
     }
 
-    private void fetchAccountAndRoute(order o, Project project,
-                                       List<order> tempList, int idx,
-                                       AtomicInteger done, int total) {
-        // 获取客户（ownerAccount）信息
-        service.getAccount(project.getOwnerAccountId()).enqueue(new Callback<Result<Account>>() {
-            @Override
-            public void onResponse(Call<Result<Account>> call, Response<Result<Account>> response) {
-                if (!isAdded()) return;
-                if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
-                    Account account = response.body().getData();
-                    User customer = new User();
-                    if (account != null) {
-                        customer.setName(account.getUsername());
-                        // 城市：从账户的 regionCode 暂无城市名，用 project 的 regionAdcode 显示
-                    }
-                    o.setCustomer(customer);
-                }
-
-                // 设置城市（用 regionAdcode 前4位对应城市，暂显示 adcode 或后续扩展）
-                String adcode = project.getRegionAdcode();
-                o.setCity(adcode != null ? regionAdcodeToCity(adcode) : "");
-
-                // 获取路线节点计算用时
-                fetchRouteAndFinish(o, project.getRouteId(), tempList, idx, done, total);
+    @Nullable
+    private Set<String> getSelectedTags(@Nullable ChipGroup chipGroupTags) {
+        Set<String> selected = new HashSet<>();
+        if (chipGroupTags == null) {
+            return selected;
+        }
+        for (int i = 0; i < chipGroupTags.getChildCount(); i++) {
+            Chip chip = (Chip) chipGroupTags.getChildAt(i);
+            if (chip.isChecked()) {
+                selected.add(chip.getText().toString());
             }
-
-            @Override
-            public void onFailure(Call<Result<Account>> call, Throwable t) {
-                if (!isAdded()) return;
-                o.setCity(regionAdcodeToCity(project.getRegionAdcode()));
-                fetchRouteAndFinish(o, project.getRouteId(), tempList, idx, done, total);
-            }
-        });
+        }
+        return selected;
     }
 
-    private void fetchRouteAndFinish(order o, int routeId,
-                                      List<order> tempList, int idx,
-                                      AtomicInteger done, int total) {
-        service.getRouteNodes(routeId).enqueue(new Callback<Result<List<RouteNode>>>() {
-            @Override
-            public void onResponse(Call<Result<List<RouteNode>>> call, Response<Result<List<RouteNode>>> response) {
-                if (!isAdded()) return;
-                if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
-                    List<RouteNode> nodes = response.body().getData();
-                    if (nodes != null && !nodes.isEmpty()) {
-                        Collections.sort(nodes, Comparator.comparingInt(RouteNode::getVisitOrder));
-                        // 计算总用时（分钟）
-                        int totalMin = 0;
-                        Route route = new Route();
-                        List<RouteStop> stops = new ArrayList<>();
-                        for (RouteNode node : nodes) {
-                            totalMin += node.getRecommendedDuration();
-                            route.addAttraction(node.getName() != null ? node.getName() : "");
+    private void showDatePicker(DateCallback callback) {
+        Calendar calendar = Calendar.getInstance();
+        new DatePickerDialog(requireContext(),
+                (view, year, month, dayOfMonth) -> {
+                    String date = String.format(Locale.getDefault(), "%04d-%02d-%02d",
+                            year, month + 1, dayOfMonth);
+                    callback.onDateSelected(date);
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)).show();
+    }
 
-                            RouteStop stop = new RouteStop();
-                            stop.setVisitOrder(node.getVisitOrder());
-                            stop.setName(node.getName());
-                            stop.setVisitTime(node.getVisitTime());
-                            stop.setRecommendedDuration(node.getRecommendedDuration());
-                            stop.setNotes(node.getNotes());
-                            stop.setLocation(node.getLocation());
-                            stop.setAddress(node.getAddress());
-                            stop.setCityname(node.getCityname());
-                            stops.add(stop);
+    private interface DateCallback {
+        void onDateSelected(String date);
+    }
+
+    private void resetFilters() {
+        filterKeyword = null;
+        filterRegionCode = null;
+        filterRegionLabel = null;
+        filterTags.clear();
+        filterStatus = null;
+        filterStatusLabel = null;
+        filterDateFrom = null;
+        filterDateTo = null;
+        filterHasLeader = null;
+        filterOnlyAvailable = null;
+        cities.clear();
+        if (tagAdapter != null) {
+            tagAdapter.clearSelection();
+        }
+    }
+
+    private void loadOrders() {
+        if (!SessionHelper.isLoggedIn(requireContext())) {
+            stopRefreshing();
+            showEmpty("请先登录后查看可接路线");
+            adapter.setItems(new ArrayList<>());
+            return;
+        }
+
+        int accountId = SessionHelper.getAccountId(requireContext());
+        if (swipeRefresh != null) {
+            swipeRefresh.setRefreshing(true);
+        }
+
+        // 多 tag 查询：分别查询每个 tag，再合并结果（OR 逻辑）
+        if (filterTags.size() > 1) {
+            final Set<Integer> seenIds = new HashSet<>();
+            final List<Project> mergedProjects = new ArrayList<>();
+            AtomicInteger pending = new AtomicInteger(filterTags.size());
+
+            for (String tag : filterTags) {
+                service.filterProjects(accountId, 1, 100,
+                        filterKeyword,
+                        filterRegionCode,
+                        tag,
+                        filterStatus,
+                        filterDateFrom,
+                        filterDateTo,
+                        filterHasLeader,
+                        filterOnlyAvailable)
+                        .enqueue(new Callback<Result<List<Project>>>() {
+                            @Override
+                            public void onResponse(@NonNull Call<Result<List<Project>>> call,
+                                                   @NonNull Response<Result<List<Project>>> response) {
+                                if (!isAdded()) return;
+                                if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
+                                    List<Project> projects = response.body().getData();
+                                    if (projects != null) {
+                                        synchronized (mergedProjects) {
+                                            for (Project p : projects) {
+                                                if (seenIds.add(p.getId())) {
+                                                    mergedProjects.add(p);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if (pending.decrementAndGet() == 0) {
+                                    onMultiTagResultsReady(mergedProjects);
+                                }
+                            }
+
+                            @Override
+                            public void onFailure(@NonNull Call<Result<List<Project>>> call, @NonNull Throwable t) {
+                                if (!isAdded()) return;
+                                if (pending.decrementAndGet() == 0) {
+                                    onMultiTagResultsReady(mergedProjects);
+                                }
+                            }
+                        });
+            }
+        } else {
+            // 单 tag 或无 tag 查询
+            String singleTag = filterTags.isEmpty() ? null : filterTags.iterator().next();
+            service.filterProjects(accountId, 1, 20,
+                    filterKeyword,
+                    filterRegionCode,
+                    singleTag,
+                    filterStatus,
+                    filterDateFrom,
+                    filterDateTo,
+                    filterHasLeader,
+                    filterOnlyAvailable)
+                    .enqueue(new Callback<Result<List<Project>>>() {
+                        @Override
+                        public void onResponse(@NonNull Call<Result<List<Project>>> call,
+                                               @NonNull Response<Result<List<Project>>> response) {
+                            if (!isAdded()) {
+                                return;
+                            }
+                            stopRefreshing();
+                            if (response.code() == 401) {
+                                Toast.makeText(requireContext(), "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
+                                SessionHelper.handleUnauthorized(requireContext());
+                                return;
+                            }
+                            if (!response.isSuccessful() || response.body() == null || response.body().getCode() != 1) {
+                                showEmpty("加载失败，下拉刷新重试");
+                                adapter.setItems(new ArrayList<>());
+                                return;
+                            }
+                            List<Project> projects = response.body().getData();
+                            if (projects == null || projects.isEmpty()) {
+                                showEmpty("暂无符合条件的路线");
+                                adapter.setItems(new ArrayList<>());
+                                return;
+                            }
+                            enrichProjects(projects);
                         }
-                        o.setRoute(route);
-                        o.setRouteStops(stops);
-                        o.setEstimatedDuration(formatDuration(totalMin));
-                    }
-                }
-                checkAndRefresh(done, total, tempList);
-            }
 
-            @Override
-            public void onFailure(Call<Result<List<RouteNode>>> call, Throwable t) {
-                if (!isAdded()) return;
-                checkAndRefresh(done, total, tempList);
+                        @Override
+                        public void onFailure(@NonNull Call<Result<List<Project>>> call, @NonNull Throwable t) {
+                            if (!isAdded()) {
+                                return;
+                            }
+                            stopRefreshing();
+                            showEmpty("网络错误，下拉刷新重试");
+                            adapter.setItems(new ArrayList<>());
+                        }
+                    });
+        }
+    }
+
+    private void onMultiTagResultsReady(List<Project> projects) {
+        requireActivity().runOnUiThread(() -> {
+            stopRefreshing();
+            if (projects.isEmpty()) {
+                showEmpty("暂无符合条件的路线");
+                adapter.setItems(new ArrayList<>());
+            } else {
+                enrichProjects(projects);
             }
         });
     }
 
-    private void checkAndRefresh(AtomicInteger done, int total, List<order> tempList) {
-        if (done.incrementAndGet() == total) {
-            requireActivity().runOnUiThread(() -> {
-                order_list.clear();
-                for (order o : tempList) {
-                    if (o != null) order_list.add(o);
+    private void enrichProjects(List<Project> projects) {
+        ProjectUiHelper.sortProjectsByStatus(projects);
+        teamItems.clear();
+        List<TeamCardItem> temp = new ArrayList<>();
+        for (Project project : projects) {
+            TeamCardItem item = new TeamCardItem(project);
+            item.setCity(ProjectUiHelper.regionAdcodeToCity(project.getRegionAdcode()));
+            temp.add(item);
+            teamItems.add(item);
+        }
+        adapter.setItems(temp);
+        txtEmpty.setVisibility(View.GONE);
+        recycler.setVisibility(View.VISIBLE);
+
+        AtomicInteger done = new AtomicInteger(0);
+        int total = projects.size();
+        for (int i = 0; i < projects.size(); i++) {
+            final int index = i;
+            Project project = projects.get(i);
+            TeamCardItem item = temp.get(index);
+
+            service.getAccount(project.getOwnerAccountId()).enqueue(new Callback<Result<Account>>() {
+                @Override
+                public void onResponse(@NonNull Call<Result<Account>> call, @NonNull Response<Result<Account>> response) {
+                    if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
+                        Account account = response.body().getData();
+                        if (account != null) {
+                            item.setOwnerName(account.getUsername());
+                        }
+                    }
+                    fetchRoute(item, project.getRouteId(), done, total);
                 }
-                adapter.setListData(order_list);
+
+                @Override
+                public void onFailure(@NonNull Call<Result<Account>> call, @NonNull Throwable t) {
+                    fetchRoute(item, project.getRouteId(), done, total);
+                }
             });
         }
     }
 
-    /** 将总分钟数格式化为 "X小时Y分钟" */
-    private String formatDuration(int totalMinutes) {
-        if (totalMinutes <= 0) return "暂无";
-        int hours = totalMinutes / 60;
-        int mins = totalMinutes % 60;
-        if (hours > 0 && mins > 0) return hours + "小时" + mins + "分钟";
-        if (hours > 0) return hours + "小时";
-        return mins + "分钟";
+    private void fetchRoute(TeamCardItem item, int routeId, AtomicInteger done, int total) {
+        service.getRouteNodes(routeId).enqueue(new Callback<Result<List<RouteNode>>>() {
+            @Override
+            public void onResponse(@NonNull Call<Result<List<RouteNode>>> call,
+                                   @NonNull Response<Result<List<RouteNode>>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
+                    List<RouteNode> nodes = response.body().getData();
+                    item.setRouteSummary(ProjectUiHelper.buildRouteSummary(nodes));
+                    item.setDuration(ProjectUiHelper.formatDuration(ProjectUiHelper.sumDurationMinutes(nodes)));
+                }
+                checkRefresh(done, total);
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Result<List<RouteNode>>> call, @NonNull Throwable t) {
+                checkRefresh(done, total);
+            }
+        });
     }
 
-    /** 根据 adcode 前缀映射常见城市名，不匹配则返回 adcode */
-    private String regionAdcodeToCity(String adcode) {
-        if (adcode == null || adcode.length() < 4) return "";
-        switch (adcode.substring(0, 4)) {
-            case "1101": return "北京市";
-            case "1201": return "天津市";
-            case "2101": return "沈阳市";
-            case "2201": return "长春市";
-            case "2301": return "哈尔滨市";
-            case "3101": return "上海市";
-            case "3201": return "南京市";
-            case "3301": return "杭州市";
-            case "3501": return "福州市";
-            case "3601": return "南昌市";
-            case "3701": return "济南市";
-            case "4101": return "郑州市";
-            case "4201": return "武汉市";
-            case "4301": return "长沙市";
-            case "4401": return "广州市";
-            case "4403": return "深圳市";
-            case "4501": return "南宁市";
-            case "5001": return "重庆市";
-            case "5101": return "成都市";
-            case "5201": return "贵阳市";
-            case "5301": return "昆明市";
-            case "6101": return "西安市";
-            default: return adcode;
+    private void checkRefresh(AtomicInteger done, int total) {
+        if (done.incrementAndGet() == total && isAdded()) {
+            requireActivity().runOnUiThread(() -> {
+                teamItems.sort((left, right) -> ProjectUiHelper.compareProjectsByStatus(
+                        left.getProject(), right.getProject()));
+                adapter.setItems(new ArrayList<>(teamItems));
+            });
         }
     }
 
-    private void handleUnauthorized() {
-        SharedPreferences prefs = requireContext().getSharedPreferences("user_pref", MODE_PRIVATE);
-        prefs.edit()
-                .putBoolean("is_logged_in", false)
-                .remove("account_id")
-                .apply();
-        ApiClient.clearToken();
+    private void stopRefreshing() {
+        if (swipeRefresh != null) {
+            swipeRefresh.setRefreshing(false);
+        }
+    }
 
-        Intent intent = new Intent(requireContext(), MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
+    private void showEmpty(String message) {
+        txtEmpty.setVisibility(View.VISIBLE);
+        txtEmpty.setText(message);
+        recycler.setVisibility(View.GONE);
     }
 }

@@ -3,45 +3,24 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFFF">
+    android:background="@drawable/login_entry_bg">
 
-    <!-- 背景变渐：现在填满父布局 -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#FFFFFF"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
+    <ImageButton
+        android:id="@+id/btnBack"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/circle_gray_background"
+        android:clickable="true"
+        android:contentDescription="@string/back"
+        android:focusable="true"
+        android:padding="12dp"
+        android:src="@drawable/ic_arrow_back"
+        android:elevation="4dp"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <FrameLayout
-        android:id="@+id/login_mode_container"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="24dp"
-        android:elevation="8dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/login_mode_toggle"
-            style="@style/Widget.MaterialComponents.Button"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:insetLeft="0dp"
-            android:insetRight="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="6dp"
-            android:text="验证码登录"
-            android:textColor="#333333"
-            android:textSize="14sp"
-            app:backgroundTint="#66B2FF"
-            app:cornerRadius="18dp" />
-    </FrameLayout>
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="#333333" />
 
     <!-- 平滑条容器：使用 padding 保留原有内边距（去掉 margin 以避免缩进背景） -->
     <ScrollView
@@ -71,11 +50,11 @@
 
                 <ImageView
                     android:id="@+id/logo"
-                    android:layout_width="130dp"
-                    android:layout_height="80dp"
+                    android:layout_width="133dp"
+                    android:layout_height="99dp"
                     android:contentDescription="@string/app_name"
-                    android:scaleType="centerInside"
-                    android:src="@drawable/ic_custom_logo"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/login_app_icon_png"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
