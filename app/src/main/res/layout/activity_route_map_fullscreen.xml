@@ -8,15 +8,15 @@
         android:id="@+id/toolbar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:background="@color/accent_dark"
+        android:background="@color/white"
         android:minHeight="?attr/actionBarSize"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:navigationIcon="@drawable/ic_arrow_back"
-        app:navigationIconTint="@color/white"
-        app:title="路线地图"
-        app:titleTextColor="@color/white" />
+        app:navigationIconTint="@color/route_text_primary"
+        app:title="研学路线"
+        app:titleTextColor="@color/route_text_primary" />
 
     <com.amap.api.maps.MapView
         android:id="@+id/mapView"

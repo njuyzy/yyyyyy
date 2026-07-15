@@ -23,14 +23,14 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** 在 AMap 上绘制蓝色加粗路线并自适应镜头 */
+/** 在 AMap 上绘制研学主题色路线并自适应镜头。 */
 public final class RouteMapDrawHelper {
 
     private static final String TAG = "RouteMapDrawHelper";
     private static final Pattern COORDINATE_PATTERN = Pattern.compile("(-?\\d+(?:\\.\\d+)?)");
 
     public static final float ROUTE_LINE_WIDTH = 20f;
-    public static final int ROUTE_LINE_COLOR = 0xFF1A73E8;
+    public static final int ROUTE_LINE_COLOR = 0xFF168B78;
 
     private RouteMapDrawHelper() {}
 
