@@ -1,6 +1,11 @@
 package com.example.Japp.user.fragment.route;
 
-import android.content.res.ColorStateList;
+import android.Manifest;
+import android.app.Activity;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.location.Location;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -9,6 +14,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Gravity;
 import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
@@ -18,6 +24,8 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -29,11 +37,9 @@ import com.amap.api.maps.MapView;
 import com.amap.api.maps.MapsInitializer;
 import com.amap.api.maps.model.LatLng;
 import com.amap.api.maps.model.MarkerOptions;
-import com.amap.api.services.core.AMapException;
+import com.amap.api.maps.model.MyLocationStyle;
 import com.amap.api.services.core.LatLonPoint;
 import com.amap.api.services.core.PoiItem;
-import com.amap.api.services.poisearch.PoiResult;
-import com.amap.api.services.poisearch.PoiSearch;
 import com.example.Japp.R;
 import com.example.Japp.leader.LeaderWalkRoutePlanner;
 import com.example.Japp.network.ApiClient;
@@ -44,6 +50,8 @@ import com.example.Japp.network.models.requests.CreateProjectRequest;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.RoutePlanHelper;
 import com.example.Japp.user.util.SessionHelper;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.gson.JsonElement;
 
@@ -59,11 +67,10 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-/** 地图常驻的研学路线页，支持自定义地点和 AI 路线两种模式。 */
-public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListener {
+/** 地图常驻的研学路线页，自定义地点与 AI 对话在同一张底卡中协作。 */
+public class routeDesign extends Fragment {
 
     private static final String TAG = "RouteDesign";
-    private static final String STATE_AI_MODE = "route_ai_mode";
     private static final LatLng DEFAULT_MAP_CENTER = new LatLng(32.0603, 118.7969);
     private static final String[] WAITING_TIPS = {
             "路线助手正在理解你的需求…",
@@ -75,31 +82,65 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
 
     private MapView mainRouteMapView;
     private AMap mainMap;
-    private View customRoutePanel;
-    private View aiRoutePanel;
+    private MaterialCardView customRoutePanel;
+    private MaterialCardView routeStopsCard;
+    private View chatArea;
+    private BottomSheetBehavior<MaterialCardView> routeSheetBehavior;
     private View welcomePanel;
-    private Button btnRouteMode;
-    private Button btnPlaceSearch;
+    private Button btnTogglePlaceSearch;
     private Button btnSend;
-    private EditText editPlaceSearch;
     private EditText editMessage;
     private TextView txtRouteStopCount;
-    private TextView txtPlaceSearchStatus;
     private TextView txtAiRouteContext;
+    private TextView txtCurrentLocationStatus;
     private LinearLayout routeStopsContainer;
-    private RecyclerView poiResultsRecyclerView;
+    private View currentLocationRow;
+    private View btnMyLocation;
     private RecyclerView chatRecyclerView;
 
-    private PoiSearchAdapter poiSearchAdapter;
     private RouteChatAdapter adapter;
     private UserService service;
     private LeaderWalkRoutePlanner walkRoutePlanner;
     private LeaderWalkRoutePlanner customWalkPlanner;
-    private PoiSearch poiSearch;
 
     private final List<RouteNode> editableRouteNodes = new ArrayList<>();
-    private boolean aiMode;
+    private LatLng currentLocation;
+    private boolean locationCameraCentered;
     private int mapRouteRevision;
+
+    private final ActivityResultLauncher<String[]> locationPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
+                if (!isAdded()) {
+                    return;
+                }
+                if (hasLocationPermission()) {
+                    enableMyLocation(true);
+                } else if (txtCurrentLocationStatus != null) {
+                    txtCurrentLocationStatus.setText(R.string.route_location_permission_needed);
+                }
+            });
+
+    private final ActivityResultLauncher<Intent> placeSearchLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (!isAdded() || result.getResultCode() != Activity.RESULT_OK
+                        || result.getData() == null) {
+                    return;
+                }
+                Intent data = result.getData();
+                double lat = data.getDoubleExtra(PlaceSearchActivity.EXTRA_LAT, 0d);
+                double lng = data.getDoubleExtra(PlaceSearchActivity.EXTRA_LNG, 0d);
+                if (lat == 0d || lng == 0d) {
+                    Toast.makeText(requireContext(), "该地点缺少坐标，无法加入路线", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                PoiItem item = new PoiItem(
+                        data.getStringExtra(PlaceSearchActivity.EXTRA_POI_ID),
+                        new LatLonPoint(lat, lng),
+                        data.getStringExtra(PlaceSearchActivity.EXTRA_NAME),
+                        data.getStringExtra(PlaceSearchActivity.EXTRA_ADDRESS));
+                item.setCityName(data.getStringExtra(PlaceSearchActivity.EXTRA_CITY));
+                addPoiToRoute(item);
+            });
 
     private final Handler waitingHandler = new Handler(Looper.getMainLooper());
     private int waitingStatusPosition = -1;
@@ -138,34 +179,105 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
         walkRoutePlanner = new LeaderWalkRoutePlanner(requireContext());
 
         bindViews(root);
+        setupRouteBottomSheet(root);
         setupMainMap(savedInstanceState);
         setupCustomRouteEditor();
         setupAiRouteAssistant(root, savedInstanceState);
 
-        aiMode = savedInstanceState != null && savedInstanceState.getBoolean(STATE_AI_MODE, false);
-        applyMode();
         renderEditableStops();
         showDefaultMapIfNeeded();
+        requestOrEnableLocation();
         return root;
     }
 
     private void bindViews(View root) {
         mainRouteMapView = root.findViewById(R.id.mainRouteMapView);
         customRoutePanel = root.findViewById(R.id.customRoutePanel);
-        aiRoutePanel = root.findViewById(R.id.aiRoutePanel);
-        btnRouteMode = root.findViewById(R.id.btnRouteMode);
-        btnPlaceSearch = root.findViewById(R.id.btnPlaceSearch);
-        editPlaceSearch = root.findViewById(R.id.editPlaceSearch);
+        routeStopsCard = root.findViewById(R.id.routeStopsCard);
+        chatArea = root.findViewById(R.id.chatArea);
+        btnTogglePlaceSearch = root.findViewById(R.id.btnTogglePlaceSearch);
         txtRouteStopCount = root.findViewById(R.id.txtRouteStopCount);
-        txtPlaceSearchStatus = root.findViewById(R.id.txtPlaceSearchStatus);
         txtAiRouteContext = root.findViewById(R.id.txtAiRouteContext);
+        txtCurrentLocationStatus = root.findViewById(R.id.txtCurrentLocationStatus);
         routeStopsContainer = root.findViewById(R.id.routeStopsContainer);
-        poiResultsRecyclerView = root.findViewById(R.id.poiResultsRecyclerView);
-
+        currentLocationRow = root.findViewById(R.id.currentLocationRow);
+        btnMyLocation = root.findViewById(R.id.btnMyLocation);
         chatRecyclerView = root.findViewById(R.id.chatRecyclerView);
         editMessage = root.findViewById(R.id.editMessage);
         btnSend = root.findViewById(R.id.btnSend);
         welcomePanel = root.findViewById(R.id.welcomePanel);
+    }
+
+    private void setupRouteBottomSheet(@NonNull View root) {
+        routeSheetBehavior = BottomSheetBehavior.from(customRoutePanel);
+        routeSheetBehavior.setHideable(false);
+        routeSheetBehavior.setDraggable(true);
+        routeSheetBehavior.setFitToContents(false);
+        routeSheetBehavior.setExpandedOffset(0);
+        routeSheetBehavior.setPeekHeight(dpToPx(312));
+
+        routeSheetBehavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
+            @Override
+            public void onStateChanged(@NonNull View bottomSheet, int newState) {
+                if (newState == BottomSheetBehavior.STATE_EXPANDED) {
+                    updateSheetContentHeight(1f);
+                    customRoutePanel.setRadius(0f);
+                } else if (newState == BottomSheetBehavior.STATE_COLLAPSED) {
+                    updateSheetContentHeight(0f);
+                    customRoutePanel.setRadius(dpToPx(20));
+                }
+            }
+
+            @Override
+            public void onSlide(@NonNull View bottomSheet, float slideOffset) {
+                updateSheetContentHeight(Math.max(0f, Math.min(1f, slideOffset)));
+            }
+        });
+
+        View handle = root.findViewById(R.id.routeSheetHandle);
+        handle.setOnClickListener(v -> {
+            int targetState = routeSheetBehavior.getState() == BottomSheetBehavior.STATE_EXPANDED
+                    ? BottomSheetBehavior.STATE_COLLAPSED
+                    : BottomSheetBehavior.STATE_EXPANDED;
+            routeSheetBehavior.setState(targetState);
+        });
+        customRoutePanel.post(() -> {
+            if (routeSheetBehavior != null) {
+                routeSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+                updateSheetContentHeight(0f);
+            }
+        });
+    }
+
+    private void updateSheetContentHeight(float expansion) {
+        if (customRoutePanel == null || routeStopsCard == null || chatArea == null
+                || customRoutePanel.getHeight() <= 0) {
+            return;
+        }
+        int collapsedStopsHeight = dpToPx(96);
+        int collapsedChatHeight = dpToPx(62);
+        int fixedContentHeight = dpToPx(140);
+        int expandedSectionHeight = Math.max(collapsedStopsHeight,
+                (customRoutePanel.getHeight() - fixedContentHeight) / 2);
+
+        int stopsHeight = collapsedStopsHeight
+                + Math.round((expandedSectionHeight - collapsedStopsHeight) * expansion);
+        int chatHeight = collapsedChatHeight
+                + Math.round((expandedSectionHeight - collapsedChatHeight) * expansion);
+        setViewHeight(routeStopsCard, stopsHeight);
+        setViewHeight(chatArea, chatHeight);
+    }
+
+    private void setViewHeight(@NonNull View view, int targetHeight) {
+        ViewGroup.LayoutParams params = view.getLayoutParams();
+        if (params.height != targetHeight) {
+            params.height = targetHeight;
+            view.setLayoutParams(params);
+        }
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
     }
 
     private void setupMainMap(@Nullable Bundle savedInstanceState) {
@@ -178,32 +290,128 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
         mainMap.getUiSettings().setMyLocationButtonEnabled(false);
         mainMap.getUiSettings().setRotateGesturesEnabled(false);
         mainMap.getUiSettings().setTiltGesturesEnabled(false);
+        mainMap.setMapType(AMap.MAP_TYPE_NORMAL);
+        mainMap.setOnMapLoadedListener(() -> {
+            if (editableRouteNodes.isEmpty() && !locationCameraCentered) {
+                showDefaultMapIfNeeded();
+            }
+        });
+        mainMap.setOnMyLocationChangeListener(this::onMyLocationChanged);
+
+        if (currentLocationRow != null) {
+            currentLocationRow.setOnClickListener(v -> centerOnMyLocation());
+        }
+        if (btnMyLocation != null) {
+            btnMyLocation.setOnClickListener(v -> centerOnMyLocation());
+        }
+    }
+
+    private void requestOrEnableLocation() {
+        if (hasLocationPermission()) {
+            enableMyLocation(false);
+            return;
+        }
+        if (txtCurrentLocationStatus != null) {
+            txtCurrentLocationStatus.setText(R.string.route_location_permission_needed);
+        }
+        locationPermissionLauncher.launch(new String[]{
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+        });
+    }
+
+    private boolean hasLocationPermission() {
+        if (!isAdded()) {
+            return false;
+        }
+        return ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void enableMyLocation(boolean centerWhenReady) {
+        if (mainMap == null || !hasLocationPermission()) {
+            return;
+        }
+        locationCameraCentered = !centerWhenReady && locationCameraCentered;
+        MyLocationStyle style = new MyLocationStyle()
+                .myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE_NO_CENTER)
+                .interval(2000L)
+                .strokeColor(Color.WHITE)
+                .strokeWidth(2f)
+                .radiusFillColor(0x221677FF);
+        mainMap.setMyLocationStyle(style);
+        try {
+            mainMap.setMyLocationEnabled(true);
+            if (txtCurrentLocationStatus != null) {
+                txtCurrentLocationStatus.setText(R.string.route_location_locating);
+            }
+        } catch (SecurityException e) {
+            Log.w(TAG, "Location permission was revoked while enabling map location", e);
+        }
+    }
+
+    private void onMyLocationChanged(@Nullable Location location) {
+        if (!isAdded() || location == null
+                || location.getLatitude() == 0d || location.getLongitude() == 0d) {
+            return;
+        }
+        LatLng candidate = new LatLng(location.getLatitude(), location.getLongitude());
+        if (!isInsideAmapServiceRegion(candidate)) {
+            currentLocation = null;
+            locationCameraCentered = false;
+            if (txtCurrentLocationStatus != null) {
+                txtCurrentLocationStatus.setText(R.string.route_location_outside_service);
+            }
+            showDefaultMapIfNeeded();
+            return;
+        }
+        boolean firstFix = currentLocation == null;
+        currentLocation = candidate;
+        if (txtCurrentLocationStatus != null) {
+            txtCurrentLocationStatus.setText(R.string.route_location_ready);
+        }
+        if (firstFix && !editableRouteNodes.isEmpty()) {
+            updateMapFromEditableRoute(true);
+        } else if (!locationCameraCentered && editableRouteNodes.isEmpty()) {
+            centerOnMyLocation();
+        }
+    }
+
+    /** 高德国内底图的稳定覆盖范围；避免模拟器默认境外坐标把镜头带到空白区域。 */
+    private boolean isInsideAmapServiceRegion(@NonNull LatLng point) {
+        return point.latitude >= 3.0 && point.latitude <= 54.0
+                && point.longitude >= 73.0 && point.longitude <= 136.0;
+    }
+
+    private void centerOnMyLocation() {
+        if (!hasLocationPermission()) {
+            requestOrEnableLocation();
+            return;
+        }
+        if (currentLocation == null || !isInsideAmapServiceRegion(currentLocation)) {
+            enableMyLocation(true);
+            showDefaultMapIfNeeded();
+            Toast.makeText(requireContext(), "正在获取可用的当前位置…", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        locationCameraCentered = true;
+        mainMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLocation, 16f));
     }
 
     private void showDefaultMapIfNeeded() {
         if (mainMap != null && editableRouteNodes.isEmpty()) {
-            mainMap.moveCamera(CameraUpdateFactory.newLatLngZoom(DEFAULT_MAP_CENTER, 11f));
+            if (currentLocation != null) {
+                mainMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLocation, 16f));
+            } else {
+                mainMap.moveCamera(CameraUpdateFactory.newLatLngZoom(DEFAULT_MAP_CENTER, 11f));
+            }
         }
     }
 
     private void setupCustomRouteEditor() {
-        poiSearchAdapter = new PoiSearchAdapter(this::addPoiToRoute);
-        poiResultsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
-        poiResultsRecyclerView.setAdapter(poiSearchAdapter);
-
-        btnPlaceSearch.setOnClickListener(v -> searchPlaces());
-        editPlaceSearch.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                searchPlaces();
-                return true;
-            }
-            return false;
-        });
-
-        btnRouteMode.setOnClickListener(v -> {
-            aiMode = !aiMode;
-            applyMode();
-        });
+        btnTogglePlaceSearch.setOnClickListener(v -> launchPlaceSearch());
     }
 
     private void setupAiRouteAssistant(View root, @Nullable Bundle savedInstanceState) {
@@ -235,132 +443,13 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
         updateWelcomeVisibility();
     }
 
-    private void applyMode() {
-        if (customRoutePanel == null || aiRoutePanel == null || btnRouteMode == null) {
-            return;
+    private void launchPlaceSearch() {
+        Intent intent = new Intent(requireContext(), PlaceSearchActivity.class);
+        if (currentLocation != null && isInsideAmapServiceRegion(currentLocation)) {
+            intent.putExtra(PlaceSearchActivity.EXTRA_ORIGIN_LAT, currentLocation.latitude);
+            intent.putExtra(PlaceSearchActivity.EXTRA_ORIGIN_LNG, currentLocation.longitude);
         }
-        customRoutePanel.setVisibility(aiMode ? View.GONE : View.VISIBLE);
-        aiRoutePanel.setVisibility(aiMode ? View.VISIBLE : View.GONE);
-        btnRouteMode.setText(aiMode ? R.string.route_mode_custom : R.string.route_mode_ai);
-        updateAiContextLabel();
-        if (aiMode && editMessage != null) {
-            editMessage.setHint(editableRouteNodes.isEmpty()
-                    ? R.string.route_ai_input_hint
-                    : R.string.route_ai_optimize_hint);
-        }
-    }
-
-    private void searchPlaces() {
-        if (editPlaceSearch == null) {
-            return;
-        }
-        String keyword = editPlaceSearch.getText().toString().trim();
-        if (TextUtils.isEmpty(keyword)) {
-            txtPlaceSearchStatus.setText(R.string.route_place_search_hint);
-            return;
-        }
-
-        txtPlaceSearchStatus.setVisibility(View.VISIBLE);
-        txtPlaceSearchStatus.setText(R.string.route_searching);
-        poiResultsRecyclerView.setVisibility(View.GONE);
-        btnPlaceSearch.setEnabled(false);
-
-        PoiSearch.Query query = new PoiSearch.Query(keyword, "", "");
-        query.setPageSize(10);
-        query.setPageNum(0);
-        query.setExtensions(PoiSearch.EXTENSIONS_BASE);
-        try {
-            poiSearch = new PoiSearch(requireContext(), query);
-            poiSearch.setLanguage(PoiSearch.CHINESE);
-            poiSearch.setOnPoiSearchListener(this);
-            poiSearch.searchPOIAsyn();
-        } catch (AMapException e) {
-            btnPlaceSearch.setEnabled(true);
-            showPlaceSearchError(e.getErrorCode(), e.getErrorMessage());
-        }
-    }
-
-    @Override
-    public void onPoiSearched(PoiResult result, int errorCode) {
-        if (!isAdded() || btnPlaceSearch == null) {
-            return;
-        }
-        btnPlaceSearch.setEnabled(true);
-        List<PoiItem> pois = result != null ? result.getPois() : null;
-        if (errorCode != AMapException.CODE_AMAP_SUCCESS) {
-            poiSearchAdapter.submitItems(null);
-            poiResultsRecyclerView.setVisibility(View.GONE);
-            txtPlaceSearchStatus.setVisibility(View.VISIBLE);
-            showPlaceSearchError(errorCode, null);
-            return;
-        }
-        if (pois == null || pois.isEmpty()) {
-            poiSearchAdapter.submitItems(null);
-            poiResultsRecyclerView.setVisibility(View.GONE);
-            txtPlaceSearchStatus.setVisibility(View.VISIBLE);
-            txtPlaceSearchStatus.setText(R.string.route_search_empty);
-            return;
-        }
-        poiSearchAdapter.submitItems(pois);
-        poiResultsRecyclerView.setVisibility(View.VISIBLE);
-        txtPlaceSearchStatus.setVisibility(View.GONE);
-    }
-
-    @Override
-    public void onPoiItemSearched(PoiItem item, int errorCode) {
-        // 当前页面只使用关键词列表搜索。
-    }
-
-    private void showPlaceSearchError(int errorCode, @Nullable String sdkMessage) {
-        String reason = describePlaceSearchError(errorCode);
-        if (TextUtils.isEmpty(reason) && !TextUtils.isEmpty(sdkMessage)) {
-            reason = sdkMessage;
-        }
-        if (TextUtils.isEmpty(reason)) {
-            reason = getString(R.string.route_search_unknown_error);
-        }
-        Log.w(TAG, "AMap POI search failed, code=" + errorCode + ", reason=" + reason);
-        txtPlaceSearchStatus.setVisibility(View.VISIBLE);
-        txtPlaceSearchStatus.setText(getString(
-                R.string.route_search_failed_with_code, reason, errorCode));
-    }
-
-    private String describePlaceSearchError(int errorCode) {
-        switch (errorCode) {
-            case AMapException.CODE_AMAP_SIGNATURE_ERROR:
-                return "应用签名未通过，请检查 SHA1";
-            case AMapException.CODE_AMAP_INVALID_USER_KEY:
-                return "高德 Key 不正确或已过期";
-            case AMapException.CODE_AMAP_SERVICE_NOT_AVAILBALE:
-                return "POI 搜索服务不可用";
-            case AMapException.CODE_AMAP_DAILY_QUERY_OVER_LIMIT:
-                return "今日搜索配额已用完";
-            case AMapException.CODE_AMAP_ACCESS_TOO_FREQUENT:
-                return "搜索过于频繁，请稍后重试";
-            case AMapException.CODE_AMAP_INVALID_USER_SCODE:
-                return "安全码校验失败，请检查 SHA1";
-            case AMapException.CODE_AMAP_USERKEY_PLAT_NOMATCH:
-                return "Key 平台不匹配，需要 Android Key";
-            case AMapException.CODE_AMAP_INSUFFICIENT_PRIVILEGES:
-                return "Key 未开通搜索权限";
-            case AMapException.CODE_AMAP_USER_KEY_RECYCLED:
-                return "高德 Key 已被删除";
-            case AMapException.CODE_AMAP_ENGINE_CONNECT_TIMEOUT:
-            case AMapException.CODE_AMAP_ENGINE_RETURN_TIMEOUT:
-            case AMapException.CODE_AMAP_CLIENT_SOCKET_TIMEOUT_EXCEPTION:
-                return "连接高德服务超时";
-            case AMapException.CODE_AMAP_CLIENT_UNKNOWHOST_EXCEPTION:
-                return "无法解析高德服务地址，请检查网络";
-            case AMapException.CODE_AMAP_CLIENT_NETWORK_EXCEPTION:
-                return "网络连接失败";
-            case AMapException.CODE_AMAP_SERVICE_INVALID_PARAMS:
-            case AMapException.CODE_AMAP_CLIENT_INVALID_PARAMETER:
-                return "搜索参数无效";
-            case AMapException.CODE_AMAP_SERVICE_MAINTENANCE:
-                return "高德搜索服务维护中";
-            default:
-                return null;
-        }
+        placeSearchLauncher.launch(intent);
     }
 
     private void addPoiToRoute(@NonNull PoiItem poi) {
@@ -384,11 +473,6 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
         node.setLocation(point.getLongitude() + "," + point.getLatitude());
         editableRouteNodes.add(node);
 
-        editPlaceSearch.setText("");
-        poiSearchAdapter.submitItems(null);
-        poiResultsRecyclerView.setVisibility(View.GONE);
-        txtPlaceSearchStatus.setVisibility(View.VISIBLE);
-        txtPlaceSearchStatus.setText(R.string.route_search_default_tip);
         renderEditableStops();
         updateMapFromEditableRoute(true);
     }
@@ -417,12 +501,15 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
         txtRouteStopCount.setText(getString(R.string.route_stop_count_format, editableRouteNodes.size()));
 
         if (editableRouteNodes.isEmpty()) {
-            TextView empty = new TextView(requireContext());
-            empty.setText(R.string.route_empty_stops);
-            empty.setTextColor(ContextCompat.getColor(requireContext(), R.color.route_text_secondary));
-            empty.setTextSize(12f);
-            empty.setPadding(4, 6, 4, 6);
-            routeStopsContainer.addView(empty);
+            TextView addDestination = new TextView(requireContext());
+            addDestination.setText(R.string.route_empty_stops);
+            addDestination.setTextColor(ContextCompat.getColor(
+                    requireContext(), R.color.route_text_secondary));
+            addDestination.setTextSize(12f);
+            addDestination.setGravity(Gravity.CENTER_VERTICAL);
+            addDestination.setPadding(dp(4), 0, dp(4), 0);
+            routeStopsContainer.addView(addDestination, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
             updateAiContextLabel();
             return;
         }
@@ -430,25 +517,62 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
         for (int i = 0; i < editableRouteNodes.size(); i++) {
             final int position = i;
             RouteNode node = editableRouteNodes.get(i);
-            Chip chip = new Chip(requireContext());
-            chip.setText(getString(R.string.route_stop_chip_format, i + 1, node.getName()));
-            chip.setTextSize(12f);
-            chip.setTextColor(ContextCompat.getColor(requireContext(), R.color.route_chip_text));
-            chip.setChipBackgroundColor(ColorStateList.valueOf(
-                    ContextCompat.getColor(requireContext(), R.color.route_chip_bg)));
-            chip.setChipStrokeColor(ColorStateList.valueOf(
-                    ContextCompat.getColor(requireContext(), R.color.route_chip_stroke)));
-            chip.setChipStrokeWidth(1f);
-            chip.setCloseIconVisible(true);
-            chip.setCloseIconTint(ColorStateList.valueOf(
-                    ContextCompat.getColor(requireContext(), R.color.route_primary)));
-            chip.setOnCloseIconClickListener(v -> removeRouteStop(position));
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            params.setMarginEnd(8);
-            routeStopsContainer.addView(chip, params);
+            if (i > 0) {
+                View divider = new View(requireContext());
+                divider.setBackgroundColor(ContextCompat.getColor(
+                        requireContext(), R.color.route_card_stroke));
+                LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dp(1));
+                dividerParams.setMarginStart(dp(29));
+                routeStopsContainer.addView(divider, dividerParams);
+            }
+
+            LinearLayout row = new LinearLayout(requireContext());
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setPadding(dp(4), 0, dp(2), 0);
+
+            TextView number = new TextView(requireContext());
+            number.setGravity(Gravity.CENTER);
+            number.setText(String.valueOf(i + 1));
+            number.setTextColor(ContextCompat.getColor(requireContext(), R.color.route_primary));
+            number.setTextSize(10f);
+            number.setBackgroundResource(R.drawable.bg_route_stop_number);
+            row.addView(number, new LinearLayout.LayoutParams(dp(20), dp(20)));
+
+            TextView name = new TextView(requireContext());
+            name.setText(node.getName());
+            name.setTextColor(ContextCompat.getColor(requireContext(), R.color.route_text_primary));
+            name.setTextSize(14f);
+            name.setSingleLine(true);
+            name.setEllipsize(TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            nameParams.setMarginStart(dp(12));
+            row.addView(name, nameParams);
+
+            TextView remove = new TextView(requireContext());
+            remove.setText("×");
+            remove.setTextColor(ContextCompat.getColor(requireContext(), R.color.route_text_secondary));
+            remove.setTextSize(22f);
+            remove.setGravity(Gravity.CENTER);
+            remove.setContentDescription("移除" + node.getName());
+            remove.setOnClickListener(v -> removeRouteStop(position));
+            row.addView(remove, new LinearLayout.LayoutParams(dp(36), dp(42)));
+
+            LatLng point = RouteMapDrawHelper.parseLocation(node.getLocation());
+            if (point != null) {
+                row.setOnClickListener(v -> mainMap.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(point, 16f)));
+            }
+            routeStopsContainer.addView(row, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
         }
         updateAiContextLabel();
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private void removeRouteStop(int position) {
@@ -470,15 +594,17 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
     private void updateMapFromEditableRoute(boolean planRoad) {
         mapRouteRevision++;
         int revision = mapRouteRevision;
-        List<LatLng> points = RouteMapDrawHelper.extractPointsFromNodes(editableRouteNodes);
         if (mainMap == null) {
             return;
         }
-        if (points.isEmpty()) {
+        if (editableRouteNodes.isEmpty()) {
             mainMap.clear();
             showDefaultMapIfNeeded();
             return;
         }
+        List<RouteNode> planningNodes = buildCustomPlanningNodes();
+        List<LatLng> points = RouteMapDrawHelper.extractPointsFromNodes(planningNodes);
+        boolean hasCurrentOrigin = currentLocation != null;
         if (points.size() == 1) {
             mainMap.clear();
             mainMap.addMarker(new MarkerOptions()
@@ -488,7 +614,7 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
             return;
         }
 
-        RouteMapDrawHelper.drawRoute(mainMap, points, points);
+        RouteMapDrawHelper.drawRoute(mainMap, points, points, !hasCurrentOrigin);
         if (!planRoad) {
             return;
         }
@@ -496,7 +622,7 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
             customWalkPlanner.cancel();
         }
         customWalkPlanner = new LeaderWalkRoutePlanner(requireContext());
-        List<RouteNode> snapshot = new ArrayList<>(editableRouteNodes);
+        List<RouteNode> snapshot = new ArrayList<>(planningNodes);
         customWalkPlanner.planSummary(snapshot, new LeaderWalkRoutePlanner.Callback() {
             @Override
             public void onPlanningStarted() {
@@ -518,7 +644,8 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
                 if (!isAdded() || mainMap == null || revision != mapRouteRevision) {
                     return;
                 }
-                RouteMapDrawHelper.drawRoute(mainMap, roadPolyline, points);
+                RouteMapDrawHelper.drawRoute(
+                        mainMap, roadPolyline, points, !hasCurrentOrigin);
             }
 
             @Override
@@ -526,6 +653,21 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
                 // 保留已经绘制的站点直连线。
             }
         });
+    }
+
+    @NonNull
+    private List<RouteNode> buildCustomPlanningNodes() {
+        List<RouteNode> nodes = new ArrayList<>();
+        if (currentLocation != null) {
+            RouteNode origin = new RouteNode();
+            origin.setVisitOrder(0);
+            origin.setName(getString(R.string.route_my_location));
+            origin.setRecommendedDuration(0);
+            origin.setLocation(currentLocation.longitude + "," + currentLocation.latitude);
+            nodes.add(origin);
+        }
+        nodes.addAll(editableRouteNodes);
+        return nodes;
     }
 
     private void updateAiContextLabel() {
@@ -917,7 +1059,6 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
     @Override
     public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
-        outState.putBoolean(STATE_AI_MODE, aiMode);
         if (mainRouteMapView != null) {
             mainRouteMapView.onSaveInstanceState(outState);
         }
@@ -958,17 +1099,25 @@ public class routeDesign extends Fragment implements PoiSearch.OnPoiSearchListen
             adapter.onHostDestroy();
         }
         if (mainRouteMapView != null) {
+            if (mainMap != null) {
+                mainMap.setMyLocationEnabled(false);
+                mainMap.setOnMyLocationChangeListener(null);
+            }
             mainRouteMapView.onDestroy();
         }
         mainRouteMapView = null;
         mainMap = null;
+        routeSheetBehavior = null;
+        customRoutePanel = null;
+        routeStopsCard = null;
+        chatArea = null;
         chatRecyclerView = null;
-        poiResultsRecyclerView = null;
         editMessage = null;
-        editPlaceSearch = null;
+        txtCurrentLocationStatus = null;
+        currentLocationRow = null;
+        btnMyLocation = null;
         btnSend = null;
-        btnPlaceSearch = null;
-        btnRouteMode = null;
+        btnTogglePlaceSearch = null;
         super.onDestroyView();
     }
 

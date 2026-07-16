@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 地图常驻，底部在「自定义地点搜索」和「AI 路线聊天」之间切换。 -->
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 地图常驻；自定义路线与 AI 对话合并在同一张无外边距底卡中。 -->
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -9,60 +9,59 @@
 
     <com.amap.api.maps.MapView
         android:id="@+id/mainRouteMapView"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnRouteMode"
-        android:layout_width="wrap_content"
-        android:layout_height="36dp"
-        android:layout_marginTop="10dp"
-        android:layout_marginEnd="10dp"
-        android:insetTop="0dp"
-        android:insetBottom="0dp"
-        android:minWidth="0dp"
-        android:paddingStart="11dp"
-        android:paddingEnd="11dp"
-        android:text="@string/route_mode_ai"
-        android:textAllCaps="false"
-        android:textColor="@color/white"
-        android:textSize="12sp"
-        android:textStyle="bold"
-        app:backgroundTint="@color/route_primary"
-        app:cornerRadius="18dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/myLocationCard"
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:layout_gravity="end"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="10dp"
+        app:cardBackgroundColor="#F8FFFFFF"
+        app:cardCornerRadius="21dp"
+        app:cardElevation="5dp"
+        app:layout_anchor="@id/customRoutePanel"
+        app:layout_anchorGravity="top|end">
+
+        <ImageButton
+            android:id="@+id/btnMyLocation"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/route_center_my_location"
+            android:padding="10dp"
+            android:src="@drawable/ic_route_my_location"
+            app:tint="@color/route_text_primary" />
+    </com.google.android.material.card.MaterialCardView>
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/customRoutePanel"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="6dp"
-        android:layout_marginEnd="6dp"
-        android:layout_marginBottom="6dp"
-        app:cardBackgroundColor="#FAFFFFFF"
-        app:cardCornerRadius="19dp"
-        app:cardElevation="5dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:cardBackgroundColor="#FCFFFFFF"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="6dp"
+        app:behavior_expandedOffset="0dp"
+        app:behavior_fitToContents="false"
+        app:behavior_hideable="false"
+        app:behavior_peekHeight="312dp"
+        app:layout_behavior="@string/bottom_sheet_behavior"
         app:strokeColor="@color/route_card_stroke"
         app:strokeWidth="1dp">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:orientation="vertical"
-            android:paddingStart="9dp"
-            android:paddingTop="6dp"
-            android:paddingEnd="9dp"
-            android:paddingBottom="9dp">
+            android:paddingStart="10dp"
+            android:paddingTop="7dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="8dp">
 
             <View
+                android:id="@+id/routeSheetHandle"
                 android:layout_width="32dp"
                 android:layout_height="4dp"
                 android:layout_gravity="center_horizontal"
@@ -70,178 +69,8 @@
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/route_custom_title"
-                    android:textColor="@color/route_text_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/txtRouteStopCount"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_route_ai_badge"
-                    android:paddingStart="10dp"
-                    android:paddingTop="4dp"
-                    android:paddingEnd="10dp"
-                    android:paddingBottom="4dp"
-                    android:text="@string/route_zero_stops"
-                    android:textColor="@color/route_primary"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <HorizontalScrollView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:fillViewport="false"
-                android:scrollbars="none">
-
-                <LinearLayout
-                    android:id="@+id/routeStopsContainer"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal" />
-            </HorizontalScrollView>
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/poiResultsRecyclerView"
-                android:layout_width="match_parent"
-                android:layout_height="116dp"
-                android:layout_marginTop="6dp"
-                android:clipToPadding="false"
-                android:paddingBottom="4dp"
-                android:visibility="gone"
-                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                tools:itemCount="3"
-                tools:listitem="@layout/item_route_poi_result" />
-
-            <TextView
-                android:id="@+id/txtPlaceSearchStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="32dp"
                 android:layout_marginTop="5dp"
-                android:gravity="center"
-                android:text="@string/route_search_default_tip"
-                android:textColor="@color/route_text_secondary"
-                android:textSize="12sp" />
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="7dp"
-                app:cardBackgroundColor="@color/white"
-                app:cardCornerRadius="19dp"
-                app:cardElevation="0dp"
-                app:strokeColor="@color/route_card_stroke"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="6dp"
-                    android:paddingTop="3dp"
-                    android:paddingEnd="3dp"
-                    android:paddingBottom="3dp">
-
-                    <ImageView
-                        android:layout_width="30dp"
-                        android:layout_height="30dp"
-                        android:background="@drawable/bg_route_search_icon"
-                        android:contentDescription="@null"
-                        android:padding="8dp"
-                        android:src="@drawable/ic_route_search"
-                        app:tint="@color/route_primary" />
-
-                    <EditText
-                        android:id="@+id/editPlaceSearch"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_marginStart="3dp"
-                        android:layout_weight="1"
-                        android:background="@android:color/transparent"
-                        android:hint="@string/route_place_search_hint"
-                        android:importantForAutofill="no"
-                        android:imeOptions="actionSearch"
-                        android:inputType="text"
-                        android:maxLines="1"
-                        android:paddingStart="4dp"
-                        android:paddingEnd="8dp"
-                        android:textColor="@color/route_text_primary"
-                        android:textColorHint="@color/route_text_hint"
-                        android:textSize="13sp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnPlaceSearch"
-                        android:layout_width="58dp"
-                        android:layout_height="34dp"
-                        android:gravity="center"
-                        android:insetTop="0dp"
-                        android:insetBottom="0dp"
-                        android:minWidth="0dp"
-                        android:maxLines="1"
-                        android:paddingStart="0dp"
-                        android:paddingEnd="0dp"
-                        android:singleLine="true"
-                        android:text="@string/route_search_action"
-                        android:textAllCaps="false"
-                        android:textColor="@color/white"
-                        android:textSize="11sp"
-                        android:textStyle="bold"
-                        app:backgroundTint="@color/route_primary"
-                        app:cornerRadius="15dp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/aiRoutePanel"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="6dp"
-        android:layout_marginEnd="6dp"
-        android:layout_marginBottom="6dp"
-        android:visibility="gone"
-        app:cardBackgroundColor="#FAFFFFFF"
-        app:cardCornerRadius="19dp"
-        app:cardElevation="5dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:strokeColor="@color/route_card_stroke"
-        app:strokeWidth="1dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingTop="5dp">
-
-            <View
-                android:layout_width="28dp"
-                android:layout_height="3dp"
-                android:layout_gravity="center_horizontal"
-                android:background="@drawable/bg_route_sheet_handle" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="11dp"
-                android:layout_marginTop="6dp"
-                android:layout_marginEnd="11dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -249,7 +78,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="@string/route_ai_panel_title"
+                    android:text="@string/route_plan_title"
                     android:textColor="@color/route_text_primary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -258,6 +87,7 @@
                     android:id="@+id/txtAiRouteContext"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
                     android:background="@drawable/bg_route_ai_badge"
                     android:paddingStart="8dp"
                     android:paddingTop="3dp"
@@ -267,32 +97,140 @@
                     android:textColor="@color/route_primary"
                     android:textSize="10sp"
                     android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/txtRouteStopCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_route_ai_badge"
+                    android:paddingStart="8dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="3dp"
+                    android:text="@string/route_zero_stops"
+                    android:textColor="@color/route_primary"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
             </LinearLayout>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/routeStopsCard"
+                android:layout_width="match_parent"
+                android:layout_height="96dp"
+                android:layout_marginTop="4dp"
+                app:cardBackgroundColor="@color/white"
+                app:cardCornerRadius="15dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/route_card_stroke"
+                app:strokeWidth="1dp">
+
+                <androidx.core.widget.NestedScrollView
+                    android:id="@+id/routeStopsScrollView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:fadeScrollbars="false"
+                    android:fillViewport="true"
+                    android:overScrollMode="ifContentScrolls"
+                    android:scrollbarStyle="insideInset"
+                    android:scrollbars="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp">
+
+                        <LinearLayout
+                            android:id="@+id/currentLocationRow"
+                            android:layout_width="match_parent"
+                            android:layout_height="44dp"
+                            android:background="?attr/selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingStart="4dp"
+                            android:paddingEnd="4dp">
+
+                            <View
+                                android:layout_width="13dp"
+                                android:layout_height="13dp"
+                                android:background="@drawable/bg_route_current_location_dot" />
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="12dp"
+                                android:layout_weight="1"
+                                android:text="@string/route_my_location"
+                                android:textColor="@color/route_text_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/txtCurrentLocationStatus"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/route_location_locating"
+                                android:textColor="@color/route_text_secondary"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginStart="29dp"
+                            android:background="@color/route_card_stroke" />
+
+                        <LinearLayout
+                            android:id="@+id/routeStopsContainer"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical" />
+                    </LinearLayout>
+                </androidx.core.widget.NestedScrollView>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTogglePlaceSearch"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="38dp"
+                android:gravity="center_vertical"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:paddingStart="5dp"
+                android:paddingEnd="5dp"
+                android:text="@string/route_add_destination"
+                android:textAllCaps="false"
+                android:textColor="@color/route_primary"
+                android:textSize="13sp" />
 
             <FrameLayout
                 android:id="@+id/chatArea"
                 android:layout_width="match_parent"
-                android:layout_height="108dp"
-                android:layout_marginTop="3dp"
-                >
+                android:layout_height="62dp">
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/chatRecyclerView"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:clipToPadding="false"
+                    android:fadeScrollbars="false"
+                    android:overScrollMode="ifContentScrolls"
                     android:paddingTop="2dp"
-                    android:paddingBottom="4dp"
+                    android:paddingBottom="2dp"
+                    android:scrollbarStyle="insideInset"
+                    android:scrollbars="vertical"
                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
                 <HorizontalScrollView
                     android:id="@+id/welcomePanel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="top"
-                    android:paddingStart="10dp"
-                    android:paddingTop="4dp"
-                    android:paddingEnd="10dp"
+                    android:layout_gravity="center_vertical"
                     android:scrollbars="none">
 
                     <com.google.android.material.chip.ChipGroup
@@ -360,9 +298,6 @@
                 android:id="@+id/inputBar"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_marginEnd="8dp"
-                android:layout_marginBottom="8dp"
                 app:cardBackgroundColor="@color/white"
                 app:cardCornerRadius="19dp"
                 app:cardElevation="0dp"
@@ -423,4 +358,4 @@
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
-</androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

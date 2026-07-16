@@ -1,70 +1,96 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:layout_marginTop="4dp"
+    android:layout_marginBottom="4dp"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
-    android:gravity="center_vertical"
-    android:minHeight="48dp"
-    android:orientation="horizontal"
-    android:paddingStart="8dp"
-    android:paddingTop="3dp"
-    android:paddingEnd="4dp"
-    android:paddingBottom="3dp">
-
-    <TextView
-        android:id="@+id/txtPoiOrder"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:background="@drawable/bg_route_search_icon"
-        android:gravity="center"
-        android:text="@string/route_add_symbol"
-        android:textColor="@color/route_primary"
-        android:textSize="16sp"
-        android:textStyle="bold" />
+    app:cardBackgroundColor="@color/white"
+    app:cardCornerRadius="15dp"
+    app:cardElevation="0dp"
+    app:strokeColor="@color/route_card_stroke"
+    app:strokeWidth="1dp">
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:minHeight="82dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="10dp">
 
         <TextView
-            android:id="@+id/txtPoiName"
-            android:layout_width="match_parent"
+            android:id="@+id/txtPoiOrder"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:background="@drawable/bg_route_search_icon"
+            android:gravity="center"
+            android:text="@string/route_add_symbol"
+            android:textColor="@color/route_primary"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/route_text_primary"
-            android:textSize="13sp"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/txtPoiName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/route_text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                tools:text="南京博物院" />
+
+            <TextView
+                android:id="@+id/txtPoiAddress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/route_text_secondary"
+                android:textSize="11sp"
+                tools:text="中山东路321号" />
+
+            <TextView
+                android:id="@+id/txtPoiType"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/route_text_hint"
+                android:textSize="10sp"
+                tools:text="科教文化服务 · 博物馆" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/txtPoiDistance"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_route_ai_badge"
+            android:paddingStart="9dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="9dp"
+            android:paddingBottom="5dp"
+            android:textColor="@color/route_primary"
+            android:textSize="10sp"
             android:textStyle="bold"
-            tools:text="南京博物院" />
-
-        <TextView
-            android:id="@+id/txtPoiAddress"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/route_text_secondary"
-            android:textSize="11sp"
-            tools:text="中山东路321号" />
+            tools:text="1.8 km" />
     </LinearLayout>
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="28dp"
-        android:background="@drawable/bg_route_ai_badge"
-        android:gravity="center"
-        android:paddingStart="10dp"
-        android:paddingEnd="10dp"
-        android:text="@string/route_add_stop"
-        android:textColor="@color/route_primary"
-        android:textSize="11sp"
-        android:textStyle="bold" />
-</LinearLayout>
+</com.google.android.material.card.MaterialCardView>

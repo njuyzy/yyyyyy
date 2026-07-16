@@ -65,6 +65,7 @@
     <string name="route_mode_ai">AI 规划</string>
     <string name="route_mode_custom">自定义</string>
     <string name="route_custom_title">自定义路线</string>
+    <string name="route_plan_title">路线规划</string>
     <string name="route_zero_stops">0 个地点</string>
     <string name="route_stop_count_format">%1$d 个地点</string>
     <string name="route_place_search_hint">搜索景点、学校或博物馆</string>
@@ -79,6 +80,14 @@
     <string name="route_add_symbol">＋</string>
     <string name="route_stop_chip_format">%1$d. %2$s</string>
     <string name="route_empty_stops">还没有地点，从下方搜索并加入</string>
+    <string name="route_my_location">我的位置</string>
+    <string name="route_location_locating">定位中…</string>
+    <string name="route_location_ready">路线起点</string>
+    <string name="route_location_permission_needed">开启定位后显示当前位置</string>
+    <string name="route_center_my_location">回到当前位置</string>
+    <string name="route_add_destination">＋  搜索并添加目的地</string>
+    <string name="route_close_place_search">收起地点搜索</string>
+    <string name="route_location_outside_service">当前位置超出地图服务范围</string>
     <string name="route_ai_panel_title">AI 路线助手</string>
     <string name="route_ai_new_route">新建路线</string>
     <string name="route_ai_existing_format">基于 %1$d 个地点</string>

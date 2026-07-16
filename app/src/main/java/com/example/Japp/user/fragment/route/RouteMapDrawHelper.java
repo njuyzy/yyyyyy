@@ -47,6 +47,17 @@ public final class RouteMapDrawHelper {
     public static Polyline drawRoute(@Nullable AMap aMap,
                                      @NonNull List<LatLng> roadPoints,
                                      @Nullable List<LatLng> waypoints) {
+        return drawRoute(aMap, roadPoints, waypoints, true);
+    }
+
+    /**
+     * @param showOriginMarker false 时保留定位蓝点作为起点，不再叠加默认 Marker。
+     */
+    @Nullable
+    public static Polyline drawRoute(@Nullable AMap aMap,
+                                     @NonNull List<LatLng> roadPoints,
+                                     @Nullable List<LatLng> waypoints,
+                                     boolean showOriginMarker) {
         if (aMap == null || roadPoints.size() < 2) {
             return null;
         }
@@ -61,7 +72,8 @@ public final class RouteMapDrawHelper {
         if (markers.size() == 1) {
             aMap.addMarker(new MarkerOptions().position(markers.get(0)).title("地点"));
         } else {
-            for (int i = 0; i < markers.size(); i++) {
+            int firstMarker = showOriginMarker ? 0 : 1;
+            for (int i = firstMarker; i < markers.size(); i++) {
                 String title;
                 if (i == 0) {
                     title = "起点";

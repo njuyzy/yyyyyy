@@ -10,6 +10,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.amap.api.services.core.PoiItem;
+import com.amap.api.services.core.LatLonPoint;
 import com.example.Japp.R;
 
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ public class PoiSearchAdapter extends RecyclerView.Adapter<PoiSearchAdapter.PoiV
 
     private final List<PoiItem> items = new ArrayList<>();
     private final OnPoiClickListener listener;
+    private LatLonPoint origin;
 
     public PoiSearchAdapter(@NonNull OnPoiClickListener listener) {
         this.listener = listener;
@@ -41,6 +43,11 @@ public class PoiSearchAdapter extends RecyclerView.Adapter<PoiSearchAdapter.PoiV
         if (!items.isEmpty()) {
             notifyItemRangeInserted(0, items.size());
         }
+    }
+
+    public void setOrigin(LatLonPoint origin) {
+        this.origin = origin;
+        notifyItemRangeChanged(0, items.size());
     }
 
     @NonNull
@@ -61,6 +68,8 @@ public class PoiSearchAdapter extends RecyclerView.Adapter<PoiSearchAdapter.PoiV
             address = joinLocation(item.getCityName(), item.getAdName());
         }
         holder.address.setText(TextUtils.isEmpty(address) ? "暂无地址" : address);
+        holder.type.setText(TextUtils.isEmpty(item.getTypeDes()) ? "地点" : item.getTypeDes());
+        holder.distance.setText(formatDistance(item, origin));
         holder.itemView.setOnClickListener(v -> listener.onPoiClick(item));
     }
 
@@ -79,14 +88,45 @@ public class PoiSearchAdapter extends RecyclerView.Adapter<PoiSearchAdapter.PoiV
         return city + " · " + district;
     }
 
+    public static String formatDistance(@NonNull PoiItem item, LatLonPoint origin) {
+        int meters = distanceMeters(item, origin);
+        if (meters == Integer.MAX_VALUE) {
+            return "距离暂不可用";
+        }
+        if (meters < 1000) {
+            return meters + " m";
+        }
+        return String.format(java.util.Locale.CHINA, "%.1f km", meters / 1000f);
+    }
+
+    public static int distanceMeters(@NonNull PoiItem item, LatLonPoint origin) {
+        int meters = item.getDistance();
+        LatLonPoint target = item.getLatLonPoint();
+        if (meters <= 0 && origin != null && target != null) {
+            float[] result = new float[1];
+            android.location.Location.distanceBetween(
+                    origin.getLatitude(), origin.getLongitude(),
+                    target.getLatitude(), target.getLongitude(), result);
+            meters = Math.round(result[0]);
+        }
+        if (meters <= 0) {
+            return Integer.MAX_VALUE;
+        }
+        return meters;
+    }
+
     static class PoiViewHolder extends RecyclerView.ViewHolder {
         final TextView name;
         final TextView address;
+        final TextView type;
+        final TextView distance;
 
         PoiViewHolder(@NonNull View itemView) {
             super(itemView);
             name = itemView.findViewById(R.id.txtPoiName);
             address = itemView.findViewById(R.id.txtPoiAddress);
+            type = itemView.findViewById(R.id.txtPoiType);
+            distance = itemView.findViewById(R.id.txtPoiDistance);
         }
     }
 }
