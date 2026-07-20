@@ -540,8 +540,7 @@ public class orderList extends Fragment {
                         }
                         stopRefreshing();
                         if (response.code() == 401) {
-                            Toast.makeText(requireContext(), "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
-                            SessionHelper.handleUnauthorized(requireContext());
+                            verifySessionAfterLeaderUnauthorized();
                             return;
                         }
                         if (!response.isSuccessful() || response.body() == null || response.body().getCode() != 1) {
@@ -573,6 +572,44 @@ public class orderList extends Fragment {
                         adapter.setItems(new ArrayList<>());
                     }
                 });
+    }
+
+    private void verifySessionAfterLeaderUnauthorized() {
+        int accountId = SessionHelper.getAccountId(requireContext());
+        service.getAccount(accountId).enqueue(new Callback<Result<Account>>() {
+            @Override
+            public void onResponse(@NonNull Call<Result<Account>> call,
+                                   @NonNull Response<Result<Account>> response) {
+                if (!isAdded()) {
+                    return;
+                }
+                if (response.isSuccessful() && response.body() != null
+                        && response.body().getCode() == 1) {
+                    Toast.makeText(requireContext(),
+                            "当前账号暂无领队端访问权限，已返回用户端",
+                            Toast.LENGTH_LONG).show();
+                    SessionHelper.returnToUserMode(requireActivity());
+                    return;
+                }
+                if (response.code() == 401) {
+                    Toast.makeText(requireContext(),
+                            "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
+                    SessionHelper.handleUnauthorized(requireContext());
+                    return;
+                }
+                showEmpty("暂时无法验证领队权限，请稍后重试");
+                adapter.setItems(new ArrayList<>());
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Result<Account>> call, @NonNull Throwable t) {
+                if (!isAdded()) {
+                    return;
+                }
+                showEmpty("网络异常，暂时无法验证领队权限");
+                adapter.setItems(new ArrayList<>());
+            }
+        });
     }
 
     private void enrichProjects(List<Project> projects) {

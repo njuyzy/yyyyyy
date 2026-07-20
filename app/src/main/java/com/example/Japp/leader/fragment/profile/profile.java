@@ -39,6 +39,7 @@ import com.example.Japp.leader.LeaderHistoryRouteActivity;
 import com.example.Japp.SettingsActivity;
 import com.example.Japp.MainActivity;
 import com.example.Japp.user.UserMainActivity;
+import com.example.Japp.user.util.SessionHelper;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
@@ -292,15 +293,11 @@ public class profile extends Fragment {
             Toast.makeText(requireContext(), "当前身份不可切换", Toast.LENGTH_SHORT).show();
             return;
         }
-        SharedPreferences sharedPreferences = requireContext().getSharedPreferences("user_pref", MODE_PRIVATE);
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-
-        editor.putString("Mode","USER").apply();
-
-        Toast.makeText(requireContext(),"已切换到用户模式",Toast.LENGTH_SHORT).show();
-
-        startActivity(new Intent(requireContext(), UserMainActivity.class));
-        requireActivity().finish();
+        switchMode.setEnabled(false);
+        if (!SessionHelper.switchMode(requireActivity(), "USER", UserMainActivity.class)) {
+            switchMode.setEnabled(true);
+            Toast.makeText(requireContext(), "身份切换失败，请重试", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private boolean canSwitchRole() {
