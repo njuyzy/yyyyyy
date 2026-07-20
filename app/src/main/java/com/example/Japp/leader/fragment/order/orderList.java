@@ -159,7 +159,8 @@ public class orderList extends Fragment {
     private void setupTagGrid() {
         if (tagGrid == null) return;
         tagAdapter = new TagGridAdapter();
-        tagGrid.setLayoutManager(new GridLayoutManager(requireContext(), 5));
+        tagGrid.setLayoutManager(new GridLayoutManager(requireContext(), 2,
+                GridLayoutManager.HORIZONTAL, false));
         tagGrid.setAdapter(tagAdapter);
 
         String[] tagNames = getResources().getStringArray(R.array.route_tag_names);

@@ -13,6 +13,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.amap.api.maps.model.LatLng;
 import com.example.Japp.R;
 import com.example.Japp.data.order;
 import com.example.Japp.network.ApiClient;
@@ -22,6 +23,7 @@ import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.example.Japp.network.models.requests.AssignLeaderRequest;
+import com.example.Japp.user.fragment.route.RouteMapDrawHelper;
 import com.example.Japp.user.fragment.route.RouteMapFullscreenActivity;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
@@ -69,6 +71,7 @@ public class orderDetailActivity extends AppCompatActivity {
     private LeaderWalkRoutePlanner walkRoutePlanner;
     private List<RouteNode> cachedRouteNodes = new ArrayList<>();
     private final ArrayList<String> walkInstructions = new ArrayList<>();
+    private final List<LatLng> plannedRoadPoints = new ArrayList<>();
     private String walkSummary = "";
 
     @Override
@@ -271,16 +274,15 @@ public class orderDetailActivity extends AppCompatActivity {
             public void onPlanningFinished(@NonNull String summary,
                                            @NonNull ArrayList<String> instructions,
                                            boolean hadFailures) {
-                runOnUiThread(() -> {
-                    walkSummary = summary;
-                    walkInstructions.clear();
-                    walkInstructions.addAll(instructions);
-                    showWalkPlanResult(summary, !instructions.isEmpty());
-                    if (hadFailures) {
-                        Toast.makeText(orderDetailActivity.this,
-                                R.string.route_planning_partial_fail, Toast.LENGTH_SHORT).show();
-                    }
-                });
+                handlePlanFinished(summary, instructions, new ArrayList<>(), hadFailures);
+            }
+
+            @Override
+            public void onPlanningFinished(@NonNull String summary,
+                                           @NonNull ArrayList<String> instructions,
+                                           @NonNull List<LatLng> roadPolyline,
+                                           boolean hadFailures) {
+                handlePlanFinished(summary, instructions, roadPolyline, hadFailures);
             }
 
             @Override
@@ -289,6 +291,24 @@ public class orderDetailActivity extends AppCompatActivity {
                     hideWalkPlanSection();
                     Toast.makeText(orderDetailActivity.this, message, Toast.LENGTH_SHORT).show();
                 });
+            }
+        });
+    }
+
+    private void handlePlanFinished(@NonNull String summary,
+                                    @NonNull ArrayList<String> instructions,
+                                    @NonNull List<LatLng> roadPolyline,
+                                    boolean hadFailures) {
+        runOnUiThread(() -> {
+            walkSummary = summary;
+            walkInstructions.clear();
+            walkInstructions.addAll(instructions);
+            plannedRoadPoints.clear();
+            plannedRoadPoints.addAll(roadPolyline);
+            showWalkPlanResult(summary, !instructions.isEmpty());
+            if (hadFailures) {
+                Toast.makeText(orderDetailActivity.this,
+                        R.string.route_planning_partial_fail, Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -350,8 +370,15 @@ public class orderDetailActivity extends AppCompatActivity {
             Toast.makeText(this, R.string.route_map_no_coords, Toast.LENGTH_SHORT).show();
             return;
         }
-        RouteMapFullscreenActivity.startWithNodes(this, cachedRouteNodes,
-                getString(R.string.leader_route_planning_title));
+        String title = getString(R.string.leader_route_planning_title);
+        List<LatLng> waypoints = RouteMapDrawHelper.extractPointsFromNodes(cachedRouteNodes);
+        // 优先使用高德规划得到的真实道路折线；尚未规划完成时回退为按站点连线
+        if (plannedRoadPoints.size() >= 2) {
+            RouteMapFullscreenActivity.start(this,
+                    new ArrayList<>(plannedRoadPoints), waypoints, title);
+        } else {
+            RouteMapFullscreenActivity.startWithNodes(this, cachedRouteNodes, title);
+        }
     }
 
     private void openWalkRouteDetail() {

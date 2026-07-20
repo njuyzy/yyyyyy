@@ -72,8 +72,8 @@
     <!-- 标签网格：一行五个，图标+文字 -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/tagGrid"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_width="413dp"
+        android:layout_height="141dp"
         android:background="@color/white"
         android:clipToPadding="false"
         android:paddingHorizontal="8dp"
