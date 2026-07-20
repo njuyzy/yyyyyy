@@ -89,8 +89,6 @@
     <string name="route_close_place_search">收起地点搜索</string>
     <string name="route_location_outside_service">当前位置超出地图服务范围</string>
     <string name="route_ai_panel_title">AI 路线助手</string>
-    <string name="route_ai_new_route">新建路线</string>
-    <string name="route_ai_existing_format">基于 %1$d 个地点</string>
     <string name="route_ai_input_hint">描述想如何优化，或新建一条路线</string>
     <string name="route_ai_optimize_hint">例如：减少步行，增加一个博物馆</string>
     <string name="route_ai_assistant_badge">智能研学助手</string>

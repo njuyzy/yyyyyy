@@ -33,6 +33,7 @@ import com.amap.api.services.poisearch.PoiItemExtension;
 import com.amap.api.services.poisearch.PoiResult;
 import com.amap.api.services.poisearch.PoiSearch;
 import com.example.Japp.R;
+import com.example.Japp.util.InsetDividerDecoration;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 
@@ -57,6 +58,7 @@ public class PlaceSearchActivity extends AppCompatActivity
     public static final String EXTRA_CITY = "selected_place_city";
     public static final String EXTRA_LAT = "selected_place_lat";
     public static final String EXTRA_LNG = "selected_place_lng";
+    public static final String EXTRA_PHOTO_URL = "selected_place_photo_url";
     private static final LatLonPoint DEFAULT_ORIGIN = new LatLonPoint(32.0603, 118.7969);
 
     private MaterialToolbar toolbar;
@@ -132,6 +134,7 @@ public class PlaceSearchActivity extends AppCompatActivity
         adapter.setOrigin(origin);
         resultsView.setLayoutManager(new LinearLayoutManager(this));
         resultsView.setAdapter(adapter);
+        resultsView.addItemDecoration(new InsetDividerDecoration(this, 70, 16));
     }
 
     private void setupActions() {
@@ -378,8 +381,22 @@ public class PlaceSearchActivity extends AppCompatActivity
         data.putExtra(EXTRA_CITY, selectedPoi.getCityName());
         data.putExtra(EXTRA_LAT, point.getLatitude());
         data.putExtra(EXTRA_LNG, point.getLongitude());
+        data.putExtra(EXTRA_PHOTO_URL, firstPhotoUrl(selectedPoi.getPhotos()));
         setResult(Activity.RESULT_OK, data);
         finish();
+    }
+
+    @Nullable
+    private static String firstPhotoUrl(@Nullable List<Photo> photos) {
+        if (photos == null) {
+            return null;
+        }
+        for (Photo photo : photos) {
+            if (photo != null && !TextUtils.isEmpty(photo.getUrl())) {
+                return photo.getUrl();
+            }
+        }
+        return null;
     }
 
     private void hideKeyboard() {

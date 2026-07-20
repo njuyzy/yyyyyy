@@ -73,7 +73,15 @@ public final class DisplayCutoutAdapter {
                     initialRight + bars.right,
                     initialBottom + bars.bottom
             );
-            return windowInsets;
+            // 根布局已经消费了系统栏与刘海安全区，不再让 BottomNavigationView
+            // 等子 View 重复增加同一份底部 inset；IME 等其他 inset 仍继续下发。
+            return new WindowInsetsCompat.Builder(windowInsets)
+                    .setInsets(
+                            WindowInsetsCompat.Type.systemBars()
+                                    | WindowInsetsCompat.Type.displayCutout(),
+                            Insets.NONE
+                    )
+                    .build();
         });
         ViewCompat.requestApplyInsets(root);
     }

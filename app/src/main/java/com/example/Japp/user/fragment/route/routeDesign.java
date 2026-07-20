@@ -2,15 +2,25 @@ package com.example.Japp.user.fragment.route;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.DragEvent;
+import android.view.HapticFeedbackConstants;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,6 +28,7 @@ import android.view.Gravity;
 import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,6 +38,7 @@ import androidx.annotation.Nullable;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
+import androidx.core.widget.NestedScrollView;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -35,11 +47,18 @@ import com.amap.api.maps.AMap;
 import com.amap.api.maps.CameraUpdateFactory;
 import com.amap.api.maps.MapView;
 import com.amap.api.maps.MapsInitializer;
+import com.amap.api.maps.model.BitmapDescriptor;
+import com.amap.api.maps.model.BitmapDescriptorFactory;
 import com.amap.api.maps.model.LatLng;
+import com.amap.api.maps.model.Marker;
 import com.amap.api.maps.model.MarkerOptions;
 import com.amap.api.maps.model.MyLocationStyle;
+import com.amap.api.services.core.AMapException;
 import com.amap.api.services.core.LatLonPoint;
 import com.amap.api.services.core.PoiItem;
+import com.amap.api.services.poisearch.Photo;
+import com.amap.api.services.poisearch.PoiResult;
+import com.amap.api.services.poisearch.PoiSearch;
 import com.example.Japp.R;
 import com.example.Japp.leader.LeaderWalkRoutePlanner;
 import com.example.Japp.network.ApiClient;
@@ -56,12 +75,20 @@ import com.google.android.material.chip.Chip;
 import com.google.gson.JsonElement;
 
 import java.text.SimpleDateFormat;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Map;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -91,9 +118,9 @@ public class routeDesign extends Fragment {
     private Button btnSend;
     private EditText editMessage;
     private TextView txtRouteStopCount;
-    private TextView txtAiRouteContext;
     private TextView txtCurrentLocationStatus;
     private LinearLayout routeStopsContainer;
+    private NestedScrollView routeStopsScrollView;
     private View currentLocationRow;
     private View btnMyLocation;
     private RecyclerView chatRecyclerView;
@@ -107,6 +134,12 @@ public class routeDesign extends Fragment {
     private LatLng currentLocation;
     private boolean locationCameraCentered;
     private int mapRouteRevision;
+    private BitmapDescriptor myLocationDescriptor;
+    private final Map<String, Bitmap> markerPhotoCache = new ConcurrentHashMap<>();
+    private final Set<String> markerPhotoRequests = ConcurrentHashMap.newKeySet();
+    private final Set<String> markerPoiDetailRequests = ConcurrentHashMap.newKeySet();
+    private final Map<String, PoiSearch> markerPoiSearches = new ConcurrentHashMap<>();
+    private final ExecutorService markerPhotoExecutor = Executors.newFixedThreadPool(2);
 
     private final ActivityResultLauncher<String[]> locationPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
@@ -139,7 +172,7 @@ public class routeDesign extends Fragment {
                         data.getStringExtra(PlaceSearchActivity.EXTRA_NAME),
                         data.getStringExtra(PlaceSearchActivity.EXTRA_ADDRESS));
                 item.setCityName(data.getStringExtra(PlaceSearchActivity.EXTRA_CITY));
-                addPoiToRoute(item);
+                addPoiToRoute(item, data.getStringExtra(PlaceSearchActivity.EXTRA_PHOTO_URL));
             });
 
     private final Handler waitingHandler = new Handler(Looper.getMainLooper());
@@ -197,15 +230,16 @@ public class routeDesign extends Fragment {
         chatArea = root.findViewById(R.id.chatArea);
         btnTogglePlaceSearch = root.findViewById(R.id.btnTogglePlaceSearch);
         txtRouteStopCount = root.findViewById(R.id.txtRouteStopCount);
-        txtAiRouteContext = root.findViewById(R.id.txtAiRouteContext);
         txtCurrentLocationStatus = root.findViewById(R.id.txtCurrentLocationStatus);
         routeStopsContainer = root.findViewById(R.id.routeStopsContainer);
+        routeStopsScrollView = root.findViewById(R.id.routeStopsScrollView);
         currentLocationRow = root.findViewById(R.id.currentLocationRow);
         btnMyLocation = root.findViewById(R.id.btnMyLocation);
         chatRecyclerView = root.findViewById(R.id.chatRecyclerView);
         editMessage = root.findViewById(R.id.editMessage);
         btnSend = root.findViewById(R.id.btnSend);
         welcomePanel = root.findViewById(R.id.welcomePanel);
+        setupRouteStopDragScrolling();
     }
 
     private void setupRouteBottomSheet(@NonNull View root) {
@@ -297,6 +331,21 @@ public class routeDesign extends Fragment {
             }
         });
         mainMap.setOnMyLocationChangeListener(this::onMyLocationChanged);
+        mainMap.setInfoWindowAdapter(new AMap.InfoWindowAdapter() {
+            @Override
+            public View getInfoWindow(Marker marker) {
+                return createRouteMarkerInfoWindow(marker);
+            }
+
+            @Override
+            public View getInfoContents(Marker marker) {
+                return null;
+            }
+        });
+        mainMap.setOnMarkerClickListener(marker -> {
+            marker.showInfoWindow();
+            return true;
+        });
 
         if (currentLocationRow != null) {
             currentLocationRow.setOnClickListener(v -> centerOnMyLocation());
@@ -320,6 +369,274 @@ public class routeDesign extends Fragment {
         });
     }
 
+    @NonNull
+    private BitmapDescriptor getMyLocationDescriptor() {
+        if (myLocationDescriptor != null) {
+            return myLocationDescriptor;
+        }
+        int size = dp(46);
+        float center = size / 2f;
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        Path direction = new Path();
+        direction.moveTo(center, dp(9));
+        direction.lineTo(center - dp(5), dp(17));
+        direction.lineTo(center + dp(5), dp(17));
+        direction.close();
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(dp(2));
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setColor(Color.WHITE);
+        canvas.drawPath(direction, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF1677FF);
+        canvas.drawPath(direction, paint);
+
+        paint.setColor(Color.WHITE);
+        canvas.drawCircle(center, center + dp(3), dp(11), paint);
+        paint.setColor(0xFF1677FF);
+        canvas.drawCircle(center, center + dp(3), dp(8), paint);
+        myLocationDescriptor = BitmapDescriptorFactory.fromBitmap(bitmap);
+        return myLocationDescriptor;
+    }
+
+    @Nullable
+    private View createRouteMarkerInfoWindow(@NonNull Marker marker) {
+        Object object = marker.getObject();
+        if (!(object instanceof RouteNode)) {
+            return null;
+        }
+        RouteNode node = (RouteNode) object;
+        LinearLayout card = new LinearLayout(requireContext());
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(7), dp(7), dp(9), dp(7));
+        card.setElevation(dp(6));
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.WHITE);
+        background.setCornerRadius(dp(12));
+        background.setStroke(dp(1), 0xFFE1E7F0);
+        card.setBackground(background);
+
+        ImageView image = new ImageView(requireContext());
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        image.setPadding(dp(9), dp(8), dp(9), dp(8));
+        image.setBackgroundColor(0xFFEEF3FA);
+        image.setImageResource(R.drawable.ic_route_photo_placeholder);
+        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        card.addView(image, imageParams);
+
+        LinearLayout textGroup = new LinearLayout(requireContext());
+        textGroup.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(dp(164),
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        textParams.setMarginStart(dp(8));
+
+        TextView name = new TextView(requireContext());
+        name.setText(TextUtils.isEmpty(node.getName()) ? marker.getTitle() : node.getName());
+        name.setTextColor(Color.BLACK);
+        name.setTextSize(13f);
+        name.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        name.setSingleLine(true);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        textGroup.addView(name);
+
+        TextView meta = new TextView(requireContext());
+        meta.setText(buildMarkerMeta(node));
+        meta.setTextColor(ContextCompat.getColor(
+                requireContext(), R.color.route_primary));
+        meta.setTextSize(10f);
+        meta.setSingleLine(true);
+        meta.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams metaParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        metaParams.setMargins(0, dp(2), 0, 0);
+        textGroup.addView(meta, metaParams);
+
+        TextView address = new TextView(requireContext());
+        address.setText(TextUtils.isEmpty(node.getAddress()) ? "路线地点" : node.getAddress());
+        address.setTextColor(ContextCompat.getColor(
+                requireContext(), R.color.route_text_secondary));
+        address.setTextSize(10f);
+        address.setMaxLines(1);
+        address.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams addressParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        addressParams.setMargins(0, dp(2), 0, 0);
+        textGroup.addView(address, addressParams);
+        card.addView(textGroup, textParams);
+
+        String photoUrl = node.getPhotoUrl();
+        if (!TextUtils.isEmpty(photoUrl)) {
+            Bitmap cached = markerPhotoCache.get(photoUrl);
+            if (cached != null) {
+                image.setPadding(0, 0, 0, 0);
+                image.setImageBitmap(cached);
+            } else {
+                requestMarkerPhoto(photoUrl, marker);
+            }
+        } else {
+            requestMarkerPoiDetail(node, marker);
+        }
+        return card;
+    }
+
+    @NonNull
+    private String buildMarkerMeta(@NonNull RouteNode node) {
+        StringBuilder meta = new StringBuilder();
+        if (node.getVisitOrder() > 0) {
+            meta.append("第 ").append(node.getVisitOrder()).append(" 站");
+        }
+        if (node.getRecommendedDuration() > 0) {
+            if (meta.length() > 0) {
+                meta.append(" · ");
+            }
+            meta.append("建议 ").append(node.getRecommendedDuration()).append(" 分钟");
+        }
+        if (!TextUtils.isEmpty(node.getVisitTime())) {
+            if (meta.length() > 0) {
+                meta.append(" · ");
+            }
+            meta.append(node.getVisitTime());
+        }
+        return meta.length() > 0 ? meta.toString() : "路线地点";
+    }
+
+    private void requestMarkerPoiDetail(@NonNull RouteNode node, @NonNull Marker marker) {
+        String poiId = node.getPoiId();
+        if (TextUtils.isEmpty(poiId) || !markerPoiDetailRequests.add(poiId)) {
+            return;
+        }
+        try {
+            PoiSearch.Query query = new PoiSearch.Query(safeNodeName(node), "", "");
+            query.setExtensions(PoiSearch.EXTENSIONS_ALL);
+            PoiSearch search = new PoiSearch(requireContext(), query);
+            markerPoiSearches.put(poiId, search);
+            search.setLanguage(PoiSearch.CHINESE);
+            search.setOnPoiSearchListener(new PoiSearch.OnPoiSearchListener() {
+                @Override
+                public void onPoiSearched(PoiResult result, int errorCode) {
+                }
+
+                @Override
+                public void onPoiItemSearched(PoiItem item, int errorCode) {
+                    markerPoiDetailRequests.remove(poiId);
+                    markerPoiSearches.remove(poiId);
+                    if (!isAdded() || errorCode != AMapException.CODE_AMAP_SUCCESS
+                            || item == null) {
+                        return;
+                    }
+                    if (TextUtils.isEmpty(node.getAddress())
+                            && !TextUtils.isEmpty(item.getSnippet())) {
+                        node.setAddress(item.getSnippet());
+                    }
+                    String detailPhotoUrl = firstPhotoUrl(item.getPhotos());
+                    if (!TextUtils.isEmpty(detailPhotoUrl)) {
+                        node.setPhotoUrl(detailPhotoUrl);
+                        requestMarkerPhoto(detailPhotoUrl, marker);
+                    } else {
+                        refreshMarkerInfoWindow(marker);
+                    }
+                }
+            });
+            search.searchPOIIdAsyn(poiId);
+        } catch (AMapException e) {
+            markerPoiDetailRequests.remove(poiId);
+            markerPoiSearches.remove(poiId);
+        }
+    }
+
+    @Nullable
+    private String firstPhotoUrl(@Nullable List<Photo> photos) {
+        if (photos == null) {
+            return null;
+        }
+        for (Photo photo : photos) {
+            if (photo != null && !TextUtils.isEmpty(photo.getUrl())) {
+                return photo.getUrl();
+            }
+        }
+        return null;
+    }
+
+    private void refreshMarkerInfoWindow(@NonNull Marker marker) {
+        if (!isAdded() || mainMap == null) {
+            return;
+        }
+        try {
+            if (marker.isInfoWindowShown()) {
+                marker.hideInfoWindow();
+                marker.showInfoWindow();
+            }
+        } catch (RuntimeException ignored) {
+            // 路线重绘后旧 Marker 已失效。
+        }
+    }
+
+    private void requestMarkerPhoto(@NonNull String photoUrl, @NonNull Marker marker) {
+        if (!markerPhotoRequests.add(photoUrl)) {
+            return;
+        }
+        markerPhotoExecutor.execute(() -> {
+            Bitmap bitmap = downloadMarkerPhoto(photoUrl);
+            markerPhotoRequests.remove(photoUrl);
+            if (bitmap == null) {
+                return;
+            }
+            markerPhotoCache.put(photoUrl, bitmap);
+            waitingHandler.post(() -> {
+                refreshMarkerInfoWindow(marker);
+            });
+        });
+    }
+
+    @Nullable
+    private Bitmap downloadMarkerPhoto(@NonNull String photoUrl) {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(photoUrl).openConnection();
+            connection.setConnectTimeout(8000);
+            connection.setReadTimeout(10000);
+            connection.setInstanceFollowRedirects(true);
+            connection.setRequestProperty("User-Agent", "Japp-Android");
+            connection.connect();
+            if (connection.getResponseCode() < 200 || connection.getResponseCode() >= 300) {
+                return null;
+            }
+            try (InputStream input = connection.getInputStream()) {
+                Bitmap source = BitmapFactory.decodeStream(input);
+                if (source == null) {
+                    return null;
+                }
+                int targetWidth = dp(120);
+                int targetHeight = dp(90);
+                float scale = Math.min(
+                        targetWidth / (float) source.getWidth(),
+                        targetHeight / (float) source.getHeight());
+                if (scale >= 1f) {
+                    return source;
+                }
+                Bitmap thumbnail = Bitmap.createScaledBitmap(
+                        source,
+                        Math.max(1, Math.round(source.getWidth() * scale)),
+                        Math.max(1, Math.round(source.getHeight() * scale)),
+                        true);
+                if (thumbnail != source) {
+                    source.recycle();
+                }
+                return thumbnail;
+            }
+        } catch (Exception ignored) {
+            return null;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
     private boolean hasLocationPermission() {
         if (!isAdded()) {
             return false;
@@ -338,6 +655,7 @@ public class routeDesign extends Fragment {
         MyLocationStyle style = new MyLocationStyle()
                 .myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE_NO_CENTER)
                 .interval(2000L)
+                .myLocationIcon(getMyLocationDescriptor())
                 .strokeColor(Color.WHITE)
                 .strokeWidth(2f)
                 .radiusFillColor(0x221677FF);
@@ -452,7 +770,7 @@ public class routeDesign extends Fragment {
         placeSearchLauncher.launch(intent);
     }
 
-    private void addPoiToRoute(@NonNull PoiItem poi) {
+    private void addPoiToRoute(@NonNull PoiItem poi, @Nullable String photoUrl) {
         LatLonPoint point = poi.getLatLonPoint();
         if (point == null) {
             Toast.makeText(requireContext(), "该地点缺少坐标，无法加入路线", Toast.LENGTH_SHORT).show();
@@ -471,6 +789,7 @@ public class routeDesign extends Fragment {
         node.setCityname(poi.getCityName());
         node.setRecommendedDuration(60);
         node.setLocation(point.getLongitude() + "," + point.getLatitude());
+        node.setPhotoUrl(photoUrl);
         editableRouteNodes.add(node);
 
         renderEditableStops();
@@ -510,7 +829,6 @@ public class routeDesign extends Fragment {
             addDestination.setPadding(dp(4), 0, dp(4), 0);
             routeStopsContainer.addView(addDestination, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
-            updateAiContextLabel();
             return;
         }
 
@@ -560,6 +878,16 @@ public class routeDesign extends Fragment {
             remove.setOnClickListener(v -> removeRouteStop(position));
             row.addView(remove, new LinearLayout.LayoutParams(dp(36), dp(42)));
 
+            ImageView dragHandle = new ImageView(requireContext());
+            dragHandle.setImageResource(R.drawable.ic_route_drag_handle);
+            dragHandle.setPadding(dp(6), dp(8), dp(6), dp(8));
+            dragHandle.setContentDescription("拖动调整" + node.getName() + "的顺序");
+            dragHandle.setOnLongClickListener(v -> startRouteStopDrag(v, position));
+            row.addView(dragHandle, new LinearLayout.LayoutParams(dp(36), dp(42)));
+
+            row.setOnDragListener((target, event) ->
+                    handleRouteStopDrop(row, position, event));
+
             LatLng point = RouteMapDrawHelper.parseLocation(node.getLocation());
             if (point != null) {
                 row.setOnClickListener(v -> mainMap.animateCamera(
@@ -568,7 +896,100 @@ public class routeDesign extends Fragment {
             routeStopsContainer.addView(row, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
         }
-        updateAiContextLabel();
+    }
+
+    private boolean startRouteStopDrag(@NonNull View handle, int position) {
+        if (position < 0 || position >= editableRouteNodes.size()
+                || editableRouteNodes.size() < 2) {
+            return false;
+        }
+        handle.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+        RouteStopDragPayload payload = new RouteStopDragPayload(position, handle);
+        boolean started = handle.startDragAndDrop(
+                ClipData.newPlainText("route-stop", String.valueOf(position)),
+                new View.DragShadowBuilder(handle),
+                payload,
+                0);
+        if (started) {
+            handle.setAlpha(0.35f);
+        }
+        return started;
+    }
+
+    private boolean handleRouteStopDrop(@NonNull View row, int targetPosition,
+                                        @NonNull DragEvent event) {
+        Object state = event.getLocalState();
+        if (!(state instanceof RouteStopDragPayload)) {
+            return false;
+        }
+        RouteStopDragPayload payload = (RouteStopDragPayload) state;
+        switch (event.getAction()) {
+            case DragEvent.ACTION_DRAG_STARTED:
+                return true;
+            case DragEvent.ACTION_DRAG_ENTERED:
+                row.setBackgroundColor(ContextCompat.getColor(
+                        requireContext(), R.color.route_primary_soft));
+                return true;
+            case DragEvent.ACTION_DRAG_EXITED:
+                row.setBackgroundColor(Color.TRANSPARENT);
+                return true;
+            case DragEvent.ACTION_DROP:
+                row.setBackgroundColor(Color.TRANSPARENT);
+                moveRouteStop(payload.sourcePosition, targetPosition);
+                return true;
+            case DragEvent.ACTION_DRAG_ENDED:
+                row.setBackgroundColor(Color.TRANSPARENT);
+                payload.sourceView.setAlpha(1f);
+                return true;
+            default:
+                return true;
+        }
+    }
+
+    private void setupRouteStopDragScrolling() {
+        if (routeStopsContainer == null || routeStopsScrollView == null) {
+            return;
+        }
+        routeStopsContainer.setOnDragListener((view, event) -> {
+            if (!(event.getLocalState() instanceof RouteStopDragPayload)) {
+                return false;
+            }
+            if (event.getAction() == DragEvent.ACTION_DRAG_LOCATION) {
+                float visibleY = event.getY() - routeStopsScrollView.getScrollY();
+                int edge = dp(30);
+                if (visibleY < edge) {
+                    routeStopsScrollView.scrollBy(0, -dp(16));
+                } else if (visibleY > routeStopsScrollView.getHeight() - edge) {
+                    routeStopsScrollView.scrollBy(0, dp(16));
+                }
+            } else if (event.getAction() == DragEvent.ACTION_DRAG_ENDED) {
+                ((RouteStopDragPayload) event.getLocalState()).sourceView.setAlpha(1f);
+            }
+            return true;
+        });
+    }
+
+    private void moveRouteStop(int fromPosition, int toPosition) {
+        if (fromPosition < 0 || fromPosition >= editableRouteNodes.size()
+                || toPosition < 0 || toPosition >= editableRouteNodes.size()
+                || fromPosition == toPosition) {
+            return;
+        }
+        RouteNode moved = editableRouteNodes.remove(fromPosition);
+        editableRouteNodes.add(toPosition, moved);
+        renumberRouteNodes();
+        renderEditableStops();
+        updateMapFromEditableRoute(true);
+    }
+
+    private static final class RouteStopDragPayload {
+        final int sourcePosition;
+        final View sourceView;
+
+        RouteStopDragPayload(int sourcePosition, @NonNull View sourceView) {
+            this.sourcePosition = sourcePosition;
+            this.sourceView = sourceView;
+        }
     }
 
     private int dp(int value) {
@@ -604,17 +1025,12 @@ public class routeDesign extends Fragment {
         }
         List<RouteNode> planningNodes = buildCustomPlanningNodes();
         List<LatLng> points = RouteMapDrawHelper.extractPointsFromNodes(planningNodes);
-        boolean hasCurrentOrigin = currentLocation != null;
         if (points.size() == 1) {
-            mainMap.clear();
-            mainMap.addMarker(new MarkerOptions()
-                    .position(points.get(0))
-                    .title(editableRouteNodes.get(0).getName()));
-            mainMap.animateCamera(CameraUpdateFactory.newLatLngZoom(points.get(0), 15f));
+            RouteMapDrawHelper.drawRouteWithNodes(mainMap, points, editableRouteNodes);
             return;
         }
 
-        RouteMapDrawHelper.drawRoute(mainMap, points, points, !hasCurrentOrigin);
+        RouteMapDrawHelper.drawRouteWithNodes(mainMap, points, editableRouteNodes);
         if (!planRoad) {
             return;
         }
@@ -644,8 +1060,8 @@ public class routeDesign extends Fragment {
                 if (!isAdded() || mainMap == null || revision != mapRouteRevision) {
                     return;
                 }
-                RouteMapDrawHelper.drawRoute(
-                        mainMap, roadPolyline, points, !hasCurrentOrigin);
+                RouteMapDrawHelper.drawRouteWithNodes(
+                        mainMap, roadPolyline, editableRouteNodes);
             }
 
             @Override
@@ -668,18 +1084,6 @@ public class routeDesign extends Fragment {
         }
         nodes.addAll(editableRouteNodes);
         return nodes;
-    }
-
-    private void updateAiContextLabel() {
-        if (txtAiRouteContext == null) {
-            return;
-        }
-        if (editableRouteNodes.isEmpty()) {
-            txtAiRouteContext.setText(R.string.route_ai_new_route);
-        } else {
-            txtAiRouteContext.setText(getString(
-                    R.string.route_ai_existing_format, editableRouteNodes.size()));
-        }
     }
 
     private void setupSuggestionChips(View root) {
@@ -734,7 +1138,8 @@ public class routeDesign extends Fragment {
 
         int accountId = SessionHelper.getAccountId(requireContext());
         String memoryId = RoutePlanHelper.buildMemoryId(accountId);
-        String requestText = buildAiRequestText(text);
+        List<RouteNode> protectedNodes = copyRouteNodes(editableRouteNodes);
+        String requestText = buildAiRequestText(text, protectedNodes);
         service.planRouteByAi(memoryId, requestText).enqueue(new Callback<Result<JsonElement>>() {
             @Override
             public void onResponse(Call<Result<JsonElement>> call, Response<Result<JsonElement>> response) {
@@ -763,7 +1168,7 @@ public class routeDesign extends Fragment {
                     return;
                 }
                 updateWaitingFeedback("路线已生成，正在匹配道路路径…");
-                loadRouteAndShow(routeId, text);
+                loadRouteAndShow(routeId, text, protectedNodes);
             }
 
             @Override
@@ -778,22 +1183,35 @@ public class routeDesign extends Fragment {
         });
     }
 
-    private String buildAiRequestText(String userText) {
-        if (editableRouteNodes.isEmpty()) {
+    private String buildAiRequestText(String userText, @NonNull List<RouteNode> protectedNodes) {
+        if (protectedNodes.isEmpty()) {
             return userText;
         }
-        StringBuilder context = new StringBuilder("当前地图路线依次包含：");
-        for (int i = 0; i < editableRouteNodes.size(); i++) {
-            if (i > 0) {
-                context.append(" → ");
+        StringBuilder context = new StringBuilder();
+        context.append("请基于已有路线处理需求，并严格遵守以下规则：\n")
+                .append("1. 下列已有地点均为受保护地点，必须全部保留，不得删除、替换、改名或修改坐标；\n")
+                .append("2. 只能在已有路线基础上新增地点，不得自动执行用户提出的删除或替换；\n")
+                .append("3. 若用户提出删改，只保留原地点，删改内容由客户端作为建议展示；\n")
+                .append("4. 返回路线必须包含全部受保护地点，并可附加符合需求的新地点。\n")
+                .append("受保护地点：\n");
+        for (int i = 0; i < protectedNodes.size(); i++) {
+            RouteNode node = protectedNodes.get(i);
+            context.append(i + 1).append(". ")
+                    .append(safeNodeName(node));
+            if (!TextUtils.isEmpty(node.getPoiId())) {
+                context.append("（POI: ").append(node.getPoiId()).append("）");
             }
-            context.append(editableRouteNodes.get(i).getName());
+            if (!TextUtils.isEmpty(node.getLocation())) {
+                context.append("，坐标：").append(node.getLocation());
+            }
+            context.append("\n");
         }
-        context.append("。请基于这条已有路线处理用户要求：").append(userText);
+        context.append("用户需求：").append(userText);
         return context.toString();
     }
 
-    private void loadRouteAndShow(int routeId, String userRequirement) {
+    private void loadRouteAndShow(int routeId, String userRequirement,
+                                  @NonNull List<RouteNode> protectedNodes) {
         service.getRouteNodes(routeId).enqueue(new Callback<Result<List<RouteNode>>>() {
             @Override
             public void onResponse(Call<Result<List<RouteNode>>> call,
@@ -807,24 +1225,37 @@ public class routeDesign extends Fragment {
                     nodes = response.body().getData();
                 }
                 if (nodes == null || nodes.isEmpty()) {
+                    if (!protectedNodes.isEmpty()) {
+                        AiRouteMergeResult mergeResult =
+                                mergeAiRoute(protectedNodes, Collections.emptyList());
+                        List<LatLng> protectedPoints =
+                                RouteMapDrawHelper.extractPointsFromNodes(mergeResult.nodes);
+                        finishWithRoute(userRequirement, mergeResult.nodes, routeId,
+                                protectedPoints, protectedPoints, null, mergeResult);
+                        return;
+                    }
                     String fallbackText = "根据你的描述「" + userRequirement
                             + "」已生成路线（ID: " + routeId + "），但暂无景点详情。";
                     finishWithRoute(fallbackText, null, routeId,
-                            RouteSampleData.getMockPolyline(), RouteSampleData.getMockPolyline(), null);
+                            RouteSampleData.getMockPolyline(), RouteSampleData.getMockPolyline(),
+                            null, null);
                     return;
                 }
 
                 updateWaitingFeedback("正在按真实道路规划步行路线…");
                 final List<RouteNode> orderedNodes = new ArrayList<>(nodes);
                 Collections.sort(orderedNodes, Comparator.comparingInt(RouteNode::getVisitOrder));
-                List<LatLng> waypoints = RouteMapDrawHelper.extractPointsFromNodes(orderedNodes);
+                final AiRouteMergeResult mergeResult =
+                        mergeAiRoute(protectedNodes, orderedNodes);
+                final List<RouteNode> displayNodes = mergeResult.nodes;
+                List<LatLng> waypoints = RouteMapDrawHelper.extractPointsFromNodes(displayNodes);
                 if (waypoints.size() < 2 || walkRoutePlanner == null) {
-                    finishWithRoute(userRequirement, orderedNodes, routeId,
-                            waypoints, waypoints, null);
+                    finishWithRoute(userRequirement, displayNodes, routeId,
+                            waypoints, waypoints, null, mergeResult);
                     return;
                 }
 
-                walkRoutePlanner.planSummary(orderedNodes, new LeaderWalkRoutePlanner.Callback() {
+                walkRoutePlanner.planSummary(displayNodes, new LeaderWalkRoutePlanner.Callback() {
                     @Override
                     public void onPlanningStarted() {
                     }
@@ -844,15 +1275,15 @@ public class routeDesign extends Fragment {
                             return;
                         }
                         List<LatLng> road = roadPolyline.size() >= 2 ? roadPolyline : waypoints;
-                        finishWithRoute(userRequirement, orderedNodes, routeId,
-                                road, waypoints, summary);
+                        finishWithRoute(userRequirement, displayNodes, routeId,
+                                road, waypoints, summary, mergeResult);
                     }
 
                     @Override
                     public void onPlanningFailed(@NonNull String message) {
                         if (isAdded()) {
-                            finishWithRoute(userRequirement, orderedNodes, routeId,
-                                    waypoints, waypoints, null);
+                            finishWithRoute(userRequirement, displayNodes, routeId,
+                                    waypoints, waypoints, null, mergeResult);
                         }
                     }
                 });
@@ -865,8 +1296,17 @@ public class routeDesign extends Fragment {
                 }
                 String fallbackText = "路线已生成（ID: " + routeId
                         + "），但节点加载失败，请稍后重试发布。";
-                finishWithRoute(fallbackText, null, routeId, RouteSampleData.getMockPolyline(),
-                        RouteSampleData.getMockPolyline(), null);
+                if (!protectedNodes.isEmpty()) {
+                    AiRouteMergeResult mergeResult =
+                            mergeAiRoute(protectedNodes, Collections.emptyList());
+                    List<LatLng> protectedPoints =
+                            RouteMapDrawHelper.extractPointsFromNodes(mergeResult.nodes);
+                    finishWithRoute(userRequirement, mergeResult.nodes, routeId,
+                            protectedPoints, protectedPoints, null, mergeResult);
+                } else {
+                    finishWithRoute(fallbackText, null, routeId, RouteSampleData.getMockPolyline(),
+                            RouteSampleData.getMockPolyline(), null, null);
+                }
             }
         });
     }
@@ -876,7 +1316,8 @@ public class routeDesign extends Fragment {
                                  int routeId,
                                  @NonNull List<LatLng> roadPolyline,
                                  @NonNull List<LatLng> waypoints,
-                                 @Nullable String walkSummary) {
+                                 @Nullable String walkSummary,
+                                 @Nullable AiRouteMergeResult mergeResult) {
         stopWaitingFeedback();
         setSending(false);
         if (!isAdded() || adapter == null) {
@@ -885,7 +1326,8 @@ public class routeDesign extends Fragment {
 
         String description;
         if (nodes != null) {
-            description = buildDescription(userRequirementOrText, nodes, routeId);
+            description = buildDescription(
+                    userRequirementOrText, nodes, routeId, mergeResult);
             if (!TextUtils.isEmpty(walkSummary)) {
                 description += "\n\n步行参考：" + walkSummary;
             }
@@ -901,7 +1343,9 @@ public class routeDesign extends Fragment {
         List<LatLng> marks = !waypoints.isEmpty() ? waypoints : road;
         mapRouteRevision++;
         if (mainMap != null && !road.isEmpty()) {
-            if (road.size() >= 2) {
+            if (nodes != null && !nodes.isEmpty()) {
+                RouteMapDrawHelper.drawRouteWithNodes(mainMap, road, editableRouteNodes);
+            } else if (road.size() >= 2) {
                 RouteMapDrawHelper.drawRoute(mainMap, road, marks);
             } else {
                 mainMap.clear();
@@ -910,7 +1354,10 @@ public class routeDesign extends Fragment {
             }
         }
 
-        RouteChatItem item = RouteChatItem.assistantRoute(description, road, marks, routeId);
+        boolean canPublish = nodes != null
+                && (mergeResult == null || mergeResult.serverRoutePreserved());
+        RouteChatItem item = RouteChatItem.assistantRoute(
+                description, road, marks, routeId, canPublish);
         int statusPos = waitingStatusPosition;
         if (statusPos >= 0 && statusPos < adapter.getItemCount()) {
             adapter.replaceItem(statusPos, item);
@@ -921,17 +1368,187 @@ public class routeDesign extends Fragment {
         scrollChatToBottom();
     }
 
-    private String buildDescription(String requirement, List<RouteNode> nodes, int routeId) {
+    private String buildDescription(String requirement,
+                                    List<RouteNode> nodes,
+                                    int routeId,
+                                    @Nullable AiRouteMergeResult mergeResult) {
         StringBuilder sb = new StringBuilder();
-        sb.append("已根据「").append(requirement).append("」更新地图路线：\n\n");
+        if (mergeResult != null && mergeResult.protectedCount > 0) {
+            sb.append("已基于现有路线完成规划，原有 ")
+                    .append(mergeResult.protectedCount)
+                    .append(" 个地点均已保留。\n");
+            if (!mergeResult.addedNodes.isEmpty()) {
+                sb.append("\n新增地点（")
+                        .append(mergeResult.addedNodes.size())
+                        .append("）：")
+                        .append(joinNodeNames(mergeResult.addedNodes))
+                        .append("\n");
+            } else {
+                sb.append("\n本次未自动新增地点。\n");
+            }
+            if (!mergeResult.omittedProtectedNodes.isEmpty()) {
+                sb.append("\n调整建议（未自动执行）：AI 结果未包含 ")
+                        .append(joinNodeNames(mergeResult.omittedProtectedNodes))
+                        .append("，系统已将其继续保留。")
+                        .append("为避免服务端路线与当前地图不一致，本次暂不提供发布；")
+                        .append("可重新说明仅新增地点的需求，或在自定义模式手动调整。\n");
+            } else if (containsDeleteOrReplaceIntent(requirement)) {
+                sb.append("\n删改建议（未自动执行）：")
+                        .append(requirement)
+                        .append("\n已有地点不会由 AI 自动删除或替换，")
+                        .append("如需采用请在自定义模式手动调整。\n");
+            }
+        } else {
+            sb.append("已根据「").append(requirement).append("」生成路线。\n");
+        }
         if (nodes != null && !nodes.isEmpty()) {
             int totalMin = ProjectUiHelper.sumDurationMinutes(nodes);
-            sb.append("• 预计总时长：约 ").append(ProjectUiHelper.formatDuration(totalMin)).append("\n");
-            sb.append("• ").append(ProjectUiHelper.buildRouteSummary(nodes)).append("\n");
+            sb.append("\n当前路线：").append(ProjectUiHelper.buildRouteSummary(nodes)).append("\n");
+            sb.append("预计总时长：约 ").append(ProjectUiHelper.formatDuration(totalMin)).append("\n");
         }
-        sb.append("• 路线编号：").append(routeId).append("\n\n");
-        sb.append("可切回「自定义」继续增删地点，或直接发布拼单。");
+        sb.append("路线编号：").append(routeId);
+        if (mergeResult == null || mergeResult.serverRoutePreserved()) {
+            sb.append("\n\n可继续让路线助手新增地点，或切回「自定义」手动调整。");
+        }
         return sb.toString();
+    }
+
+    @NonNull
+    private AiRouteMergeResult mergeAiRoute(@NonNull List<RouteNode> protectedNodes,
+                                            @NonNull List<RouteNode> generatedNodes) {
+        List<RouteNode> merged = copyRouteNodes(protectedNodes);
+        List<RouteNode> added = new ArrayList<>();
+        List<RouteNode> omitted = new ArrayList<>();
+
+        for (RouteNode protectedNode : protectedNodes) {
+            if (!containsMatchingNode(generatedNodes, protectedNode)) {
+                omitted.add(copyRouteNode(protectedNode));
+            }
+        }
+        for (RouteNode generatedNode : generatedNodes) {
+            if (containsMatchingNode(protectedNodes, generatedNode)
+                    || containsMatchingNode(merged, generatedNode)) {
+                continue;
+            }
+            RouteNode addition = copyRouteNode(generatedNode);
+            merged.add(addition);
+            added.add(addition);
+        }
+        for (int i = 0; i < merged.size(); i++) {
+            merged.get(i).setVisitOrder(i + 1);
+        }
+        return new AiRouteMergeResult(
+                merged, added, omitted, protectedNodes.size());
+    }
+
+    private boolean containsMatchingNode(@NonNull List<RouteNode> nodes,
+                                         @NonNull RouteNode candidate) {
+        for (RouteNode node : nodes) {
+            if (isSamePlace(node, candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isSamePlace(@NonNull RouteNode first, @NonNull RouteNode second) {
+        if (!TextUtils.isEmpty(first.getPoiId())
+                && first.getPoiId().equals(second.getPoiId())) {
+            return true;
+        }
+        LatLng firstPoint = RouteMapDrawHelper.parseLocation(first.getLocation());
+        LatLng secondPoint = RouteMapDrawHelper.parseLocation(second.getLocation());
+        if (firstPoint != null && secondPoint != null
+                && Math.abs(firstPoint.latitude - secondPoint.latitude) < 0.00005
+                && Math.abs(firstPoint.longitude - secondPoint.longitude) < 0.00005) {
+            return true;
+        }
+        String firstName = safeNodeName(first).replaceAll("\\s+", "");
+        String secondName = safeNodeName(second).replaceAll("\\s+", "");
+        return !"未命名地点".equals(firstName)
+                && firstName.equalsIgnoreCase(secondName);
+    }
+
+    @NonNull
+    private List<RouteNode> copyRouteNodes(@NonNull List<RouteNode> source) {
+        List<RouteNode> copies = new ArrayList<>(source.size());
+        for (RouteNode node : source) {
+            copies.add(copyRouteNode(node));
+        }
+        return copies;
+    }
+
+    @NonNull
+    private RouteNode copyRouteNode(@NonNull RouteNode source) {
+        RouteNode copy = new RouteNode();
+        copy.setRouteId(source.getRouteId());
+        copy.setVisitOrder(source.getVisitOrder());
+        copy.setPoiId(source.getPoiId());
+        copy.setName(source.getName());
+        copy.setAddress(source.getAddress());
+        copy.setVisitTime(source.getVisitTime());
+        copy.setCityname(source.getCityname());
+        copy.setRecommendedDuration(source.getRecommendedDuration());
+        copy.setNotes(source.getNotes());
+        copy.setLocation(source.getLocation());
+        copy.setPhotoUrl(source.getPhotoUrl());
+        return copy;
+    }
+
+    @NonNull
+    private static String safeNodeName(@NonNull RouteNode node) {
+        return TextUtils.isEmpty(node.getName()) ? "未命名地点" : node.getName().trim();
+    }
+
+    @NonNull
+    private String joinNodeNames(@NonNull List<RouteNode> nodes) {
+        StringBuilder names = new StringBuilder();
+        for (RouteNode node : nodes) {
+            if (names.length() > 0) {
+                names.append("、");
+            }
+            names.append(safeNodeName(node));
+        }
+        return names.toString();
+    }
+
+    private boolean containsDeleteOrReplaceIntent(@Nullable String requirement) {
+        if (TextUtils.isEmpty(requirement)) {
+            return false;
+        }
+        String text = requirement.toLowerCase(Locale.ROOT);
+        String[] keywords = {
+                "删除", "删掉", "去掉", "移除", "取消", "不要去", "不经过",
+                "排除", "替换", "换成", "改成", "修改", "减少地点",
+                "delete", "remove", "replace"
+        };
+        for (String keyword : keywords) {
+            if (text.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final class AiRouteMergeResult {
+        final List<RouteNode> nodes;
+        final List<RouteNode> addedNodes;
+        final List<RouteNode> omittedProtectedNodes;
+        final int protectedCount;
+
+        AiRouteMergeResult(@NonNull List<RouteNode> nodes,
+                           @NonNull List<RouteNode> addedNodes,
+                           @NonNull List<RouteNode> omittedProtectedNodes,
+                           int protectedCount) {
+            this.nodes = nodes;
+            this.addedNodes = addedNodes;
+            this.omittedProtectedNodes = omittedProtectedNodes;
+            this.protectedCount = protectedCount;
+        }
+
+        boolean serverRoutePreserved() {
+            return omittedProtectedNodes.isEmpty();
+        }
     }
 
     private void startWaitingFeedback() {
@@ -1119,6 +1736,25 @@ public class routeDesign extends Fragment {
         btnSend = null;
         btnTogglePlaceSearch = null;
         super.onDestroyView();
+    }
+
+    @Override
+    public void onDestroy() {
+        markerPhotoExecutor.shutdownNow();
+        markerPhotoRequests.clear();
+        markerPoiDetailRequests.clear();
+        markerPoiSearches.clear();
+        for (Bitmap bitmap : markerPhotoCache.values()) {
+            if (bitmap != null && !bitmap.isRecycled()) {
+                bitmap.recycle();
+            }
+        }
+        markerPhotoCache.clear();
+        if (myLocationDescriptor != null) {
+            myLocationDescriptor.recycle();
+            myLocationDescriptor = null;
+        }
+        super.onDestroy();
     }
 
     @Override

@@ -20,23 +20,23 @@
     <color name="chat_send_btn">#1E72FF</color>
 
     <!-- Route planning -->
-    <color name="route_primary">#168B78</color>
-    <color name="route_primary_dark">#0D6F60</color>
-    <color name="route_primary_soft">#E9F6F2</color>
-    <color name="route_page_bg">#F3F5F4</color>
-    <color name="route_text_primary">#17201E</color>
-    <color name="route_text_secondary">#66736F</color>
-    <color name="route_text_hint">#98A29F</color>
-    <color name="route_card_stroke">#E2E8E6</color>
-    <color name="route_chip_bg">#F7FAF9</color>
-    <color name="route_chip_text">#33534D</color>
-    <color name="route_chip_stroke">#DCE7E3</color>
-    <color name="route_query_bg">#EAF5F2</color>
-    <color name="route_query_stroke">#D2E8E1</color>
-    <color name="route_header_start">#168B78</color>
-    <color name="route_header_end">#35A88F</color>
-    <color name="route_welcome_title">#17201E</color>
-    <color name="route_welcome_sub">#66736F</color>
+    <color name="route_primary">#1E72FF</color>
+    <color name="route_primary_dark">#1558C7</color>
+    <color name="route_primary_soft">#EAF2FF</color>
+    <color name="route_page_bg">#F4F7FC</color>
+    <color name="route_text_primary">#172033</color>
+    <color name="route_text_secondary">#667085</color>
+    <color name="route_text_hint">#98A2B3</color>
+    <color name="route_card_stroke">#E1E7F0</color>
+    <color name="route_chip_bg">#F6F8FC</color>
+    <color name="route_chip_text">#334B70</color>
+    <color name="route_chip_stroke">#DCE5F2</color>
+    <color name="route_query_bg">#EAF2FF</color>
+    <color name="route_query_stroke">#CDDDFA</color>
+    <color name="route_header_start">#1E72FF</color>
+    <color name="route_header_end">#4C8DFF</color>
+    <color name="route_welcome_title">#172033</color>
+    <color name="route_welcome_sub">#667085</color>
 
     <!-- Application colors -->
     <color name="background">#F5F7FA</color>
@@ -46,6 +46,15 @@
     <color name="text_primary">#000000</color>
     <color name="text_secondary">#666666</color>
     <color name="unread_text">#FFFFFF</color>
+
+    <!-- Flat information lists -->
+    <color name="list_page_bg">#F2F5FF</color>
+    <color name="list_text_primary">#151A24</color>
+    <color name="list_text_secondary">#7F8796</color>
+    <color name="list_text_tertiary">#B3BAC7</color>
+    <color name="list_avatar_bg">#4A8DFF</color>
+    <color name="list_chip_bg">#E8F0FF</color>
+    <color name="list_divider">#CDD5E3</color>
 
     <!-- Status colors -->
     <color name="online">#4CAF50</color>

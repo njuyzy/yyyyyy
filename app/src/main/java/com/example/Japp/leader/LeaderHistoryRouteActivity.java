@@ -23,6 +23,7 @@ import com.example.Japp.user.fragment.joinTeam.TeamCardItem;
 import com.example.Japp.user.fragment.joinTeam.TeamListAdapter;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
+import com.example.Japp.util.InsetDividerDecoration;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.gson.Gson;
 
@@ -63,6 +64,7 @@ public class LeaderHistoryRouteActivity extends AppCompatActivity {
 
         recycler.setLayoutManager(new LinearLayoutManager(this));
         recycler.setAdapter(adapter);
+        recycler.addItemDecoration(new InsetDividerDecoration(this, 14, 16));
 
         service = ApiClient.getClient().create(UserService.class);
         loadHistoryRoutes();

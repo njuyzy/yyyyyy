@@ -4,37 +4,33 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="4dp"
-    android:layout_marginBottom="4dp"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
-    app:cardBackgroundColor="@color/white"
-    app:cardCornerRadius="15dp"
-    app:cardElevation="0dp"
-    app:strokeColor="@color/route_card_stroke"
-    app:strokeWidth="1dp">
+    app:cardBackgroundColor="@color/list_page_bg"
+    app:cardCornerRadius="0dp"
+    app:cardElevation="0dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="82dp"
+        android:minHeight="76dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingTop="10dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="10dp">
+        android:paddingStart="14dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="8dp">
 
         <TextView
             android:id="@+id/txtPoiOrder"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
             android:background="@drawable/bg_route_search_icon"
             android:gravity="center"
             android:text="@string/route_add_symbol"
             android:textColor="@color/route_primary"
-            android:textSize="17sp"
+            android:textSize="20sp"
             android:textStyle="bold" />
 
         <LinearLayout
@@ -50,8 +46,8 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="@color/route_text_primary"
-                android:textSize="14sp"
+                android:textColor="@color/list_text_primary"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 tools:text="南京博物院" />
 
@@ -62,8 +58,8 @@
                 android:layout_marginTop="3dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="@color/route_text_secondary"
-                android:textSize="11sp"
+                android:textColor="@color/list_text_secondary"
+                android:textSize="13sp"
                 tools:text="中山东路321号" />
 
             <TextView
@@ -73,8 +69,8 @@
                 android:layout_marginTop="3dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="@color/route_text_hint"
-                android:textSize="10sp"
+                android:textColor="@color/list_text_tertiary"
+                android:textSize="11sp"
                 tools:text="科教文化服务 · 博物馆" />
         </LinearLayout>
 
@@ -83,14 +79,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:background="@drawable/bg_route_ai_badge"
-            android:paddingStart="9dp"
-            android:paddingTop="5dp"
-            android:paddingEnd="9dp"
-            android:paddingBottom="5dp"
-            android:textColor="@color/route_primary"
-            android:textSize="10sp"
-            android:textStyle="bold"
+            android:textColor="@color/list_text_tertiary"
+            android:textSize="12sp"
             tools:text="1.8 km" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

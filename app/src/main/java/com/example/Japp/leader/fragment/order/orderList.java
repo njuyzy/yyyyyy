@@ -39,6 +39,7 @@ import com.example.Japp.user.fragment.joinTeam.TeamCardItem;
 import com.example.Japp.user.fragment.joinTeam.TeamListAdapter;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
+import com.example.Japp.util.InsetDividerDecoration;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.chip.Chip;
@@ -117,6 +118,7 @@ public class orderList extends Fragment {
 
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         recycler.setAdapter(adapter);
+        recycler.addItemDecoration(new InsetDividerDecoration(requireContext(), 14, 16));
 
         if (swipeRefresh != null) {
             swipeRefresh.setOnRefreshListener(this::loadOrders);
@@ -159,7 +161,7 @@ public class orderList extends Fragment {
     private void setupTagGrid() {
         if (tagGrid == null) return;
         tagAdapter = new TagGridAdapter();
-        tagGrid.setLayoutManager(new GridLayoutManager(requireContext(), 2,
+        tagGrid.setLayoutManager(new GridLayoutManager(requireContext(), 3,
                 GridLayoutManager.HORIZONTAL, false));
         tagGrid.setAdapter(tagAdapter);
 

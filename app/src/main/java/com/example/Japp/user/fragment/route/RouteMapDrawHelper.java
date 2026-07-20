@@ -1,5 +1,11 @@
 package com.example.Japp.user.fragment.route;
 
+import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -8,8 +14,10 @@ import androidx.annotation.Nullable;
 
 import com.amap.api.maps.AMap;
 import com.amap.api.maps.CameraUpdateFactory;
+import com.amap.api.maps.model.BitmapDescriptorFactory;
 import com.amap.api.maps.model.LatLng;
 import com.amap.api.maps.model.LatLngBounds;
+import com.amap.api.maps.model.Marker;
 import com.amap.api.maps.model.MarkerOptions;
 import com.amap.api.maps.model.Polyline;
 import com.amap.api.maps.model.PolylineOptions;
@@ -30,7 +38,7 @@ public final class RouteMapDrawHelper {
     private static final Pattern COORDINATE_PATTERN = Pattern.compile("(-?\\d+(?:\\.\\d+)?)");
 
     public static final float ROUTE_LINE_WIDTH = 20f;
-    public static final int ROUTE_LINE_COLOR = 0xFF168B78;
+    public static final int ROUTE_LINE_COLOR = 0xFF1E72FF;
 
     private RouteMapDrawHelper() {}
 
@@ -88,6 +96,92 @@ public final class RouteMapDrawHelper {
 
         fitCamera(aMap, roadPoints, 48);
         return polyline;
+    }
+
+    /**
+     * 按节点最新 visitOrder 绘制醒目的数字站点，并把节点挂到 Marker 上供信息卡使用。
+     */
+    @Nullable
+    public static Polyline drawRouteWithNodes(@Nullable AMap aMap,
+                                              @NonNull List<LatLng> roadPoints,
+                                              @NonNull List<RouteNode> nodes) {
+        if (aMap == null || roadPoints.isEmpty()) {
+            return null;
+        }
+        aMap.clear();
+        Polyline polyline = null;
+        if (roadPoints.size() >= 2) {
+            polyline = aMap.addPolyline(new PolylineOptions()
+                    .addAll(roadPoints)
+                    .width(ROUTE_LINE_WIDTH)
+                    .color(ROUTE_LINE_COLOR)
+                    .geodesic(false));
+        }
+
+        List<RouteNode> ordered = new ArrayList<>(nodes);
+        Collections.sort(ordered, Comparator.comparingInt(RouteNode::getVisitOrder));
+        for (int i = 0; i < ordered.size(); i++) {
+            RouteNode node = ordered.get(i);
+            LatLng point = parseLocation(node.getLocation());
+            if (point == null) {
+                continue;
+            }
+            int number = node.getVisitOrder() > 0 ? node.getVisitOrder() : i + 1;
+            Marker marker = aMap.addMarker(new MarkerOptions()
+                    .position(point)
+                    .anchor(0.5f, 0.94f)
+                    .icon(BitmapDescriptorFactory.fromBitmap(createNumberedMarker(number)))
+                    .title(TextUtils.isEmpty(node.getName()) ? "地点 " + number : node.getName())
+                    .snippet(node.getAddress()));
+            marker.setObject(node);
+        }
+        fitCamera(aMap, roadPoints, 48);
+        return polyline;
+    }
+
+    @NonNull
+    private static Bitmap createNumberedMarker(int number) {
+        float density = Resources.getSystem().getDisplayMetrics().density;
+        int width = Math.round(36f * density);
+        int height = Math.round(43f * density);
+        float centerX = width / 2f;
+        float centerY = 16.5f * density;
+        float radius = 13f * density;
+
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        Path pointer = new Path();
+        pointer.moveTo(centerX - 6f * density, centerY + 10f * density);
+        pointer.lineTo(centerX, 40f * density);
+        pointer.lineTo(centerX + 6f * density, centerY + 10f * density);
+        pointer.close();
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0x33000000);
+        canvas.drawCircle(centerX + density, centerY + 2f * density,
+                radius + 2f * density, paint);
+        canvas.save();
+        canvas.translate(density, 2f * density);
+        canvas.drawPath(pointer, paint);
+        canvas.restore();
+
+        paint.setColor(Color.WHITE);
+        canvas.drawCircle(centerX, centerY, radius + 2f * density, paint);
+        canvas.drawPath(pointer, paint);
+        paint.setColor(ROUTE_LINE_COLOR);
+        canvas.drawCircle(centerX, centerY, radius, paint);
+        canvas.drawPath(pointer, paint);
+
+        paint.setColor(Color.WHITE);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setFakeBoldText(true);
+        paint.setTextSize((number >= 10 ? 10.5f : 13f) * density);
+        Paint.FontMetrics metrics = paint.getFontMetrics();
+        float baseline = centerY - (metrics.ascent + metrics.descent) / 2f;
+        canvas.drawText(String.valueOf(number), centerX, baseline, paint);
+        return bitmap;
     }
 
     public static void fitCamera(@Nullable AMap aMap, @NonNull List<LatLng> points, int paddingPx) {

@@ -22,6 +22,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.Japp.Chat.adapter.conversationListAdapter;
 import com.example.Japp.Chat.chatActivity;
 import com.example.Japp.R;
+import com.example.Japp.util.InsetDividerDecoration;
 import com.example.Japp.data.Conversation;
 import com.example.Japp.data.Message;
 import com.example.Japp.data.User;
@@ -69,6 +70,7 @@ public class ConversationList extends Fragment {
 
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         recycler.setAdapter(adapter);
+        recycler.addItemDecoration(new InsetDividerDecoration(requireContext(), 76, 16));
 
         initDatabase();
         initCurrentUser();

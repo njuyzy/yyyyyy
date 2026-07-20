@@ -19,13 +19,16 @@ public class RouteChatItem {
     private final int routeId;
     private final List<LatLng> polylinePoints;
     private final List<LatLng> waypointPoints;
+    private final boolean publishAllowed;
 
     private RouteChatItem(int type, String text, long timestamp, int routeId,
-                          List<LatLng> polylinePoints, List<LatLng> waypointPoints) {
+                          List<LatLng> polylinePoints, List<LatLng> waypointPoints,
+                          boolean publishAllowed) {
         this.type = type;
         this.text = text;
         this.timestamp = timestamp;
         this.routeId = routeId;
+        this.publishAllowed = publishAllowed;
         this.polylinePoints = polylinePoints != null
                 ? new ArrayList<>(polylinePoints)
                 : new ArrayList<>();
@@ -35,11 +38,13 @@ public class RouteChatItem {
     }
 
     public static RouteChatItem user(String text) {
-        return new RouteChatItem(TYPE_USER, text, System.currentTimeMillis(), 0, null, null);
+        return new RouteChatItem(
+                TYPE_USER, text, System.currentTimeMillis(), 0, null, null, false);
     }
 
     public static RouteChatItem assistantStatus(String text) {
-        return new RouteChatItem(TYPE_ASSISTANT_STATUS, text, System.currentTimeMillis(), 0, null, null);
+        return new RouteChatItem(
+                TYPE_ASSISTANT_STATUS, text, System.currentTimeMillis(), 0, null, null, false);
     }
 
     public static RouteChatItem assistantRoute(String text, List<LatLng> points) {
@@ -54,8 +59,16 @@ public class RouteChatItem {
                                                List<LatLng> roadPolyline,
                                                List<LatLng> waypoints,
                                                int routeId) {
+        return assistantRoute(text, roadPolyline, waypoints, routeId, true);
+    }
+
+    public static RouteChatItem assistantRoute(String text,
+                                               List<LatLng> roadPolyline,
+                                               List<LatLng> waypoints,
+                                               int routeId,
+                                               boolean publishAllowed) {
         return new RouteChatItem(TYPE_ASSISTANT_ROUTE, text, System.currentTimeMillis(),
-                routeId, roadPolyline, waypoints);
+                routeId, roadPolyline, waypoints, publishAllowed);
     }
 
     public void setText(String text) {
@@ -95,6 +108,6 @@ public class RouteChatItem {
     }
 
     public boolean canPublish() {
-        return type == TYPE_ASSISTANT_ROUTE && routeId > 0;
+        return type == TYPE_ASSISTANT_ROUTE && routeId > 0 && publishAllowed;
     }
 }

@@ -16,8 +16,13 @@
 
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/UserBottomNav"
+        style="@style/Widget.Japp.CompactBottomNavigation"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="@dimen/compact_bottom_nav_height"
+        android:minHeight="0dp"
+        android:paddingTop="0dp"
+        android:paddingBottom="0dp"
+        app:labelVisibilityMode="selected"
         app:menu="@menu/bottom_nav_user"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"

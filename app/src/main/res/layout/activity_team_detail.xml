@@ -8,18 +8,18 @@
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
+        style="@style/Widget.Japp.CompactToolbar"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:background="@color/accent_dark"
-        android:minHeight="?attr/actionBarSize"
+        android:layout_height="@dimen/compact_toolbar_height"
+        android:background="@color/white"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:navigationIcon="@drawable/ic_arrow_back"
-        app:navigationIconTint="@color/white"
+        app:navigationIconTint="@color/black"
         app:title="拼单详情"
         app:titleCentered="true"
-        app:titleTextColor="@color/white" />
+        app:titleTextColor="@color/black" />
 
     <ScrollView
         android:layout_width="0dp"

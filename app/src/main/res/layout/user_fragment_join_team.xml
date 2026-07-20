@@ -5,13 +5,13 @@
     android:id="@+id/joinTeam"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background">
+    android:background="@color/list_page_bg">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/topBar"
         android:layout_width="0dp"
         android:layout_height="@dimen/wide_toolbar_height"
-        android:background="@color/accent_dark"
+        android:background="@color/white"
         android:paddingHorizontal="16dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -21,7 +21,7 @@
             android:id="@+id/txtCurrentCity"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="@color/white"
+            android:textColor="@color/black"
             android:textSize="15sp"
             android:textStyle="bold"
             app:layout_constraintBottom_toBottomOf="parent"
@@ -34,7 +34,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="拼单"
-            android:textColor="@color/white"
+            android:textColor="@color/black"
             android:textSize="20sp"
             android:textStyle="bold"
             app:layout_constraintBottom_toBottomOf="parent"
@@ -53,7 +53,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@id/add"
             app:layout_constraintTop_toTopOf="parent"
-            app:tint="@color/white" />
+            app:tint="@color/black" />
 
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/add"
@@ -65,14 +65,14 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:tint="@color/white" />
+            app:tint="@color/black" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/tagGrid"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:background="@color/white"
+        android:layout_height="180dp"
+        android:background="@color/list_page_bg"
         android:clipToPadding="false"
         android:paddingHorizontal="8dp"
         android:paddingVertical="12dp"
@@ -84,6 +84,7 @@
         android:id="@+id/swipeRefresh"
         android:layout_width="0dp"
         android:layout_height="0dp"
+        android:background="@color/list_page_bg"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -98,7 +99,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:padding="12dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
                 tools:listitem="@layout/item_team_card" />
 
             <TextView
@@ -108,7 +110,7 @@
                 android:layout_gravity="center"
                 android:gravity="center"
                 android:padding="24dp"
-                android:textColor="@color/text_secondary"
+                android:textColor="@color/list_text_secondary"
                 android:textSize="15sp"
                 android:visibility="gone"
                 tools:text="暂无可加入的拼单"

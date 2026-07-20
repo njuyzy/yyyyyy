@@ -5,25 +5,24 @@
     android:id="@+id/conversationCard"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="10dp"
-    app:cardBackgroundColor="@color/white"
-    app:cardCornerRadius="18dp"
-    app:cardElevation="2dp"
-    app:strokeColor="#E8EEF7"
-    app:strokeWidth="1dp">
+    android:foreground="?attr/selectableItemBackground"
+    app:cardBackgroundColor="@color/list_page_bg"
+    app:cardCornerRadius="0dp"
+    app:cardElevation="0dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:minHeight="74dp"
         android:paddingStart="14dp"
-        android:paddingTop="14dp"
-        android:paddingEnd="14dp"
-        android:paddingBottom="14dp">
+        android:paddingTop="9dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="9dp">
 
         <FrameLayout
             android:id="@+id/avatarContainer"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
             android:background="@drawable/bg_chat_avatar_peer"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -56,8 +55,8 @@
             android:layout_marginStart="12dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="#12263A"
-            android:textSize="16sp"
+            android:textColor="@color/list_text_primary"
+            android:textSize="17sp"
             android:textStyle="bold"
             app:layout_constraintEnd_toStartOf="@id/txtTime"
             app:layout_constraintStart_toEndOf="@id/avatarContainer"
@@ -68,8 +67,8 @@
             android:id="@+id/txtTime"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="@color/chat_time"
-            android:textSize="11sp"
+            android:textColor="@color/list_text_tertiary"
+            android:textSize="12sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             tools:text="10:30" />
@@ -83,8 +82,8 @@
             android:layout_marginEnd="8dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp"
+            android:textColor="@color/list_text_secondary"
+            android:textSize="14sp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@id/txtUnread"
             app:layout_constraintStart_toEndOf="@id/avatarContainer"

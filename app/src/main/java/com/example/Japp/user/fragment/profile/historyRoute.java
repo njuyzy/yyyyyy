@@ -25,6 +25,7 @@ import com.example.Japp.user.fragment.joinTeam.TeamCardItem;
 import com.example.Japp.user.fragment.joinTeam.TeamListAdapter;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
+import com.example.Japp.util.InsetDividerDecoration;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.gson.Gson;
 
@@ -64,6 +65,7 @@ public class historyRoute extends Fragment {
 
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         recycler.setAdapter(adapter);
+        recycler.addItemDecoration(new InsetDividerDecoration(requireContext(), 14, 16));
         loadHistory();
         return view;
     }

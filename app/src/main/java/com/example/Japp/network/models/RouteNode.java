@@ -33,6 +33,9 @@ public class RouteNode {
     @SerializedName("location")
     private String location;
 
+    // 地图信息卡本地使用，不参与接口序列化。
+    private transient String photoUrl;
+
     public int getRouteId() { return routeId; }
     public void setRouteId(int routeId) { this.routeId = routeId; }
     public int getVisitOrder() { return visitOrder; }
@@ -53,4 +56,6 @@ public class RouteNode {
     public void setNotes(String notes) { this.notes = notes; }
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }
+    public String getPhotoUrl() { return photoUrl; }
+    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
 }

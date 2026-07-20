@@ -104,5 +104,6 @@ public class orderListAdapter extends RecyclerView.Adapter<orderListAdapter.MyHo
     public interface OrderOnClickListener {
         void onItemClick(int position);
     }
+
 }
 

@@ -38,6 +38,7 @@ import com.example.Japp.user.TeamDetailActivity;
 import com.example.Japp.user.UserMainActivity;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
+import com.example.Japp.util.InsetDividerDecoration;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
@@ -113,6 +114,7 @@ public class TeamList extends Fragment {
 
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         recycler.setAdapter(adapter);
+        recycler.addItemDecoration(new InsetDividerDecoration(requireContext(), 14, 16));
 
         if (swipeRefresh != null) {
             swipeRefresh.setOnRefreshListener(this::loadTeams);
@@ -154,7 +156,8 @@ public class TeamList extends Fragment {
             return;
         }
         tagAdapter = new TagGridAdapter();
-        tagGrid.setLayoutManager(new GridLayoutManager(requireContext(), 5));
+        tagGrid.setLayoutManager(new GridLayoutManager(requireContext(), 3,
+                GridLayoutManager.HORIZONTAL, false));
         tagGrid.setAdapter(tagAdapter);
 
         String[] tagNames = getResources().getStringArray(R.array.route_tag_names);

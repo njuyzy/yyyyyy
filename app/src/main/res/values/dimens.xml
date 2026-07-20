@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <dimen name="wide_toolbar_height">72dp</dimen>
+    <dimen name="wide_toolbar_height">48dp</dimen>
+    <dimen name="compact_toolbar_height">48dp</dimen>
+    <dimen name="compact_bottom_nav_height">56dp</dimen>
 </resources>

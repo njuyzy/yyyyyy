@@ -90,11 +90,13 @@ public class TagGridAdapter extends RecyclerView.Adapter<TagGridAdapter.Holder> 
                 .inflate(R.layout.item_tag_card, parent, false);
         // 每屏正好显示 5 列，item 宽 = 可用宽度 / 5，随 RecyclerView 宽度自适应
         int avail = parent.getWidth() - parent.getPaddingLeft() - parent.getPaddingRight();
-        if (avail > 0) {
-            ViewGroup.LayoutParams lp = view.getLayoutParams();
-            lp.width = avail / 5;
-            view.setLayoutParams(lp);
+        if (avail <= 0) {
+            avail = parent.getResources().getDisplayMetrics().widthPixels
+                    - parent.getPaddingLeft() - parent.getPaddingRight();
         }
+        ViewGroup.LayoutParams lp = view.getLayoutParams();
+        lp.width = avail / 5;
+        view.setLayoutParams(lp);
         return new Holder(view);
     }
 

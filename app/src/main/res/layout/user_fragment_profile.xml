@@ -9,7 +9,7 @@
         android:id="@+id/headerBackground"
         android:layout_width="0dp"
         android:layout_height="130dp"
-        android:background="#1E72FF"
+        android:background="@color/white"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -45,7 +45,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="用户"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/black"
                 android:textSize="21sp"
                 android:textStyle="bold" />
 
@@ -55,7 +55,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="所在地区"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/black"
                 android:textSize="17sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -73,7 +73,7 @@
         app:layout_constraintBottom_toBottomOf="@id/headerInfo"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="@id/headerInfo"
-        app:tint="#FFFFFF" />
+        app:tint="@color/black" />
 
     <LinearLayout
         android:id="@+id/contentContainer"
