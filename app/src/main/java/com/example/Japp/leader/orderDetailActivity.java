@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -48,31 +49,23 @@ public class orderDetailActivity extends AppCompatActivity {
     private UserService service;
     private Project project;
     private TextView txtTitle;
+    private TextView txtTime;
     private TextView txtMeta;
     private TextView txtOwner;
     private TextView txtStatus;
     private TextView txtRouteDetail;
+    private TextView txtMembers;
     private MaterialButton btnJoin;
+    private LinearLayout routeDetailRow;
     @Nullable
     private FrameLayout mapContainer;
     @Nullable
     private TextView mapTapHint;
     @Nullable
-    private MaterialCardView walkPlanCard;
-    @Nullable
-    private View walkPlanContent;
-    @Nullable
-    private TextView txtWalkPlanStatus;
-    @Nullable
-    private TextView txtWalkPlanSummary;
-    @Nullable
-    private TextView txtWalkPlanHint;
-    @Nullable
     private LeaderWalkRoutePlanner walkRoutePlanner;
     private List<RouteNode> cachedRouteNodes = new ArrayList<>();
     private final ArrayList<String> walkInstructions = new ArrayList<>();
     private final List<LatLng> plannedRoadPoints = new ArrayList<>();
-    private String walkSummary = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,18 +79,20 @@ public class orderDetailActivity extends AppCompatActivity {
         toolbar.setNavigationOnClickListener(v -> finish());
 
         txtTitle = findViewById(R.id.txtTitle);
+        txtTime = findViewById(R.id.txtTime);
         txtMeta = findViewById(R.id.txtMeta);
         txtOwner = findViewById(R.id.txtOwner);
         txtStatus = findViewById(R.id.txtStatus);
         txtRouteDetail = findViewById(R.id.txtRouteDetail);
+        txtMembers = findViewById(R.id.txtMembers);
         btnJoin = findViewById(R.id.btnJoin);
+        routeDetailRow = findViewById(R.id.routeDetailRow);
         mapContainer = findViewById(R.id.mapContainer);
         mapTapHint = findViewById(R.id.mapTapHint);
-        walkPlanCard = findViewById(R.id.walkPlanCard);
-        walkPlanContent = findViewById(R.id.walkPlanContent);
-        txtWalkPlanStatus = findViewById(R.id.txtWalkPlanStatus);
-        txtWalkPlanSummary = findViewById(R.id.txtWalkPlanSummary);
-        txtWalkPlanHint = findViewById(R.id.txtWalkPlanHint);
+
+        if (routeDetailRow != null) {
+            routeDetailRow.setOnClickListener(v -> openFullscreenRouteMap());
+        }
 
         View.OnClickListener openFullscreen = v -> openFullscreenRouteMap();
         if (mapContainer != null) {
@@ -105,9 +100,6 @@ public class orderDetailActivity extends AppCompatActivity {
         }
         if (mapTapHint != null) {
             mapTapHint.setOnClickListener(openFullscreen);
-        }
-        if (walkPlanContent != null) {
-            walkPlanContent.setOnClickListener(v -> openWalkRouteDetail());
         }
 
         project = parseProjectFromIntent();
@@ -179,10 +171,26 @@ public class orderDetailActivity extends AppCompatActivity {
         txtTitle.setText(title == null || title.isEmpty() ? "研学拼单" : title);
 
         String city = ProjectUiHelper.regionAdcodeToCity(project.getRegionAdcode());
-        String date = project.getDepartureDate() != null ? project.getDepartureDate() : "待定";
-        txtMeta.setText((city.isEmpty() ? "未知城市" : city)
-                + " · 出发 " + date
-                + " · " + project.getCurrentMembers() + "/" + project.getMaxMembers() + " 人");
+        txtMeta.setText(city.isEmpty() ? "未知城市" : city);
+
+        if (txtMembers != null) {
+            txtMembers.setText(project.getCurrentMembers() + "/" + project.getMaxMembers() + " 人");
+        }
+
+        if (txtTime != null) {
+            String departureTime = project.getDepartureTime();
+            String departureDate = project.getDepartureDate();
+            String timeText;
+            if (!TextUtils.isEmpty(departureTime)) {
+                timeText = (TextUtils.isEmpty(departureDate) ? "当日" : departureDate)
+                        + "  " + departureTime;
+            } else if (!TextUtils.isEmpty(departureDate)) {
+                timeText = departureDate;
+            } else {
+                timeText = "时间待定";
+            }
+            txtTime.setText(timeText);
+        }
 
         ProjectUiHelper.bindStatusBadge(txtStatus, project.getStatus());
     }
@@ -194,14 +202,14 @@ public class orderDetailActivity extends AppCompatActivity {
                 if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
                     Account account = response.body().getData();
                     if (account != null) {
-                        txtOwner.setText("发起人：" + account.getUsername());
+                        txtOwner.setText(account.getUsername());
                     }
                 }
             }
 
             @Override
             public void onFailure(Call<Result<Account>> call, Throwable t) {
-                txtOwner.setText("发起人：未知");
+                txtOwner.setText("未知");
             }
         });
     }
@@ -212,13 +220,11 @@ public class orderDetailActivity extends AppCompatActivity {
             public void onResponse(Call<Result<List<RouteNode>>> call, Response<Result<List<RouteNode>>> response) {
                 if (!response.isSuccessful() || response.body() == null || response.body().getCode() != 1) {
                     txtRouteDetail.setText("暂无路线详情");
-                    hideMapSection();
                     return;
                 }
                 List<RouteNode> nodes = response.body().getData();
                 if (nodes == null || nodes.isEmpty()) {
                     txtRouteDetail.setText("暂无路线详情");
-                    hideMapSection();
                     return;
                 }
                 Collections.sort(nodes, Comparator.comparingInt(RouteNode::getVisitOrder));
@@ -230,7 +236,6 @@ public class orderDetailActivity extends AppCompatActivity {
             @Override
             public void onFailure(Call<Result<List<RouteNode>>> call, Throwable t) {
                 txtRouteDetail.setText("路线加载失败");
-                hideMapSection();
             }
         });
     }
@@ -253,21 +258,16 @@ public class orderDetailActivity extends AppCompatActivity {
 
     private void startRoutePlanning(List<RouteNode> nodes) {
         if (mapContainer == null || walkRoutePlanner == null) {
-            hideMapSection();
             return;
         }
         if (!hasConfiguredAmapKey()) {
-            hideMapSection();
             return;
         }
-
-        mapContainer.setVisibility(View.VISIBLE);
-        showWalkPlanLoading();
 
         walkRoutePlanner.planSummary(nodes, new LeaderWalkRoutePlanner.Callback() {
             @Override
             public void onPlanningStarted() {
-                runOnUiThread(() -> showWalkPlanLoading());
+                // 步行指引 UI 已移除，仅在后台规划路径
             }
 
             @Override
@@ -287,10 +287,7 @@ public class orderDetailActivity extends AppCompatActivity {
 
             @Override
             public void onPlanningFailed(@NonNull String message) {
-                runOnUiThread(() -> {
-                    hideWalkPlanSection();
-                    Toast.makeText(orderDetailActivity.this, message, Toast.LENGTH_SHORT).show();
-                });
+                runOnUiThread(() -> Toast.makeText(orderDetailActivity.this, message, Toast.LENGTH_SHORT).show());
             }
         });
     }
@@ -300,69 +297,18 @@ public class orderDetailActivity extends AppCompatActivity {
                                     @NonNull List<LatLng> roadPolyline,
                                     boolean hadFailures) {
         runOnUiThread(() -> {
-            walkSummary = summary;
+            if (isFinishing() || isDestroyed()) {
+                return;
+            }
             walkInstructions.clear();
             walkInstructions.addAll(instructions);
             plannedRoadPoints.clear();
             plannedRoadPoints.addAll(roadPolyline);
-            showWalkPlanResult(summary, !instructions.isEmpty());
             if (hadFailures) {
                 Toast.makeText(orderDetailActivity.this,
                         R.string.route_planning_partial_fail, Toast.LENGTH_SHORT).show();
             }
         });
-    }
-
-    private void showWalkPlanLoading() {
-        if (walkPlanCard != null) {
-            walkPlanCard.setVisibility(View.VISIBLE);
-        }
-        if (txtWalkPlanStatus != null) {
-            txtWalkPlanStatus.setVisibility(View.VISIBLE);
-            txtWalkPlanStatus.setText(R.string.route_planning_in_progress);
-        }
-        if (txtWalkPlanSummary != null) {
-            txtWalkPlanSummary.setVisibility(View.GONE);
-        }
-        if (txtWalkPlanHint != null) {
-            txtWalkPlanHint.setVisibility(View.GONE);
-        }
-        if (walkPlanContent != null) {
-            walkPlanContent.setClickable(false);
-        }
-    }
-
-    private void showWalkPlanResult(String summary, boolean hasInstructions) {
-        if (walkPlanCard != null) {
-            walkPlanCard.setVisibility(View.VISIBLE);
-        }
-        if (txtWalkPlanStatus != null) {
-            txtWalkPlanStatus.setVisibility(View.GONE);
-        }
-        if (txtWalkPlanSummary != null) {
-            txtWalkPlanSummary.setVisibility(View.VISIBLE);
-            txtWalkPlanSummary.setText(summary);
-        }
-        if (txtWalkPlanHint != null) {
-            txtWalkPlanHint.setText(R.string.route_plan_tap_detail);
-            txtWalkPlanHint.setVisibility(hasInstructions ? View.VISIBLE : View.GONE);
-        }
-        if (walkPlanContent != null) {
-            walkPlanContent.setClickable(hasInstructions);
-        }
-    }
-
-    private void hideWalkPlanSection() {
-        if (walkPlanCard != null) {
-            walkPlanCard.setVisibility(View.GONE);
-        }
-    }
-
-    private void hideMapSection() {
-        if (mapContainer != null) {
-            mapContainer.setVisibility(View.GONE);
-        }
-        hideWalkPlanSection();
     }
 
     private void openFullscreenRouteMap() {
@@ -379,16 +325,6 @@ public class orderDetailActivity extends AppCompatActivity {
         } else {
             RouteMapFullscreenActivity.startWithNodes(this, cachedRouteNodes, title);
         }
-    }
-
-    private void openWalkRouteDetail() {
-        if (walkInstructions.isEmpty()) {
-            return;
-        }
-        Intent intent = new Intent(this, WalkRouteDetailActivity.class);
-        intent.putStringArrayListExtra(WalkRouteDetailActivity.EXTRA_WALK_INSTRUCTIONS, walkInstructions);
-        intent.putExtra(WalkRouteDetailActivity.EXTRA_WALK_SUMMARY, walkSummary);
-        startActivity(intent);
     }
 
     private boolean hasConfiguredAmapKey() {

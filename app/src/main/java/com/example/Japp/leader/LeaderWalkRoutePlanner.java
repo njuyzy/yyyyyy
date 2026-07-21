@@ -76,7 +76,8 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
     public LeaderWalkRoutePlanner(@NonNull Context context) {
         appContext = context.getApplicationContext();
         try {
-            routeSearch = new RouteSearch(context);
+            // 必须使用 applicationContext；用 Activity 上下文在切回前台时容易触发 AMap 原生层崩溃
+            routeSearch = new RouteSearch(appContext);
             routeSearch.setRouteSearchListener(this);
         } catch (AMapException e) {
             routeSearch = null;
@@ -147,6 +148,15 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
     public void cancel() {
         callback = null;
         aMap = null;
+        if (routeSearch != null) {
+            try {
+                // 解绑监听器避免 Activity 销毁后仍收到异步回调导致的崩溃
+                routeSearch.setRouteSearchListener(null);
+            } catch (Throwable t) {
+                Log.w(TAG, "detach listener failed", t);
+            }
+            routeSearch = null;
+        }
     }
 
     private void startRoutePlanning() {
@@ -373,7 +383,10 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
 
     @Override
     public void onWalkRouteSearched(WalkRouteResult result, int errorCode) {
-        if (callback == null || currentSegmentIndex >= routePoints.size() - 1) {
+        if (callback == null || routeSearch == null || routePoints.isEmpty()) {
+            return;
+        }
+        if (currentSegmentIndex < 0 || currentSegmentIndex >= routePoints.size() - 1) {
             return;
         }
         LatLng from = routePoints.get(currentSegmentIndex);

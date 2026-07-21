@@ -27,6 +27,12 @@ public class Project {
     @SerializedName("departureDate")
     private String departureDate;
 
+    @SerializedName("departureTime")
+    private String departureTime;
+
+    @SerializedName("arrivalTime")
+    private String arrivalTime;
+
     @SerializedName("maxMembers")
     private int maxMembers;
 
@@ -65,6 +71,12 @@ public class Project {
 
     public String getDepartureDate() { return departureDate; }
     public void setDepartureDate(String departureDate) { this.departureDate = departureDate; }
+
+    public String getDepartureTime() { return departureTime; }
+    public void setDepartureTime(String departureTime) { this.departureTime = departureTime; }
+
+    public String getArrivalTime() { return arrivalTime; }
+    public void setArrivalTime(String arrivalTime) { this.arrivalTime = arrivalTime; }
 
     public int getMaxMembers() { return maxMembers; }
     public void setMaxMembers(int maxMembers) { this.maxMembers = maxMembers; }

@@ -20,9 +20,8 @@ import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,7 +34,6 @@ import androidx.fragment.app.FragmentTransaction;
 import com.example.Japp.R;
 import com.example.Japp.PersonalInfoActivity;
 import com.example.Japp.RoleSelectionActivity;
-import com.example.Japp.leader.LeaderHistoryRouteActivity;
 import com.example.Japp.SettingsActivity;
 import com.example.Japp.MainActivity;
 import com.example.Japp.user.UserMainActivity;
@@ -60,12 +58,15 @@ public class profile extends Fragment {
 
     private static final int REQUEST_PERSONAL_INFO = 1003;
 
-    private Button switchMode, check_review, btnPersonalInfo, btnHistoryRoute;
-    private Button btnLogout;
+    private LinearLayout switchMode, check_review;
+    private TextView btnPersonalInfo;
+    private LinearLayout btnLogout;
+    private LinearLayout btnSettings, btnOverallReview;
+    private LinearLayout btnOrderReceived, btnOrderInProgress, btnOrderToReview, btnOrderCompleted;
     private ImageView ivAvatar;
-    private ImageButton Settings;
     private TextView txtName;
     private TextView txtStats;
+    private TextView txtPendingOrders, txtCompletedOrders, txtRating;
     private static final int SELECT_FILE = 1002;
     private static final String AVATAR_UPLOAD_URL = "http://10.6.86.86/upload";
 
@@ -76,14 +77,21 @@ public class profile extends Fragment {
         View view = inflater.inflate(R.layout.leader_fragment_profile, container, false);
 
         ivAvatar = view.findViewById(R.id.ivAvatar);
-        switchMode = view.findViewById(R.id.btnViewReviews);
-        check_review = view.findViewById(R.id.btnSwitchRole);
+        check_review = view.findViewById(R.id.btnViewReviews);
+        switchMode = view.findViewById(R.id.btnSwitchRole);
         btnPersonalInfo = view.findViewById(R.id.btnPersonalInfo);
-        btnHistoryRoute = view.findViewById(R.id.btnHistoryRoute);
         btnLogout = view.findViewById(R.id.btnLogout);
-        Settings = view.findViewById(R.id.btnSettings);
+        btnSettings = view.findViewById(R.id.btnSettings);
+        btnOverallReview = view.findViewById(R.id.btnOverallReview);
+        btnOrderReceived = view.findViewById(R.id.btnOrderReceived);
+        btnOrderInProgress = view.findViewById(R.id.btnOrderInProgress);
+        btnOrderToReview = view.findViewById(R.id.btnOrderToReview);
+        btnOrderCompleted = view.findViewById(R.id.btnOrderCompleted);
         txtName = view.findViewById(R.id.txtName);
         txtStats = view.findViewById(R.id.txtStats);
+        txtPendingOrders = view.findViewById(R.id.txtPendingOrders);
+        txtCompletedOrders = view.findViewById(R.id.txtCompletedOrders);
+        txtRating = view.findViewById(R.id.txtRating);
 
         // 加载本地存储的图片
         loadImageFromLocal();
@@ -122,15 +130,27 @@ public class profile extends Fragment {
         btnPersonalInfo.setOnClickListener(v ->
                 startActivityForResult(new Intent(requireContext(), PersonalInfoActivity.class), REQUEST_PERSONAL_INFO));
 
-        btnHistoryRoute.setOnClickListener(v ->
-                startActivity(new Intent(requireContext(), LeaderHistoryRouteActivity.class)));
-
-        Settings.setOnClickListener(new View.OnClickListener() {
+        btnSettings.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 startActivity(new Intent(requireContext(), SettingsActivity.class));
             }
         });
+
+        btnOverallReview.setOnClickListener(v ->
+                Toast.makeText(requireContext(), "综合评价", Toast.LENGTH_SHORT).show());
+
+        btnOrderReceived.setOnClickListener(v ->
+                Toast.makeText(requireContext(), "已接单", Toast.LENGTH_SHORT).show());
+
+        btnOrderInProgress.setOnClickListener(v ->
+                Toast.makeText(requireContext(), "进行中", Toast.LENGTH_SHORT).show());
+
+        btnOrderToReview.setOnClickListener(v ->
+                Toast.makeText(requireContext(), "待评价", Toast.LENGTH_SHORT).show());
+
+        btnOrderCompleted.setOnClickListener(v ->
+                Toast.makeText(requireContext(), "已完成", Toast.LENGTH_SHORT).show());
 
         btnLogout.setOnClickListener(new View.OnClickListener() {
             @Override
