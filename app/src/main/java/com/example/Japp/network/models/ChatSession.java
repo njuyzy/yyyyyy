@@ -10,8 +10,8 @@ public class ChatSession {
     @SerializedName("projectId")
     private int projectId;
 
-    @SerializedName("memberAccountId")
-    private int memberAccountId;
+    @SerializedName("userAccountId")
+    private int userAccountId;
 
     @SerializedName("leaderAccountId")
     private int leaderAccountId;
@@ -32,12 +32,12 @@ public class ChatSession {
         this.projectId = projectId;
     }
 
-    public int getMemberAccountId() {
-        return memberAccountId;
+    public int getUserAccountId() {
+        return userAccountId;
     }
 
-    public void setMemberAccountId(int memberAccountId) {
-        this.memberAccountId = memberAccountId;
+    public void setUserAccountId(int userAccountId) {
+        this.userAccountId = userAccountId;
     }
 
     public int getLeaderAccountId() {

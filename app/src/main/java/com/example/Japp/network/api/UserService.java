@@ -4,6 +4,7 @@ import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.AccountLeaderProfile;
 import com.example.Japp.network.models.AccountTagPref;
 import com.example.Japp.network.models.ChatSession;
+import com.example.Japp.network.models.ServerChatMessage;
 import com.example.Japp.network.models.LoginResponse;
 import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.Region;
@@ -13,9 +14,11 @@ import com.google.gson.JsonElement;
 import com.example.Japp.network.models.requests.CreateProjectRequest;
 import com.example.Japp.network.models.requests.CreateSessionRequest;
 import com.example.Japp.network.models.requests.IntroRequest;
+import com.example.Japp.network.models.requests.JoinProjectRequest;
 import com.example.Japp.network.models.requests.UpdateUsernameRequest;
 import com.example.Japp.network.models.requests.LoginRequest;
 import com.example.Japp.network.models.requests.RegisterRequest;
+import com.example.Japp.network.models.requests.SendChatMessageRequest;
 
 import java.util.List;
 
@@ -96,6 +99,9 @@ public interface UserService {
     Call<Result<JsonElement>> planRouteByAi(@Path("memoryId") String memoryId,
                                             @Query("message") String message);
 
+    @POST("routes/manual")
+    Call<Result<JsonElement>> createManualRoute(@Body List<RouteNode> routeNodes);
+
     @GET("routes/{id}")
     Call<Result<List<RouteNode>>> getRouteNodes(@Path("id") int routeId);
 
@@ -107,8 +113,17 @@ public interface UserService {
                              @Body com.example.Japp.network.models.requests.AssignLeaderRequest request);
 
     @POST("projects/{id}/join")
-    Call<Result> joinProject(@Path("id") int projectId);
+    Call<Result> joinProject(@Path("id") int projectId, @Body JoinProjectRequest request);
 
     @POST("chat/sessions")
     Call<Result<ChatSession>> createChatSession(@Body CreateSessionRequest request);
+
+    @GET("chat/sessions")
+    Call<Result<List<ChatSession>>> getChatSessions();
+
+    @GET("chat/sessions/{sessionId}/messages")
+    Call<Result<List<ServerChatMessage>>> getChatMessages(@Path("sessionId") long sessionId);
+
+    @POST("chat/messages")
+    Call<Result<Long>> sendChatMessage(@Body SendChatMessageRequest request);
 }

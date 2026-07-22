@@ -3,6 +3,7 @@ package com.example.Japp.user;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.TextView;
@@ -20,17 +21,18 @@ import com.example.Japp.R;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
-import com.example.Japp.network.models.ChatSession;
 import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
-import com.example.Japp.network.models.requests.CreateSessionRequest;
+import com.example.Japp.network.models.requests.JoinProjectRequest;
 import com.example.Japp.user.fragment.route.RouteMapDrawHelper;
 import com.example.Japp.user.fragment.route.RouteMapFullscreenActivity;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
@@ -51,6 +53,7 @@ public class TeamDetailActivity extends AppCompatActivity {
     private TextView txtTitle;
     private TextView txtMeta;
     private TextView txtOwner;
+    private TextView txtMyPartySize;
     private TextView txtStatus;
     private TextView txtRouteDetail;
     private MaterialButton btnJoin;
@@ -81,6 +84,7 @@ public class TeamDetailActivity extends AppCompatActivity {
         txtTitle = findViewById(R.id.txtTitle);
         txtMeta = findViewById(R.id.txtMeta);
         txtOwner = findViewById(R.id.txtOwner);
+        txtMyPartySize = findViewById(R.id.txtMyPartySize);
         txtStatus = findViewById(R.id.txtStatus);
         txtRouteDetail = findViewById(R.id.txtRouteDetail);
         btnJoin = findViewById(R.id.btnJoin);
@@ -127,6 +131,7 @@ public class TeamDetailActivity extends AppCompatActivity {
         }
 
         bindProjectHeader();
+        restoreMyPartySize();
         loadOwnerName();
         loadRouteDetail();
         setupJoinButton();
@@ -281,10 +286,43 @@ public class TeamDetailActivity extends AppCompatActivity {
             return;
         }
 
-        btnJoin.setOnClickListener(v -> joinProject());
+        btnJoin.setOnClickListener(v -> showJoinPartySizeDialog());
     }
 
-    private void joinProject() {
+    private void showJoinPartySizeDialog() {
+        View content = LayoutInflater.from(this).inflate(R.layout.dialog_join_party_size, null);
+        TextInputEditText input = content.findViewById(R.id.editPartySize);
+        androidx.appcompat.app.AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+                .setTitle("填写参团人数")
+                .setView(content)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("确认加入", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    String raw = input.getText() != null ? input.getText().toString().trim() : "";
+                    int partySize;
+                    try {
+                        partySize = Integer.parseInt(raw);
+                    } catch (NumberFormatException e) {
+                        partySize = 0;
+                    }
+                    if (partySize <= 0) {
+                        input.setError("人数至少为 1");
+                        return;
+                    }
+                    int remaining = project.getMaxMembers() - project.getCurrentMembers();
+                    if (remaining > 0 && partySize > remaining) {
+                        input.setError("当前最多还可加入 " + remaining + " 人");
+                        return;
+                    }
+                    dialog.dismiss();
+                    joinProject(partySize);
+                }));
+        dialog.show();
+    }
+
+    private void joinProject(int partySize) {
         if (!SessionHelper.isLoggedIn(this)) {
             Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
             SessionHelper.handleUnauthorized(this);
@@ -292,7 +330,8 @@ public class TeamDetailActivity extends AppCompatActivity {
         }
 
         btnJoin.setEnabled(false);
-        service.joinProject(project.getId()).enqueue(new Callback<Result>() {
+        service.joinProject(project.getId(), new JoinProjectRequest(partySize))
+                .enqueue(new Callback<Result>() {
             @Override
             public void onResponse(Call<Result> call, Response<Result> response) {
                 if (response.code() == 401) {
@@ -301,11 +340,13 @@ public class TeamDetailActivity extends AppCompatActivity {
                     return;
                 }
                 if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
-                    Toast.makeText(TeamDetailActivity.this, "加入成功", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(TeamDetailActivity.this,
+                            "加入成功，你代表 " + partySize + " 人", Toast.LENGTH_SHORT).show();
                     btnJoin.setText("已加入");
-                    project.setCurrentMembers(project.getCurrentMembers() + 1);
+                    project.setCurrentMembers(project.getCurrentMembers() + partySize);
+                    saveMyPartySize(partySize);
+                    showMyPartySize(partySize);
                     bindProjectHeader();
-                    createChatSessionIfNeeded();
                     setResult(RESULT_OK);
                 } else {
                     btnJoin.setEnabled(true);
@@ -322,27 +363,28 @@ public class TeamDetailActivity extends AppCompatActivity {
         });
     }
 
-    private void createChatSessionIfNeeded() {
-        Integer leaderId = project.getLeaderAccountId();
-        if (leaderId == null || leaderId <= 0) {
-            return;
-        }
-        int userId = SessionHelper.getAccountId(this);
-        if (userId <= 0) {
-            return;
-        }
-        CreateSessionRequest request = new CreateSessionRequest(project.getId(), userId, leaderId);
-        service.createChatSession(request).enqueue(new Callback<Result<ChatSession>>() {
-            @Override
-            public void onResponse(Call<Result<ChatSession>> call, Response<Result<ChatSession>> response) {
-                // session created or reused silently
-            }
+    private String partySizePreferenceKey() {
+        return "project_" + project.getId() + "_account_" + SessionHelper.getAccountId(this);
+    }
 
-            @Override
-            public void onFailure(Call<Result<ChatSession>> call, Throwable t) {
-                // ignore
-            }
-        });
+    private void saveMyPartySize(int partySize) {
+        getSharedPreferences("project_party_sizes", MODE_PRIVATE)
+                .edit().putInt(partySizePreferenceKey(), partySize).apply();
+    }
+
+    private void restoreMyPartySize() {
+        int partySize = getSharedPreferences("project_party_sizes", MODE_PRIVATE)
+                .getInt(partySizePreferenceKey(), 0);
+        if (partySize > 0) {
+            showMyPartySize(partySize);
+        }
+    }
+
+    private void showMyPartySize(int partySize) {
+        if (txtMyPartySize != null) {
+            txtMyPartySize.setText("你代表 " + partySize + " 人参团");
+            txtMyPartySize.setVisibility(View.VISIBLE);
+        }
     }
 
     @Override

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- AI 路线结果：地图优先、信息卡承载摘要与发布操作。 -->
+<!-- AI 路线结果消息仅展示规划摘要，发布入口位于主路线卡片。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -79,23 +79,6 @@
                 android:textColor="@color/route_text_primary"
                 android:textSize="14sp" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnPublish"
-                android:layout_width="match_parent"
-                android:layout_height="42dp"
-                android:layout_marginStart="12dp"
-                android:layout_marginTop="2dp"
-                android:layout_marginEnd="12dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:text="@string/route_publish"
-                android:textAllCaps="false"
-                android:textColor="@color/white"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:visibility="gone"
-                app:backgroundTint="@color/route_primary"
-                app:cornerRadius="14dp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 </LinearLayout>

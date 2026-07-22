@@ -12,6 +12,7 @@ import retrofit2.converter.gson.GsonConverterFactory;
 
 public class ApiClient {
     private static final String BASE_URL = "http://47.94.95.110:8080/";
+    private static final int AI_ROUTE_READ_TIMEOUT_SECONDS = 300;
     public static volatile Retrofit retrofit;
     private static Context appContext;
 
@@ -46,7 +47,8 @@ public class ApiClient {
                             .readTimeout(120, TimeUnit.SECONDS)
                             .writeTimeout(30, TimeUnit.SECONDS)
                             .addInterceptor(chain -> {
-                                Request.Builder builder = chain.request().newBuilder();
+                                Request request = chain.request();
+                                Request.Builder builder = request.newBuilder();
                                 String token = getToken();
                                 if (token != null && !token.trim().isEmpty()) {
                                     String normalized = token.trim();
@@ -54,6 +56,12 @@ public class ApiClient {
                                         normalized = "Bearer " + normalized;
                                     }
                                     builder.header("Authorization", normalized);
+                                }
+                                if (request.url().encodedPath().startsWith("/routes/ai/")) {
+                                    return chain.withReadTimeout(
+                                                    AI_ROUTE_READ_TIMEOUT_SECONDS,
+                                                    TimeUnit.SECONDS)
+                                            .proceed(builder.build());
                                 }
                                 return chain.proceed(builder.build());
                             })

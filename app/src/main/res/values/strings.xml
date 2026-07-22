@@ -82,7 +82,6 @@
     <string name="route_empty_stops">还没有地点，从下方搜索并加入</string>
     <string name="route_my_location">我的位置</string>
     <string name="route_location_locating">定位中…</string>
-    <string name="route_location_ready">路线起点</string>
     <string name="route_location_permission_needed">开启定位后显示当前位置</string>
     <string name="route_center_my_location">回到当前位置</string>
     <string name="route_add_destination">＋  搜索并添加目的地</string>

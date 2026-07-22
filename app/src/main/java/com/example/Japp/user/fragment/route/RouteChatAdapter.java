@@ -15,7 +15,6 @@ import com.amap.api.maps.MapView;
 import com.amap.api.maps.model.LatLng;
 import com.amap.api.maps.model.Polyline;
 import com.example.Japp.R;
-import com.google.android.material.button.MaterialButton;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -33,8 +32,6 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     private final SimpleDateFormat timeFmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
 
     public interface RouteChatListener {
-        void onPublishClick(RouteChatItem item, int position);
-
         default void onMapClick(RouteChatItem item) {}
     }
 
@@ -223,7 +220,6 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     static class AssistantVH extends RecyclerView.ViewHolder {
         final TextView message;
         final TextView time;
-        final MaterialButton publish;
         final View mapContainer;
         final MapView routeMapView;
         final TextView mapTapHint;
@@ -247,7 +243,6 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             this.listener = listener;
             message = itemView.findViewById(R.id.txtMessage);
             time = itemView.findViewById(R.id.txtTime);
-            publish = itemView.findViewById(R.id.btnPublish);
             mapContainer = itemView.findViewById(R.id.mapContainer);
             routeMapView = itemView.findViewById(R.id.routeMapView);
             mapTapHint = itemView.findViewById(R.id.mapTapHint);
@@ -260,19 +255,6 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             if (time != null) {
                 time.setText(timeText);
             }
-            if (publish != null) {
-                boolean canPublish = item.canPublish();
-                publish.setVisibility(canPublish ? View.VISIBLE : View.GONE);
-                publish.setOnClickListener(v -> {
-                    if (listener != null && canPublish) {
-                        int pos = getAdapterPosition();
-                        if (pos != RecyclerView.NO_POSITION) {
-                            listener.onPublishClick(item, pos);
-                        }
-                    }
-                });
-            }
-
             if (mapContainer == null || routeMapView == null || !item.hasPolyline()) {
                 if (mapContainer != null) {
                     mapContainer.setVisibility(View.GONE);

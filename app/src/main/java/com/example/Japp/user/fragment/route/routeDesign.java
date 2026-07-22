@@ -65,7 +65,7 @@ import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
-import com.example.Japp.network.models.requests.CreateProjectRequest;
+import com.example.Japp.user.RoutePublishDetailActivity;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.RoutePlanHelper;
 import com.example.Japp.user.util.SessionHelper;
@@ -74,18 +74,17 @@ import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.gson.JsonElement;
 
-import java.text.SimpleDateFormat;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -98,13 +97,14 @@ import retrofit2.Response;
 public class routeDesign extends Fragment {
 
     private static final String TAG = "RouteDesign";
+    private static final String STATE_AI_ROUTE_MEMORY_ID = "ai_route_memory_id";
     private static final LatLng DEFAULT_MAP_CENTER = new LatLng(32.0603, 118.7969);
     private static final String[] WAITING_TIPS = {
             "路线助手正在理解你的需求…",
             "正在检索合适的研学景点…",
             "正在生成行程顺序与时长…",
-            "AI 规划通常需要约 1 分钟，请稍候…",
-            "马上就好，正在完善路线细节…"
+            "AI 规划可能需要 1～3 分钟，请稍候…",
+            "服务仍在处理，已有路线不会受到影响…"
     };
 
     private MapView mainRouteMapView;
@@ -115,6 +115,7 @@ public class routeDesign extends Fragment {
     private BottomSheetBehavior<MaterialCardView> routeSheetBehavior;
     private View welcomePanel;
     private Button btnTogglePlaceSearch;
+    private Button btnPublishRoute;
     private Button btnSend;
     private EditText editMessage;
     private TextView txtRouteStopCount;
@@ -134,6 +135,9 @@ public class routeDesign extends Fragment {
     private LatLng currentLocation;
     private boolean locationCameraCentered;
     private int mapRouteRevision;
+    private String aiRouteMemoryId;
+    private int publishableRouteId;
+    private String publishableRouteSummary;
     private BitmapDescriptor myLocationDescriptor;
     private final Map<String, Bitmap> markerPhotoCache = new ConcurrentHashMap<>();
     private final Set<String> markerPhotoRequests = ConcurrentHashMap.newKeySet();
@@ -200,6 +204,9 @@ public class routeDesign extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (savedInstanceState != null) {
+            aiRouteMemoryId = savedInstanceState.getString(STATE_AI_ROUTE_MEMORY_ID);
+        }
         MapsInitializer.updatePrivacyShow(requireContext(), true, true);
         MapsInitializer.updatePrivacyAgree(requireContext(), true);
     }
@@ -229,6 +236,8 @@ public class routeDesign extends Fragment {
         routeStopsCard = root.findViewById(R.id.routeStopsCard);
         chatArea = root.findViewById(R.id.chatArea);
         btnTogglePlaceSearch = root.findViewById(R.id.btnTogglePlaceSearch);
+        btnPublishRoute = root.findViewById(R.id.btnPublishRoute);
+        btnPublishRoute.setEnabled(false);
         txtRouteStopCount = root.findViewById(R.id.txtRouteStopCount);
         txtCurrentLocationStatus = root.findViewById(R.id.txtCurrentLocationStatus);
         routeStopsContainer = root.findViewById(R.id.routeStopsContainer);
@@ -688,7 +697,7 @@ public class routeDesign extends Fragment {
         boolean firstFix = currentLocation == null;
         currentLocation = candidate;
         if (txtCurrentLocationStatus != null) {
-            txtCurrentLocationStatus.setText(R.string.route_location_ready);
+            txtCurrentLocationStatus.setText("");
         }
         if (firstFix && !editableRouteNodes.isEmpty()) {
             updateMapFromEditableRoute(true);
@@ -730,6 +739,7 @@ public class routeDesign extends Fragment {
 
     private void setupCustomRouteEditor() {
         btnTogglePlaceSearch.setOnClickListener(v -> launchPlaceSearch());
+        btnPublishRoute.setOnClickListener(v -> openPublishDetails());
     }
 
     private void setupAiRouteAssistant(View root, @Nullable Bundle savedInstanceState) {
@@ -737,11 +747,6 @@ public class routeDesign extends Fragment {
         adapter.setRecyclerView(chatRecyclerView);
         adapter.setMapCreateBundle(savedInstanceState);
         adapter.setListener(new RouteChatAdapter.RouteChatListener() {
-            @Override
-            public void onPublishClick(RouteChatItem item, int position) {
-                publishProject(item);
-            }
-
             @Override
             public void onMapClick(RouteChatItem item) {
                 // 地图已经常驻在主界面，不再打开卡片内地图。
@@ -791,6 +796,7 @@ public class routeDesign extends Fragment {
         node.setLocation(point.getLongitude() + "," + point.getLatitude());
         node.setPhotoUrl(photoUrl);
         editableRouteNodes.add(node);
+        invalidatePublishableRoute();
 
         renderEditableStops();
         updateMapFromEditableRoute(true);
@@ -978,6 +984,7 @@ public class routeDesign extends Fragment {
         RouteNode moved = editableRouteNodes.remove(fromPosition);
         editableRouteNodes.add(toPosition, moved);
         renumberRouteNodes();
+        invalidatePublishableRoute();
         renderEditableStops();
         updateMapFromEditableRoute(true);
     }
@@ -1002,6 +1009,7 @@ public class routeDesign extends Fragment {
         }
         editableRouteNodes.remove(position);
         renumberRouteNodes();
+        invalidatePublishableRoute();
         renderEditableStops();
         updateMapFromEditableRoute(true);
     }
@@ -1009,6 +1017,14 @@ public class routeDesign extends Fragment {
     private void renumberRouteNodes() {
         for (int i = 0; i < editableRouteNodes.size(); i++) {
             editableRouteNodes.get(i).setVisitOrder(i + 1);
+        }
+    }
+
+    private void invalidatePublishableRoute() {
+        publishableRouteId = 0;
+        publishableRouteSummary = null;
+        if (btnPublishRoute != null) {
+            btnPublishRoute.setEnabled(!editableRouteNodes.isEmpty());
         }
     }
 
@@ -1137,7 +1153,7 @@ public class routeDesign extends Fragment {
         startWaitingFeedback();
 
         int accountId = SessionHelper.getAccountId(requireContext());
-        String memoryId = RoutePlanHelper.buildMemoryId(accountId);
+        String memoryId = getOrCreateAiRouteMemoryId(accountId);
         List<RouteNode> protectedNodes = copyRouteNodes(editableRouteNodes);
         String requestText = buildAiRequestText(text, protectedNodes);
         service.planRouteByAi(memoryId, requestText).enqueue(new Callback<Result<JsonElement>>() {
@@ -1178,9 +1194,27 @@ public class routeDesign extends Fragment {
                 }
                 stopWaitingFeedback();
                 setSending(false);
+                restoreFailedRequest(text);
                 showPlanError(RoutePlanHelper.failureMessage(t));
             }
         });
+    }
+
+    @NonNull
+    private String getOrCreateAiRouteMemoryId(int accountId) {
+        if (TextUtils.isEmpty(aiRouteMemoryId)) {
+            aiRouteMemoryId = RoutePlanHelper.buildMemoryId(accountId)
+                    + "-route-" + UUID.randomUUID();
+        }
+        return aiRouteMemoryId;
+    }
+
+    private void restoreFailedRequest(@NonNull String text) {
+        if (editMessage == null || TextUtils.isEmpty(text)) {
+            return;
+        }
+        editMessage.setText(text);
+        editMessage.setSelection(text.length());
     }
 
     private String buildAiRequestText(String userText, @NonNull List<RouteNode> protectedNodes) {
@@ -1189,8 +1223,8 @@ public class routeDesign extends Fragment {
         }
         StringBuilder context = new StringBuilder();
         context.append("请基于已有路线处理需求，并严格遵守以下规则：\n")
-                .append("1. 下列已有地点均为受保护地点，必须全部保留，不得删除、替换、改名或修改坐标；\n")
-                .append("2. 只能在已有路线基础上新增地点，不得自动执行用户提出的删除或替换；\n")
+                .append("1. 下列已有地点均为受保护地点，必须全部保留，不得删除、改名或修改坐标；\n")
+                .append("2. 只能在已有路线基础上新增地点，不得自动移除或改动已有地点；\n")
                 .append("3. 若用户提出删改，只保留原地点，删改内容由客户端作为建议展示；\n")
                 .append("4. 返回路线必须包含全部受保护地点，并可附加符合需求的新地点。\n")
                 .append("受保护地点：\n");
@@ -1356,6 +1390,11 @@ public class routeDesign extends Fragment {
 
         boolean canPublish = nodes != null
                 && (mergeResult == null || mergeResult.serverRoutePreserved());
+        publishableRouteId = canPublish ? routeId : 0;
+        publishableRouteSummary = canPublish ? description : null;
+        if (btnPublishRoute != null) {
+            btnPublishRoute.setEnabled(canPublish || !editableRouteNodes.isEmpty());
+        }
         RouteChatItem item = RouteChatItem.assistantRoute(
                 description, road, marks, routeId, canPublish);
         int statusPos = waitingStatusPosition;
@@ -1577,8 +1616,8 @@ public class routeDesign extends Fragment {
         waitingHandler.removeCallbacks(waitingTipRunnable);
     }
 
-    private void publishProject(RouteChatItem item) {
-        if (!item.canPublish()) {
+    private void openPublishDetails() {
+        if (editableRouteNodes.isEmpty()) {
             Toast.makeText(requireContext(), "当前路线暂不可发布", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -1588,46 +1627,29 @@ public class routeDesign extends Fragment {
             return;
         }
 
-        Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.DAY_OF_MONTH, 7);
-        String departureDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                .format(calendar.getTime());
-        String title = item.getText().length() > 20
-                ? item.getText().substring(0, 20) + "…"
-                : item.getText();
+        launchPublishDetails();
+    }
+
+    private void launchPublishDetails() {
+
+        String summary = !TextUtils.isEmpty(publishableRouteSummary)
+                ? publishableRouteSummary : "研学路线";
+        String title = summary.length() > 20
+                ? summary.substring(0, 20) + "…"
+                : summary;
         if (title.trim().isEmpty()) {
             title = "研学拼单";
         }
-
-        CreateProjectRequest request = new CreateProjectRequest(
-                item.getRouteId(), title, departureDate, 10, 1, "OPEN");
-        service.createProject(request).enqueue(new Callback<Result>() {
-            @Override
-            public void onResponse(Call<Result> call, Response<Result> response) {
-                if (!isAdded()) {
-                    return;
-                }
-                if (response.code() == 401) {
-                    Toast.makeText(requireContext(), "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
-                    SessionHelper.handleUnauthorized(requireContext());
-                    return;
-                }
-                if (response.isSuccessful() && response.body() != null
-                        && response.body().getCode() == 1) {
-                    Toast.makeText(requireContext(), "发布成功，可在拼单页查看", Toast.LENGTH_SHORT).show();
-                } else {
-                    String msg = response.body() != null ? response.body().getMsg() : "发布失败";
-                    Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onFailure(Call<Result> call, Throwable t) {
-                if (isAdded()) {
-                    Toast.makeText(requireContext(), "网络错误，发布失败", Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
+        Intent intent = new Intent(requireContext(), RoutePublishDetailActivity.class);
+        intent.putExtra(RoutePublishDetailActivity.EXTRA_ROUTE_ID, publishableRouteId);
+        intent.putExtra(RoutePublishDetailActivity.EXTRA_ROUTE_TITLE, title);
+        intent.putExtra(RoutePublishDetailActivity.EXTRA_ROUTE_NODES,
+                new ArrayList<>(copyRouteNodes(editableRouteNodes)));
+        if (currentLocation != null) {
+            intent.putExtra(RoutePublishDetailActivity.EXTRA_CURRENT_LAT, currentLocation.latitude);
+            intent.putExtra(RoutePublishDetailActivity.EXTRA_CURRENT_LNG, currentLocation.longitude);
+        }
+        startActivity(intent);
     }
 
     private void showPlanError(String message) {
@@ -1676,6 +1698,9 @@ public class routeDesign extends Fragment {
     @Override
     public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
+        if (!TextUtils.isEmpty(aiRouteMemoryId)) {
+            outState.putString(STATE_AI_ROUTE_MEMORY_ID, aiRouteMemoryId);
+        }
         if (mainRouteMapView != null) {
             mainRouteMapView.onSaveInstanceState(outState);
         }

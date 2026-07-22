@@ -17,7 +17,7 @@
         android:orientation="horizontal"
         android:paddingStart="14dp"
         android:paddingTop="0dp"
-        android:paddingEnd="6dp"
+        android:paddingEnd="14dp"
         android:paddingBottom="0dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -43,19 +43,10 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
-                android:text="好友与群聊"
+                android:text="接单后自动建立会话"
                 android:textColor="@color/list_text_secondary"
                 android:textSize="10sp" />
         </LinearLayout>
-
-        <androidx.appcompat.widget.AppCompatImageButton
-            android:id="@+id/add"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="新建聊天"
-            android:src="@drawable/ic_toolbar_add"
-            app:tint="@color/black" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
@@ -70,5 +61,20 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/toolbar"
         tools:listitem="@layout/fragment_conversation_card" />
+
+    <TextView
+        android:id="@+id/txtEmptyState"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:padding="24dp"
+        android:text="领队确认接单后，将自动建立项目会话"
+        android:textColor="@color/list_text_secondary"
+        android:textSize="14sp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/toolbar" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

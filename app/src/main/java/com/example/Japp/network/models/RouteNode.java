@@ -2,7 +2,9 @@ package com.example.Japp.network.models;
 
 import com.google.gson.annotations.SerializedName;
 
-public class RouteNode {
+import java.io.Serializable;
+
+public class RouteNode implements Serializable {
     @SerializedName("routeId")
     private int routeId;
 

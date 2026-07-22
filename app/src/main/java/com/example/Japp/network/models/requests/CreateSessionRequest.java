@@ -7,15 +7,15 @@ public class CreateSessionRequest {
     @SerializedName("projectId")
     private final int projectId;
 
-    @SerializedName("memberAccountId")
-    private final int memberAccountId;
+    @SerializedName("userAccountId")
+    private final int userAccountId;
 
     @SerializedName("leaderAccountId")
     private final int leaderAccountId;
 
-    public CreateSessionRequest(int projectId, int memberAccountId, int leaderAccountId) {
+    public CreateSessionRequest(int projectId, int userAccountId, int leaderAccountId) {
         this.projectId = projectId;
-        this.memberAccountId = memberAccountId;
+        this.userAccountId = userAccountId;
         this.leaderAccountId = leaderAccountId;
     }
 
@@ -23,8 +23,8 @@ public class CreateSessionRequest {
         return projectId;
     }
 
-    public int getMemberAccountId() {
-        return memberAccountId;
+    public int getUserAccountId() {
+        return userAccountId;
     }
 
     public int getLeaderAccountId() {

@@ -12,6 +12,24 @@ public class Conversation implements Serializable {
     private boolean isGroup;
     private String groupName;
     private List<String> memberNames;
+    private long backendSessionId;
+    private int projectId;
+
+    public long getBackendSessionId() {
+        return backendSessionId;
+    }
+
+    public void setBackendSessionId(long backendSessionId) {
+        this.backendSessionId = backendSessionId;
+    }
+
+    public int getProjectId() {
+        return projectId;
+    }
+
+    public void setProjectId(int projectId) {
+        this.projectId = projectId;
+    }
 
     public boolean isGroup() {
         return isGroup;

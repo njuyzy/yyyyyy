@@ -11,6 +11,9 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 
 import java.net.SocketTimeoutException;
+import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.UnknownHostException;
 
 import retrofit2.Response;
 
@@ -83,17 +86,50 @@ public final class RoutePlanHelper {
     }
 
     public static String failureMessage(Throwable t) {
-        if (t instanceof SocketTimeoutException) {
-            return "路线规划超时，请稍后重试";
+        if (isConnectionFailure(t)) {
+            return "无法连接路线规划服务，请确认后端已启动且 8080 端口可访问";
+        }
+        if (isTimeout(t)) {
+            return "AI 路线规划等待超过 5 分钟，服务端仍未返回；原路线未受影响，请稍后手动重试";
         }
         String message = t.getMessage();
         if (message == null || message.isEmpty()) {
             return "网络错误，路线规划失败";
         }
-        if (message.contains("timeout") || message.contains("Timeout")) {
-            return "路线规划超时，请稍后重试";
-        }
         return "网络错误，路线规划失败";
+    }
+
+    private static boolean isConnectionFailure(@Nullable Throwable t) {
+        Throwable current = t;
+        while (current != null) {
+            if (current instanceof ConnectException
+                    || current instanceof NoRouteToHostException
+                    || current instanceof UnknownHostException) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null) {
+                String lower = message.toLowerCase();
+                if (lower.contains("failed to connect")
+                        || lower.contains("connect timed out")
+                        || lower.contains("connection refused")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    public static boolean isTimeout(@Nullable Throwable t) {
+        if (t == null) {
+            return false;
+        }
+        if (t instanceof SocketTimeoutException) {
+            return true;
+        }
+        String message = t.getMessage();
+        return message != null && message.toLowerCase().contains("timeout");
     }
 
     public static String readErrorMessage(@Nullable Response<?> response,
