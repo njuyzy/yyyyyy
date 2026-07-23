@@ -1156,13 +1156,17 @@ public class routeDesign extends Fragment {
         String memoryId = getOrCreateAiRouteMemoryId(accountId);
         List<RouteNode> protectedNodes = copyRouteNodes(editableRouteNodes);
         String requestText = buildAiRequestText(text, protectedNodes);
-        service.planRouteByAi(memoryId, requestText).enqueue(new Callback<Result<JsonElement>>() {
+        service.planRouteByAi(memoryId, requestText, accountId > 0 ? accountId : null)
+                .enqueue(new Callback<Result<JsonElement>>() {
             @Override
             public void onResponse(Call<Result<JsonElement>> call, Response<Result<JsonElement>> response) {
                 if (!isAdded()) {
                     return;
                 }
                 Result<JsonElement> body = response.body();
+                Log.d(TAG, "AI route response: http=" + response.code()
+                        + ", resultCode=" + (body == null ? "null" : body.getCode())
+                        + ", message=" + (body == null ? "null" : body.getMsg()));
                 if (response.code() == 401) {
                     stopWaitingFeedback();
                     setSending(false);
@@ -1195,6 +1199,7 @@ public class routeDesign extends Fragment {
                 stopWaitingFeedback();
                 setSending(false);
                 restoreFailedRequest(text);
+                Log.e(TAG, "AI route request failed", t);
                 showPlanError(RoutePlanHelper.failureMessage(t));
             }
         });

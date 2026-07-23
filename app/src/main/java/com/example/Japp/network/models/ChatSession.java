@@ -14,7 +14,25 @@ public class ChatSession {
     private int userAccountId;
 
     @SerializedName("leaderAccountId")
-    private int leaderAccountId;
+    private Integer leaderAccountId;
+
+    @SerializedName("projectTitle")
+    private String projectTitle;
+
+    @SerializedName("status")
+    private String status;
+
+    @SerializedName("currentUserRole")
+    private String currentUserRole;
+
+    @SerializedName("memberCount")
+    private int memberCount;
+
+    @SerializedName("latestMessage")
+    private String latestMessage;
+
+    @SerializedName("latestMessageAt")
+    private String latestMessageAt;
 
     public int getId() {
         return id;
@@ -40,11 +58,18 @@ public class ChatSession {
         this.userAccountId = userAccountId;
     }
 
-    public int getLeaderAccountId() {
+    public Integer getLeaderAccountId() {
         return leaderAccountId;
     }
 
-    public void setLeaderAccountId(int leaderAccountId) {
+    public void setLeaderAccountId(Integer leaderAccountId) {
         this.leaderAccountId = leaderAccountId;
     }
+
+    public String getProjectTitle() { return projectTitle; }
+    public String getStatus() { return status; }
+    public String getCurrentUserRole() { return currentUserRole; }
+    public int getMemberCount() { return memberCount; }
+    public String getLatestMessage() { return latestMessage; }
+    public String getLatestMessageAt() { return latestMessageAt; }
 }

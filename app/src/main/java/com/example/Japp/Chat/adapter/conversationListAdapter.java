@@ -65,10 +65,10 @@ public class conversationListAdapter extends RecyclerView.Adapter<conversationLi
             String lastMessage = messages.get(messages.size() - 1);
             holder.LatestMessage.setText(lastMessage != null ? lastMessage : "");
         } else if (conversation.isGroup()) {
-            int memberCount = conversation.getMemberNames().size();
-            holder.LatestMessage.setText(memberCount > 0
-                    ? "群聊已创建，共 " + memberCount + " 人"
-                    : "群聊已创建");
+            List<String> members = conversation.getMemberNames();
+            holder.LatestMessage.setText(members.isEmpty()
+                    ? "群聊已创建"
+                    : String.join("、", members));
         } else {
             holder.LatestMessage.setText("暂无消息");
         }

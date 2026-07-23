@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -58,6 +59,8 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 public class TeamList extends Fragment {
+
+    private static final String TAG = "TeamListApi";
 
     private RecyclerView recycler;
     private SwipeRefreshLayout swipeRefresh;
@@ -547,6 +550,10 @@ public class TeamList extends Fragment {
                             return;
                         }
                         stopRefreshing();
+                        Result<List<Project>> responseBody = response.body();
+                        Log.d(TAG, "projects response: http=" + response.code()
+                                + ", resultCode=" + (responseBody == null ? "null" : responseBody.getCode())
+                                + ", message=" + (responseBody == null ? "null" : responseBody.getMsg()));
                         if (response.code() == 401) {
                             Toast.makeText(requireContext(), "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
                             SessionHelper.handleUnauthorized(requireContext());
@@ -588,6 +595,7 @@ public class TeamList extends Fragment {
                             return;
                         }
                         stopRefreshing();
+                        Log.e(TAG, "projects request failed", t);
                         showEmpty("网络错误，下拉刷新重试");
                         adapter.setItems(new ArrayList<>());
                     }

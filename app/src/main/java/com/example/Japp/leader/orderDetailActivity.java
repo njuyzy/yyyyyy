@@ -20,12 +20,9 @@ import com.example.Japp.data.order;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
-import com.example.Japp.network.models.ChatSession;
 import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
-import com.example.Japp.network.models.requests.AssignLeaderRequest;
-import com.example.Japp.network.models.requests.CreateSessionRequest;
 import com.example.Japp.user.fragment.route.RouteMapDrawHelper;
 import com.example.Japp.user.fragment.route.RouteMapFullscreenActivity;
 import com.example.Japp.user.util.ProjectUiHelper;
@@ -413,7 +410,7 @@ public class orderDetailActivity extends AppCompatActivity {
         }
 
         btnJoin.setEnabled(false);
-        service.assignLeader(project.getId(), new AssignLeaderRequest(leaderAccountId))
+        service.acceptProject(project.getId())
                 .enqueue(new Callback<Result>() {
                     @Override
                     public void onResponse(Call<Result> call, Response<Result> response) {
@@ -425,9 +422,11 @@ public class orderDetailActivity extends AppCompatActivity {
                         if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
                             btnJoin.setText("已接单");
                             project.setLeaderAccountId(leaderAccountId);
+                            project.setStatus(ProjectUiHelper.STATUS_CONFIRMED);
                             bindProjectHeader();
                             setResult(RESULT_OK);
-                            createPublisherChatSession(leaderAccountId);
+                            Toast.makeText(orderDetailActivity.this,
+                                    "接单成功，已加入项目群聊", Toast.LENGTH_SHORT).show();
                         } else {
                             btnJoin.setEnabled(true);
                             String msg = response.body() != null ? response.body().getMsg() : "接单失败";
@@ -441,43 +440,6 @@ public class orderDetailActivity extends AppCompatActivity {
                         Toast.makeText(orderDetailActivity.this, "网络错误，接单失败", Toast.LENGTH_SHORT).show();
                     }
                 });
-    }
-
-    private void createPublisherChatSession(int leaderAccountId) {
-        int publisherAccountId = project.getOwnerAccountId();
-        if (publisherAccountId <= 0) {
-            Toast.makeText(this, "接单成功，但发布者信息无效，未能建立聊天", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        CreateSessionRequest request = new CreateSessionRequest(
-                project.getId(), publisherAccountId, leaderAccountId);
-        service.createChatSession(request).enqueue(new Callback<Result<ChatSession>>() {
-            @Override
-            public void onResponse(Call<Result<ChatSession>> call,
-                                   Response<Result<ChatSession>> response) {
-                if (response.code() == 401) {
-                    Toast.makeText(orderDetailActivity.this,
-                            "接单成功，但登录已失效，未能建立聊天", Toast.LENGTH_LONG).show();
-                    SessionHelper.handleUnauthorized(orderDetailActivity.this);
-                    return;
-                }
-                if (response.isSuccessful() && response.body() != null
-                        && response.body().getCode() == 1 && response.body().getData() != null) {
-                    Toast.makeText(orderDetailActivity.this,
-                            "接单成功，已建立与发布者的聊天", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(orderDetailActivity.this,
-                            "接单成功，但聊天建立失败，请稍后重试", Toast.LENGTH_LONG).show();
-                }
-            }
-
-            @Override
-            public void onFailure(Call<Result<ChatSession>> call, Throwable t) {
-                Toast.makeText(orderDetailActivity.this,
-                        "接单成功，但网络异常，聊天建立失败", Toast.LENGTH_LONG).show();
-            }
-        });
     }
 
     @Override

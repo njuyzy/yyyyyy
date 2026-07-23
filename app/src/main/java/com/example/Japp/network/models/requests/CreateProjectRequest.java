@@ -22,8 +22,8 @@ public class CreateProjectRequest {
     @SerializedName("status")
     private final String status;
 
-    @SerializedName("representativeCount")
-    private final int representativeCount;
+    @SerializedName("representedCount")
+    private final int representedCount;
 
     @SerializedName("departureTime")
     private final String departureTime;
@@ -31,17 +31,14 @@ public class CreateProjectRequest {
     @SerializedName("startPoint")
     private final String startPoint;
 
-    @SerializedName("startLongitude")
-    private final Double startLongitude;
-
-    @SerializedName("startLatitude")
-    private final Double startLatitude;
+    @SerializedName("startPointType")
+    private final String startPointType;
 
     @SerializedName("leaderRequirements")
     private final String leaderRequirements;
 
-    @SerializedName("memberRequirements")
-    private final String memberRequirements;
+    @SerializedName("participantRequirements")
+    private final String participantRequirements;
 
     public CreateProjectRequest(int routeId,
                                 String title,
@@ -50,7 +47,7 @@ public class CreateProjectRequest {
                                 int currentMembers,
                                 String status) {
         this(routeId, title, departureDate, maxMembers, currentMembers, status,
-                currentMembers, null, null, null, null, null, null);
+                currentMembers, null, null, "MANUAL", null, null);
     }
 
     public CreateProjectRequest(int routeId,
@@ -59,26 +56,24 @@ public class CreateProjectRequest {
                                 int maxMembers,
                                 int currentMembers,
                                 String status,
-                                int representativeCount,
+                                int representedCount,
                                 String departureTime,
                                 String startPoint,
-                                Double startLongitude,
-                                Double startLatitude,
+                                String startPointType,
                                 String leaderRequirements,
-                                String memberRequirements) {
+                                String participantRequirements) {
         this.routeId = routeId;
         this.title = title;
         this.departureDate = departureDate;
         this.maxMembers = maxMembers;
         this.currentMembers = currentMembers;
         this.status = status;
-        this.representativeCount = representativeCount;
+        this.representedCount = representedCount;
         this.departureTime = departureTime;
         this.startPoint = startPoint;
-        this.startLongitude = startLongitude;
-        this.startLatitude = startLatitude;
+        this.startPointType = startPointType;
         this.leaderRequirements = leaderRequirements;
-        this.memberRequirements = memberRequirements;
+        this.participantRequirements = participantRequirements;
     }
 
     public int getRouteId() {
@@ -105,11 +100,10 @@ public class CreateProjectRequest {
         return status;
     }
 
-    public int getRepresentativeCount() { return representativeCount; }
+    public int getRepresentedCount() { return representedCount; }
     public String getDepartureTime() { return departureTime; }
     public String getStartPoint() { return startPoint; }
-    public Double getStartLongitude() { return startLongitude; }
-    public Double getStartLatitude() { return startLatitude; }
+    public String getStartPointType() { return startPointType; }
     public String getLeaderRequirements() { return leaderRequirements; }
-    public String getMemberRequirements() { return memberRequirements; }
+    public String getParticipantRequirements() { return participantRequirements; }
 }

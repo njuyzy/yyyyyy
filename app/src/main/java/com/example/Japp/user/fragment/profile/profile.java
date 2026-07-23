@@ -20,7 +20,6 @@ import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -61,10 +60,10 @@ public class profile extends Fragment {
     private static final int SELECT_FILE = 1002;
     private static final String AVATAR_UPLOAD_URL = "http://10.6.86.86/upload";
 
-    private Button switchMode;
-    private Button btnPersonalInfo;
-    private Button btnHistoryRoute;
-    private Button btnLogout;
+    private View switchMode;
+    private View btnPersonalInfo;
+    private View btnHistoryRoute;
+    private View btnLogout;
     private ImageView ivAvatar;
     private ImageButton btnSettings;
     private TextView txtName;
@@ -104,8 +103,8 @@ public class profile extends Fragment {
         btnSettings.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), SettingsActivity.class)));
 
-        Button btnShareApp = view.findViewById(R.id.btnShareApp);
-        Button btnAboutUs = view.findViewById(R.id.btnAboutUs);
+        View btnShareApp = view.findViewById(R.id.btnShareApp);
+        View btnAboutUs = view.findViewById(R.id.btnAboutUs);
         if (btnShareApp != null) {
             btnShareApp.setOnClickListener(v ->
                     Toast.makeText(requireContext(), "功能开发中，敬请期待", Toast.LENGTH_SHORT).show());

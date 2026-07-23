@@ -25,7 +25,6 @@ import com.example.Japp.user.fragment.route.RouteMapDrawHelper;
 import com.example.Japp.user.util.RoutePlanHelper;
 import com.example.Japp.user.util.SessionHelper;
 import com.example.Japp.util.DisplayCutoutAdapter;
-import com.amap.api.maps.model.LatLng;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
@@ -285,8 +284,6 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
 
     private void createProject(int savedRouteId, PublishForm form) {
         RouteNode firstNode = routeNodes.isEmpty() ? null : routeNodes.get(0);
-        LatLng firstPoint = firstNode == null
-                ? null : RouteMapDrawHelper.parseLocation(firstNode.getLocation());
         String startPoint = firstNode == null ? null : firstNode.getName();
         if (TextUtils.isEmpty(startPoint) && firstNode != null) {
             startPoint = firstNode.getAddress();
@@ -294,10 +291,6 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
         if (TextUtils.isEmpty(startPoint)) {
             startPoint = hasCurrentLocation() ? "当前位置" : null;
         }
-        Double longitude = firstPoint != null ? firstPoint.longitude
-                : (firstNode == null && hasCurrentLocation() ? currentLng : null);
-        Double latitude = firstPoint != null ? firstPoint.latitude
-                : (firstNode == null && hasCurrentLocation() ? currentLat : null);
         CreateProjectRequest request = new CreateProjectRequest(
                 savedRouteId,
                 form.title,
@@ -308,14 +301,14 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
                 form.representativeCount,
                 form.departureTime,
                 startPoint,
-                longitude,
-                latitude,
+                "MANUAL",
                 form.leaderRequirements,
                 form.memberRequirements);
 
-        service.createProject(request).enqueue(new Callback<Result>() {
+        service.publishRoute(savedRouteId, request).enqueue(new Callback<Result<JsonElement>>() {
             @Override
-            public void onResponse(Call<Result> call, Response<Result> response) {
+            public void onResponse(Call<Result<JsonElement>> call,
+                                   Response<Result<JsonElement>> response) {
                 btnSubmit.setEnabled(true);
                 if (response.code() == 401) {
                     SessionHelper.handleUnauthorized(RoutePublishDetailActivity.this);
@@ -335,7 +328,7 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onFailure(Call<Result> call, Throwable t) {
+            public void onFailure(Call<Result<JsonElement>> call, Throwable t) {
                 btnSubmit.setEnabled(true);
                 Toast.makeText(RoutePublishDetailActivity.this,
                         "网络错误，发布失败", Toast.LENGTH_SHORT).show();
@@ -368,11 +361,11 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
     private void saveLocalPublishDetails(CreateProjectRequest request) {
         String prefix = "route_" + routeId + "_";
         getSharedPreferences("project_publish_details", MODE_PRIVATE).edit()
-                .putInt(prefix + "representative_count", request.getRepresentativeCount())
+                .putInt(prefix + "representative_count", request.getRepresentedCount())
                 .putString(prefix + "departure_time", request.getDepartureTime())
                 .putString(prefix + "start_point", request.getStartPoint())
                 .putString(prefix + "leader_requirements", request.getLeaderRequirements())
-                .putString(prefix + "member_requirements", request.getMemberRequirements())
+                .putString(prefix + "member_requirements", request.getParticipantRequirements())
                 .apply();
     }
 

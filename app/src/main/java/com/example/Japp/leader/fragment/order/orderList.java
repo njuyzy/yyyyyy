@@ -32,6 +32,7 @@ import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.Project;
+import com.example.Japp.network.models.ProjectPage;
 import com.example.Japp.network.models.Region;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
@@ -532,11 +533,11 @@ public class orderList extends Fragment {
         }
 
         // 拉取较宽结果集，再按「任一条件命中」做本地 OR 筛选
-        service.getProjects(accountId, 1, 100)
-                .enqueue(new Callback<Result<List<Project>>>() {
+        service.getAvailableProjects(1, 100)
+                .enqueue(new Callback<Result<ProjectPage>>() {
                     @Override
-                    public void onResponse(@NonNull Call<Result<List<Project>>> call,
-                                           @NonNull Response<Result<List<Project>>> response) {
+                    public void onResponse(@NonNull Call<Result<ProjectPage>> call,
+                                           @NonNull Response<Result<ProjectPage>> response) {
                         if (!isAdded()) {
                             return;
                         }
@@ -550,7 +551,8 @@ public class orderList extends Fragment {
                             adapter.setItems(new ArrayList<>());
                             return;
                         }
-                        List<Project> projects = response.body().getData();
+                        ProjectPage page = response.body().getData();
+                        List<Project> projects = page == null ? null : page.getItems();
                         if (projects == null) {
                             projects = new ArrayList<>();
                         }
@@ -565,7 +567,7 @@ public class orderList extends Fragment {
                     }
 
                     @Override
-                    public void onFailure(@NonNull Call<Result<List<Project>>> call, @NonNull Throwable t) {
+                    public void onFailure(@NonNull Call<Result<ProjectPage>> call, @NonNull Throwable t) {
                         if (!isAdded()) {
                             return;
                         }

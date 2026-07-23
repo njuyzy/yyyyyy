@@ -23,6 +23,7 @@ import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.ChatSession;
+import com.example.Japp.network.models.ChatGroupMember;
 import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.ServerChatMessage;
@@ -128,10 +129,17 @@ public class ConversationList extends Fragment {
                     return;
                 }
                 showEmptyState("正在加载项目会话…");
-                pendingSessionChecks = sessions.size();
                 for (ChatSession session : sessions) {
-                    validateAndAddConversation(session);
+                    Conversation conversation = buildConversation(session);
+                    conversationList.add(conversation);
+                    if (session.getLatestMessage() != null
+                            && !session.getLatestMessage().trim().isEmpty()) {
+                        conversation.addMessage(session.getLatestMessage());
+                    }
+                    loadConversationDetails(conversation);
                 }
+                adapter.setListData(conversationList);
+                updateEmptyState();
             }
 
             @Override
@@ -191,51 +199,53 @@ public class ConversationList extends Fragment {
     }
 
     private Conversation buildConversation(ChatSession session) {
-        int peerAccountId = session.getLeaderAccountId() == currentAccountId
-                ? session.getUserAccountId()
-                : session.getLeaderAccountId();
-
         User peer = new User();
-        peer.setId(String.valueOf(peerAccountId));
-        peer.setName("项目联系人");
+        peer.setId("0");
+        peer.setName("项目群成员");
 
         Conversation conversation = new Conversation();
         conversation.setUser_me(currentUser);
         conversation.setUser_opposite(peer);
         conversation.setBackendSessionId(session.getId());
         conversation.setProjectId(session.getProjectId());
+        conversation.setGroup(true);
+        String title = session.getProjectTitle();
+        conversation.setGroupName(title == null || title.trim().isEmpty()
+                ? "项目群聊" : title);
         conversation.setUnRead_num(0);
         return conversation;
     }
 
     private void loadConversationDetails(Conversation conversation) {
-        int peerAccountId;
-        try {
-            peerAccountId = Integer.parseInt(conversation.getUser_opposite().getId());
-        } catch (NumberFormatException e) {
-            return;
-        }
+        service.getChatMembers(conversation.getBackendSessionId())
+                .enqueue(new Callback<Result<List<ChatGroupMember>>>() {
+                    @Override
+                    public void onResponse(Call<Result<List<ChatGroupMember>>> call,
+                                           Response<Result<List<ChatGroupMember>>> response) {
+                        if (!isAdded() || adapter == null || !response.isSuccessful()
+                                || response.body() == null || response.body().getCode() != 1) {
+                            return;
+                        }
+                        List<String> members = new ArrayList<>();
+                        List<ChatGroupMember> data = response.body().getData();
+                        if (data != null) {
+                            for (ChatGroupMember member : data) {
+                                String name = member.getUsername() == null
+                                        ? "群成员" : member.getUsername();
+                                String representation = member.getRepresentationText();
+                                members.add(representation == null || representation.trim().isEmpty()
+                                        ? name : name + "（" + representation + "）");
+                            }
+                        }
+                        conversation.setMemberNames(members);
+                        adapter.notifyDataSetChanged();
+                    }
 
-        service.getAccount(peerAccountId).enqueue(new Callback<Result<Account>>() {
-            @Override
-            public void onResponse(Call<Result<Account>> call, Response<Result<Account>> response) {
-                if (!isAdded() || adapter == null) {
-                    return;
-                }
-                if (response.isSuccessful() && response.body() != null
-                        && response.body().getCode() == 1 && response.body().getData() != null) {
-                    Account account = response.body().getData();
-                    conversation.getUser_opposite().setName(account.getUsername());
-                    conversation.getUser_opposite().setPhone(account.getPhone());
-                    adapter.notifyDataSetChanged();
-                }
-            }
-
-            @Override
-            public void onFailure(Call<Result<Account>> call, Throwable t) {
-                // 保留默认联系人名称。
-            }
-        });
+                    @Override
+                    public void onFailure(Call<Result<List<ChatGroupMember>>> call, Throwable t) {
+                        // 成员信息加载失败不影响聊天。
+                    }
+                });
 
         service.getChatMessages(conversation.getBackendSessionId())
                 .enqueue(new Callback<Result<List<ServerChatMessage>>>() {
@@ -277,7 +287,7 @@ public class ConversationList extends Fragment {
             return;
         }
         boolean empty = conversationList.isEmpty();
-        emptyState.setText("领队确认接单后，将自动建立项目会话");
+        emptyState.setText("发布、加入拼单或领队接单后，将自动出现项目群聊");
         emptyState.setVisibility(empty ? View.VISIBLE : View.GONE);
         recycler.setVisibility(empty ? View.GONE : View.VISIBLE);
     }

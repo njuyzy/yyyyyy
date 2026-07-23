@@ -18,6 +18,7 @@ import com.amap.api.maps.MapView;
 import com.amap.api.maps.MapsInitializer;
 import com.amap.api.maps.model.LatLng;
 import com.example.Japp.R;
+import com.example.Japp.leader.LeaderWalkRoutePlanner;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
@@ -66,6 +67,11 @@ public class TeamDetailActivity extends AppCompatActivity {
     @Nullable
     private AMap aMap;
     private final List<LatLng> routePoints = new ArrayList<>();
+    private final List<LatLng> plannedRoadPoints = new ArrayList<>();
+    private final List<RouteNode> cachedRouteNodes = new ArrayList<>();
+    @Nullable
+    private LeaderWalkRoutePlanner walkRoutePlanner;
+    private boolean routePlanningStarted;
     private boolean mapCreated;
 
     @Override
@@ -104,8 +110,9 @@ public class TeamDetailActivity extends AppCompatActivity {
                 aMap.getUiSettings().setZoomControlsEnabled(false);
                 aMap.getUiSettings().setRotateGesturesEnabled(false);
                 aMap.getUiSettings().setTiltGesturesEnabled(false);
-                aMap.setOnMapLoadedListener(this::drawRouteOnMap);
+                aMap.setOnMapLoadedListener(this::startRoadRoutePlanning);
             }
+            walkRoutePlanner = new LeaderWalkRoutePlanner(this);
         }
 
         View.OnClickListener openFullscreen = v -> openFullscreenMap();
@@ -214,8 +221,12 @@ public class TeamDetailActivity extends AppCompatActivity {
     }
 
     private void bindRouteMap(List<RouteNode> nodes) {
+        cachedRouteNodes.clear();
+        cachedRouteNodes.addAll(nodes);
         routePoints.clear();
         routePoints.addAll(RouteMapDrawHelper.extractPointsFromNodes(nodes));
+        plannedRoadPoints.clear();
+        routePlanningStarted = false;
 
         if (routePoints.size() < 2) {
             hideMapSection();
@@ -226,8 +237,8 @@ public class TeamDetailActivity extends AppCompatActivity {
             mapContainer.setVisibility(View.VISIBLE);
         }
         if (routeMapView != null) {
-            routeMapView.post(this::drawRouteOnMap);
-            routeMapView.postDelayed(this::drawRouteOnMap, 400);
+            routeMapView.post(this::startRoadRoutePlanning);
+            routeMapView.postDelayed(this::startRoadRoutePlanning, 400);
         }
     }
 
@@ -241,7 +252,46 @@ public class TeamDetailActivity extends AppCompatActivity {
         if (aMap == null || routePoints.size() < 2) {
             return;
         }
-        RouteMapDrawHelper.drawRoute(aMap, routePoints);
+        List<LatLng> line = plannedRoadPoints.size() >= 2
+                ? plannedRoadPoints : routePoints;
+        RouteMapDrawHelper.drawRoute(aMap, line, routePoints);
+    }
+
+    private void startRoadRoutePlanning() {
+        if (aMap == null || cachedRouteNodes.size() < 2
+                || walkRoutePlanner == null || routePlanningStarted) {
+            return;
+        }
+        routePlanningStarted = true;
+        walkRoutePlanner.plan(aMap, cachedRouteNodes, new LeaderWalkRoutePlanner.Callback() {
+            @Override
+            public void onPlanningStarted() {
+                // 保持地图可交互，规划完成后自动替换为道路折线。
+            }
+
+            @Override
+            public void onPlanningFinished(@NonNull String summary,
+                                           @NonNull ArrayList<String> instructions,
+                                           boolean hadFailures) {
+                // 使用带道路折线的重载。
+            }
+
+            @Override
+            public void onPlanningFinished(@NonNull String summary,
+                                           @NonNull ArrayList<String> instructions,
+                                           @NonNull List<LatLng> roadPolyline,
+                                           boolean hadFailures) {
+                plannedRoadPoints.clear();
+                plannedRoadPoints.addAll(roadPolyline);
+                drawRouteOnMap();
+            }
+
+            @Override
+            public void onPlanningFailed(@NonNull String message) {
+                routePlanningStarted = false;
+                drawRouteOnMap();
+            }
+        });
     }
 
     private void openFullscreenMap() {
@@ -249,7 +299,10 @@ public class TeamDetailActivity extends AppCompatActivity {
             Toast.makeText(this, R.string.route_map_no_coords, Toast.LENGTH_SHORT).show();
             return;
         }
-        RouteMapFullscreenActivity.start(this, new ArrayList<>(routePoints));
+        List<LatLng> line = plannedRoadPoints.size() >= 2
+                ? plannedRoadPoints : routePoints;
+        RouteMapFullscreenActivity.start(this,
+                new ArrayList<>(line), new ArrayList<>(routePoints), txtTitle.getText().toString());
     }
 
     private boolean hasConfiguredAmapKey() {
@@ -392,7 +445,7 @@ public class TeamDetailActivity extends AppCompatActivity {
         super.onResume();
         if (mapCreated && routeMapView != null) {
             routeMapView.onResume();
-            drawRouteOnMap();
+            startRoadRoutePlanning();
         }
     }
 
@@ -414,6 +467,10 @@ public class TeamDetailActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if (walkRoutePlanner != null) {
+            walkRoutePlanner.cancel();
+            walkRoutePlanner = null;
+        }
         if (mapCreated && routeMapView != null) {
             routeMapView.onDestroy();
             routeMapView = null;

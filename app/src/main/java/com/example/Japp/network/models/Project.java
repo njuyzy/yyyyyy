@@ -33,6 +33,21 @@ public class Project {
     @SerializedName("arrivalTime")
     private String arrivalTime;
 
+    @SerializedName("startPointType")
+    private String startPointType;
+
+    @SerializedName("startPoint")
+    private String startPoint;
+
+    @SerializedName("leaderRequirements")
+    private String leaderRequirements;
+
+    @SerializedName("participantRequirements")
+    private String participantRequirements;
+
+    @SerializedName("representedCount")
+    private int representedCount;
+
     @SerializedName("maxMembers")
     private int maxMembers;
 
@@ -47,6 +62,27 @@ public class Project {
 
     @SerializedName("updatedAt")
     private String updatedAt;
+
+    @SerializedName("publisherName")
+    private String publisherName;
+
+    @SerializedName("leaderName")
+    private String leaderName;
+
+    @SerializedName("availabilityStatus")
+    private String availabilityStatus;
+
+    @SerializedName("viewerRole")
+    private String viewerRole;
+
+    @SerializedName("canAccept")
+    private boolean canAccept;
+
+    @SerializedName("canJoin")
+    private boolean canJoin;
+
+    @SerializedName("groupId")
+    private Long groupId;
 
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
@@ -78,6 +114,12 @@ public class Project {
     public String getArrivalTime() { return arrivalTime; }
     public void setArrivalTime(String arrivalTime) { this.arrivalTime = arrivalTime; }
 
+    public String getStartPointType() { return startPointType; }
+    public String getStartPoint() { return startPoint; }
+    public String getLeaderRequirements() { return leaderRequirements; }
+    public String getParticipantRequirements() { return participantRequirements; }
+    public int getRepresentedCount() { return representedCount; }
+
     public int getMaxMembers() { return maxMembers; }
     public void setMaxMembers(int maxMembers) { this.maxMembers = maxMembers; }
 
@@ -92,4 +134,12 @@ public class Project {
 
     public String getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getPublisherName() { return publisherName; }
+    public String getLeaderName() { return leaderName; }
+    public String getAvailabilityStatus() { return availabilityStatus; }
+    public String getViewerRole() { return viewerRole; }
+    public boolean isCanAccept() { return canAccept; }
+    public boolean isCanJoin() { return canJoin; }
+    public Long getGroupId() { return groupId; }
 }

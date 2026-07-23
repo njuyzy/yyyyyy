@@ -106,7 +106,11 @@ public class chatActivity extends AppCompatActivity {
 
         TextView subtitleView = findViewById(R.id.txtToolbarSubtitle);
         if (subtitleView != null) {
-            subtitleView.setText("项目沟通");
+            if (conversation.isGroup() && !conversation.getMemberNames().isEmpty()) {
+                subtitleView.setText(String.join("、", conversation.getMemberNames()));
+            } else {
+                subtitleView.setText("项目沟通");
+            }
         }
 
         TextView avatarView = findViewById(R.id.txtToolbarAvatar);

@@ -4,14 +4,14 @@ import com.google.gson.annotations.SerializedName;
 
 public class JoinProjectRequest {
 
-    @SerializedName("representativeCount")
-    private final int representativeCount;
+    @SerializedName("representedCount")
+    private final int representedCount;
 
-    public JoinProjectRequest(int representativeCount) {
-        this.representativeCount = representativeCount;
+    public JoinProjectRequest(int representedCount) {
+        this.representedCount = representedCount;
     }
 
-    public int getRepresentativeCount() {
-        return representativeCount;
+    public int getRepresentedCount() {
+        return representedCount;
     }
 }

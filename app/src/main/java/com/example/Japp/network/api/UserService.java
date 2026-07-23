@@ -4,9 +4,11 @@ import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.AccountLeaderProfile;
 import com.example.Japp.network.models.AccountTagPref;
 import com.example.Japp.network.models.ChatSession;
+import com.example.Japp.network.models.ChatGroupMember;
 import com.example.Japp.network.models.ServerChatMessage;
 import com.example.Japp.network.models.LoginResponse;
 import com.example.Japp.network.models.Project;
+import com.example.Japp.network.models.ProjectPage;
 import com.example.Japp.network.models.Region;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
@@ -71,6 +73,10 @@ public interface UserService {
     @GET("projects/{id}")
     Call<Result<Project>> getProject(@Path("id") int projectId);
 
+    @GET("projects/available")
+    Call<Result<ProjectPage>> getAvailableProjects(@Query("pageNum") int pageNum,
+                                                   @Query("pageSize") int pageSize);
+
     @GET("regions/provinces")
     Call<Result<List<Region>>> getProvinces();
 
@@ -82,22 +88,27 @@ public interface UserService {
                                               @Query("pageNum") int pageNum,
                                               @Query("pageSize") int pageSize,
                                               @Query("keyword") String keyword,
-                                              @Query("regionAdcode") String regionAdcode,
+                                              @Query("regionCode") String regionAdcode,
                                               @Query("tag") String tag,
                                               @Query("status") String status,
                                               @Query("departureDateFrom") String departureDateFrom,
                                               @Query("departureDateTo") String departureDateTo,
                                               @Query("hasLeader") Boolean hasLeader,
-                                              @Query("joinableOnly") Boolean joinableOnly);
+                                              @Query("onlyAvailable") Boolean joinableOnly);
 
     @POST("projects")
     Call<Result> createProject(@Body CreateProjectRequest request);
 
-    // 后端约定：POST /routes/ai/{memoryId}?message=...
+    @POST("routes/{id}/publish")
+    Call<Result<JsonElement>> publishRoute(@Path("id") int routeId,
+                                           @Body CreateProjectRequest request);
+
+    // 后端约定：POST /routes/ai/{memoryId}?message=...&accountId=...
     // 成功时 data 为路线 ID（数字）
     @POST("routes/ai/{memoryId}")
     Call<Result<JsonElement>> planRouteByAi(@Path("memoryId") String memoryId,
-                                            @Query("message") String message);
+                                            @Query("message") String message,
+                                            @Query("accountId") Integer accountId);
 
     @POST("routes/manual")
     Call<Result<JsonElement>> createManualRoute(@Body List<RouteNode> routeNodes);
@@ -115,6 +126,9 @@ public interface UserService {
     @POST("projects/{id}/join")
     Call<Result> joinProject(@Path("id") int projectId, @Body JoinProjectRequest request);
 
+    @POST("projects/{id}/accept")
+    Call<Result> acceptProject(@Path("id") int projectId);
+
     @POST("chat/sessions")
     Call<Result<ChatSession>> createChatSession(@Body CreateSessionRequest request);
 
@@ -123,6 +137,9 @@ public interface UserService {
 
     @GET("chat/sessions/{sessionId}/messages")
     Call<Result<List<ServerChatMessage>>> getChatMessages(@Path("sessionId") long sessionId);
+
+    @GET("chat/sessions/{sessionId}/members")
+    Call<Result<List<ChatGroupMember>>> getChatMembers(@Path("sessionId") long sessionId);
 
     @POST("chat/messages")
     Call<Result<Long>> sendChatMessage(@Body SendChatMessageRequest request);
