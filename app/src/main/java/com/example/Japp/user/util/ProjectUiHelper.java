@@ -288,14 +288,17 @@ public final class ProjectUiHelper {
         if (project.equals(filter)) {
             return true;
         }
-        // 选省时匹配该省下城市；选市时也可被省码前缀命中
-        int prefixLen = Math.min(filter.length(), project.length());
-        if (prefixLen >= 2) {
-            int compareLen = filter.length() >= 4 ? 4 : 2;
-            compareLen = Math.min(compareLen, prefixLen);
-            return project.regionMatches(0, filter, 0, compareLen);
+        // 省级码（如 320000）按前 2 位匹配全省，市级码（如 320100）按前 4 位匹配。
+        int compareLen;
+        if (filter.length() >= 6 && filter.endsWith("0000")) {
+            compareLen = 2;
+        } else if (filter.length() >= 6 && filter.endsWith("00")) {
+            compareLen = 4;
+        } else {
+            compareLen = Math.min(filter.length(), 6);
         }
-        return false;
+        compareLen = Math.min(compareLen, Math.min(filter.length(), project.length()));
+        return compareLen >= 2 && project.regionMatches(0, filter, 0, compareLen);
     }
 
     private static boolean matchesAnyTag(String projectTag, Set<String> selectedTags) {
@@ -355,5 +358,14 @@ public final class ProjectUiHelper {
             return false;
         }
         return project.getMaxMembers() <= 0 || project.getCurrentMembers() < project.getMaxMembers();
+    }
+
+    public static boolean hasRemainingCapacity(Project project) {
+        if (project == null) {
+            return false;
+        }
+        return !STATUS_DONE.equals(normalizeStatus(project.getStatus()))
+                && (project.getMaxMembers() <= 0
+                || project.getCurrentMembers() < project.getMaxMembers());
     }
 }

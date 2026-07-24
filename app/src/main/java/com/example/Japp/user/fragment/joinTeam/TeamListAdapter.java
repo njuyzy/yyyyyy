@@ -89,8 +89,9 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
 
         String date = project.getDepartureDate() != null ? project.getDepartureDate() : "待定";
         String duration = item.getDuration().isEmpty() ? "暂无" : item.getDuration();
-        holder.txtMeta.setText("出发 " + date + " · 用时 " + duration + " · "
-                + project.getCurrentMembers() + "/" + project.getMaxMembers() + " 人");
+        holder.txtMeta.setText("出发 " + date + " · 用时 " + duration
+                + "\n已有人数 " + Math.max(0, project.getCurrentMembers())
+                + " / 人数上限 " + Math.max(0, project.getMaxMembers()));
 
         holder.txtStatus.setText(ProjectUiHelper.statusLabel(project.getStatus()));
 

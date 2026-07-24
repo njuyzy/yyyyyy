@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:cardBackgroundColor="#F7F8FA"
+    app:cardCornerRadius="10dp"
+    app:cardElevation="0dp"
+    app:strokeColor="#E2E5EA"
+    app:strokeWidth="1dp">
+
+    <ListView
+        android:id="@+id/listCity"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:choiceMode="singleChoice"
+        android:divider="#E7E9ED"
+        android:dividerHeight="1dp"
+        android:listSelector="#EAF2FF" />
+</com.google.android.material.card.MaterialCardView>

@@ -21,6 +21,13 @@
             android:id="@+id/txtCurrentCity"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:drawablePadding="2dp"
+            android:drawableEnd="@drawable/ic_arrow_drop_down"
+            android:focusable="true"
+            android:paddingHorizontal="4dp"
+            android:paddingVertical="8dp"
             android:textColor="@color/black"
             android:textSize="15sp"
             android:textStyle="bold"
@@ -43,29 +50,62 @@
             app:layout_constraintTop_toTopOf="parent" />
 
         <androidx.appcompat.widget.AppCompatImageButton
-            android:id="@+id/btnSearch"
+            android:id="@+id/btnFilter"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:layout_marginEnd="8dp"
+            android:layout_marginEnd="6dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="搜索"
-            android:src="@android:drawable/ic_menu_search"
+            android:contentDescription="筛选"
+            android:src="@drawable/ic_toolbar_filter"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/add"
+            app:layout_constraintEnd_toStartOf="@id/btnSearch"
             app:layout_constraintTop_toTopOf="parent"
             app:tint="@color/black" />
 
         <androidx.appcompat.widget.AppCompatImageButton
-            android:id="@+id/add"
+            android:id="@+id/btnSearch"
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="发布拼单"
-            android:src="@drawable/ic_toolbar_add"
+            android:contentDescription="搜索"
+            android:src="@android:drawable/ic_menu_search"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:tint="@color/black" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/inlineSearchContainer"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_marginEnd="8dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="@color/white"
+            app:cardCornerRadius="21dp"
+            app:cardElevation="4dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/btnSearch"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:strokeColor="#DCE2EC"
+            app:strokeWidth="1dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/editInlineSearch"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@android:color/transparent"
+                android:hint="输入关键词"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:maxLines="1"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:singleLine="true"
+                android:textColor="@color/list_text_primary"
+                android:textColorHint="@color/list_text_tertiary"
+                android:textSize="15sp" />
+        </com.google.android.material.card.MaterialCardView>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <androidx.recyclerview.widget.RecyclerView
@@ -76,6 +116,7 @@
         android:clipToPadding="false"
         android:paddingHorizontal="8dp"
         android:paddingVertical="12dp"
+        android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topBar" />
@@ -94,27 +135,178 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recycler"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:clipToPadding="false"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp"
-                tools:listitem="@layout/item_team_card" />
-
-            <TextView
-                android:id="@+id/txtEmpty"
+            <LinearLayout
+                android:id="@+id/myPendingSection"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:gravity="center"
-                android:padding="24dp"
-                android:textColor="@color/list_text_secondary"
-                android:textSize="15sp"
+                android:background="@color/list_page_bg"
+                android:orientation="vertical"
                 android:visibility="gone"
-                tools:text="暂无可加入的拼单"
-                tools:visibility="visible" />
+                tools:visibility="visible">
+
+                <LinearLayout
+                    android:id="@+id/myPendingHeader"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:background="@color/white"
+                    android:clickable="true"
+                    android:elevation="2dp"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:translationZ="2dp">
+
+                    <View
+                        android:layout_width="3dp"
+                        android:layout_height="18dp"
+                        android:background="#1E72FF" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="9dp"
+                        android:layout_weight="1"
+                        android:text="我的待接单路线"
+                        android:textColor="@color/list_text_primary"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/txtMyPendingCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/list_text_secondary"
+                        android:textSize="13sp"
+                        tools:text="2 条" />
+
+                    <ImageView
+                        android:id="@+id/imgMyPendingExpand"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="5dp"
+                        android:contentDescription="展开我的待接单路线"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@null" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/myPendingContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/myPendingRecycler"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:clipToPadding="false"
+                        android:nestedScrollingEnabled="false"
+                        android:paddingTop="4dp"
+                        tools:itemCount="1"
+                        tools:listitem="@layout/item_team_card" />
+
+                    <TextView
+                        android:id="@+id/btnMoreMine"
+                        android:layout_width="match_parent"
+                        android:layout_height="42dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="查看更多"
+                        android:textColor="#1E72FF"
+                        android:textSize="14sp"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="8dp"
+                        android:background="@color/list_page_bg" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/availableSection"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/list_page_bg"
+                android:elevation="3dp"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/availableHeader"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:background="@color/white"
+                    android:elevation="2dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:translationZ="2dp">
+
+                    <View
+                        android:layout_width="3dp"
+                        android:layout_height="18dp"
+                        android:background="#1E72FF" />
+
+                    <TextView
+                        android:id="@+id/txtAvailableTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="9dp"
+                        android:text="可加入的拼单"
+                        android:textColor="@color/list_text_primary"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recycler"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@color/list_page_bg"
+                        android:clipToPadding="false"
+                        android:paddingTop="6dp"
+                        android:paddingBottom="6dp"
+                        tools:listitem="@layout/item_team_card" />
+
+                    <TextView
+                        android:id="@+id/txtEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:gravity="center"
+                        android:padding="24dp"
+                        android:textColor="@color/list_text_secondary"
+                        android:textSize="15sp"
+                        android:visibility="gone"
+                        tools:text="暂无可加入的拼单"
+                        tools:visibility="visible" />
+                </FrameLayout>
+            </LinearLayout>
         </FrameLayout>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <View
+        android:id="@+id/searchDismissOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topBar" />
 </androidx.constraintlayout.widget.ConstraintLayout>

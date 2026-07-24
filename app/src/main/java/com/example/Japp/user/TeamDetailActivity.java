@@ -152,7 +152,8 @@ public class TeamDetailActivity extends AppCompatActivity {
         String date = project.getDepartureDate() != null ? project.getDepartureDate() : "待定";
         txtMeta.setText((city.isEmpty() ? "未知城市" : city)
                 + " · 出发 " + date
-                + " · " + project.getCurrentMembers() + "/" + project.getMaxMembers() + " 人");
+                + "\n已有人数 " + Math.max(0, project.getCurrentMembers())
+                + " / 人数上限 " + Math.max(0, project.getMaxMembers()));
 
         txtStatus.setText(ProjectUiHelper.statusLabel(project.getStatus()));
     }

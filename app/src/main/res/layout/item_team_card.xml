@@ -107,10 +107,10 @@
                     android:layout_weight="1"
                     android:ellipsize="end"
                     android:gravity="end"
-                    android:maxLines="1"
+                    android:maxLines="2"
                     android:textColor="@color/list_text_tertiary"
                     android:textSize="11sp"
-                    tools:text="明天 · 4/8 人" />
+                    tools:text="出发 2026-07-31 · 用时 2小时&#10;已有人数 4 / 人数上限 8" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

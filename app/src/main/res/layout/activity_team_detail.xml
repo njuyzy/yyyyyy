@@ -65,7 +65,7 @@
                         android:layout_marginTop="8dp"
                         android:textColor="@color/text_secondary"
                         android:textSize="14sp"
-                        tools:text="北京市 · 出发 2026-06-08 · 2/10 人" />
+                        tools:text="北京市 · 出发 2026-06-08&#10;已有人数 2 / 人数上限 10" />
 
                     <TextView
                         android:id="@+id/txtOwner"

@@ -76,7 +76,8 @@ public class historyRoute extends Fragment {
             return;
         }
         int accountId = SessionHelper.getAccountId(requireContext());
-        service.getProjects(accountId, 1, 30).enqueue(new Callback<Result<List<Project>>>() {
+        service.getOwnedProjects(accountId, accountId, 1, 30, false)
+                .enqueue(new Callback<Result<List<Project>>>() {
             @Override
             public void onResponse(Call<Result<List<Project>>> call, Response<Result<List<Project>>> response) {
                 if (!isAdded()) {
@@ -95,7 +96,17 @@ public class historyRoute extends Fragment {
                     showEmpty("暂无相关项目");
                     return;
                 }
-                enrichProjects(projects);
+                List<Project> ownedProjects = new ArrayList<>();
+                for (Project project : projects) {
+                    if (project != null && project.getOwnerAccountId() == accountId) {
+                        ownedProjects.add(project);
+                    }
+                }
+                if (ownedProjects.isEmpty()) {
+                    showEmpty("暂无自己发布的路线");
+                    return;
+                }
+                enrichProjects(ownedProjects);
             }
 
             @Override
