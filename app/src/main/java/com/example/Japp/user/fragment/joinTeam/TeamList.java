@@ -44,11 +44,6 @@ import com.example.Japp.user.TeamDetailActivity;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
 import com.example.Japp.util.InsetDividerDecoration;
-import com.amap.api.services.core.AMapException;
-import com.amap.api.services.district.DistrictItem;
-import com.amap.api.services.district.DistrictResult;
-import com.amap.api.services.district.DistrictSearch;
-import com.amap.api.services.district.DistrictSearchQuery;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
@@ -596,16 +591,19 @@ public class TeamList extends Fragment {
                                 String.valueOf(listCity.getTag()))) {
                     return;
                 }
-                cities = response.isSuccessful() && response.body() != null
-                        && response.body().getCode() == 1 && response.body().getData() != null
+                boolean successful = response.isSuccessful() && response.body() != null
+                        && response.body().getCode() == 1;
+                cities = successful && response.body().getData() != null
                         ? response.body().getData() : new ArrayList<>();
-                if (cities.isEmpty()) {
-                    loadAmapCityPickerCities(
-                            listCity, province, cityPopup, provincePopup);
-                } else {
-                    bindCityPickerList(
-                            listCity, province, cities, cityPopup, provincePopup);
+                if (!successful) {
+                    Toast.makeText(requireContext(),
+                            "城市列表加载失败", Toast.LENGTH_SHORT).show();
+                } else if (cities.isEmpty()) {
+                    Toast.makeText(requireContext(),
+                            "暂无城市数据", Toast.LENGTH_SHORT).show();
                 }
+                bindCityPickerList(
+                        listCity, province, cities, cityPopup, provincePopup);
             }
 
             @Override
@@ -614,95 +612,13 @@ public class TeamList extends Fragment {
                 if (isAdded() && cityPopup.isShowing()
                         && TextUtils.equals(province.getAdcode(),
                                 String.valueOf(listCity.getTag()))) {
-                    loadAmapCityPickerCities(
-                            listCity, province, cityPopup, provincePopup);
+                    Toast.makeText(requireContext(),
+                            "城市列表加载失败", Toast.LENGTH_SHORT).show();
+                    bindCityPickerList(listCity, province, new ArrayList<>(),
+                            cityPopup, provincePopup);
                 }
             }
         });
-    }
-
-    private void loadAmapCityPickerCities(ListView listCity,
-                                          Region province,
-                                          PopupWindow cityPopup,
-                                          PopupWindow provincePopup) {
-        try {
-            DistrictSearch districtSearch =
-                    new DistrictSearch(requireContext().getApplicationContext());
-            DistrictSearchQuery query = new DistrictSearchQuery(
-                    province.getName(), DistrictSearchQuery.KEYWORDS_PROVINCE, 0);
-            query.setSubDistrict(1);
-            query.setShowBoundary(false);
-            districtSearch.setQuery(query);
-            districtSearch.setOnDistrictSearchListener(result -> {
-                if (!isAdded() || !cityPopup.isShowing()
-                        || !TextUtils.equals(province.getAdcode(),
-                                String.valueOf(listCity.getTag()))) {
-                    return;
-                }
-                List<Region> fallbackCities = extractAmapCities(result, province);
-                if (fallbackCities.isEmpty()) {
-                    Toast.makeText(requireContext(), "暂无城市数据", Toast.LENGTH_SHORT).show();
-                }
-                cities = fallbackCities;
-                bindCityPickerList(listCity, province, fallbackCities,
-                        cityPopup, provincePopup);
-            });
-            districtSearch.searchDistrictAsyn();
-        } catch (AMapException e) {
-            if (isAdded()) {
-                Toast.makeText(requireContext(), "城市列表加载失败", Toast.LENGTH_SHORT).show();
-                bindCityPickerList(listCity, province, new ArrayList<>(),
-                        cityPopup, provincePopup);
-            }
-        }
-    }
-
-    private List<Region> extractAmapCities(@Nullable DistrictResult result, Region province) {
-        List<Region> resultCities = new ArrayList<>();
-        if (result != null && result.getDistrict() != null) {
-            DistrictItem matchedProvince = null;
-            for (DistrictItem item : result.getDistrict()) {
-                if (item != null && TextUtils.equals(province.getAdcode(), item.getAdcode())) {
-                    matchedProvince = item;
-                    break;
-                }
-            }
-            if (matchedProvince == null && !result.getDistrict().isEmpty()) {
-                matchedProvince = result.getDistrict().get(0);
-            }
-            if (matchedProvince != null && matchedProvince.getSubDistrict() != null) {
-                for (DistrictItem item : matchedProvince.getSubDistrict()) {
-                    if (item == null || !"city".equalsIgnoreCase(item.getLevel())) {
-                        continue;
-                    }
-                    Region city = new Region();
-                    city.setAdcode(item.getAdcode());
-                    city.setName(item.getName());
-                    city.setLevel(2);
-                    city.setParentAdcode(province.getAdcode());
-                    city.setCitycode(item.getCitycode());
-                    resultCities.add(city);
-                }
-            }
-        }
-        if (resultCities.isEmpty() && isMunicipality(province.getAdcode())) {
-            Region city = new Region();
-            city.setAdcode(province.getAdcode().substring(0, 2) + "0100");
-            city.setName(province.getName());
-            city.setLevel(2);
-            city.setParentAdcode(province.getAdcode());
-            resultCities.add(city);
-        }
-        return resultCities;
-    }
-
-    private boolean isMunicipality(@Nullable String adcode) {
-        if (TextUtils.isEmpty(adcode) || adcode.length() < 2) {
-            return false;
-        }
-        String prefix = adcode.substring(0, 2);
-        return "11".equals(prefix) || "12".equals(prefix)
-                || "31".equals(prefix) || "50".equals(prefix);
     }
 
     private void bindCityPickerList(ListView listCity,

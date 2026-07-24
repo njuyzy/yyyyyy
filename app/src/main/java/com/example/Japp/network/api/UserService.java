@@ -101,8 +101,9 @@ public interface UserService {
     @GET("regions/provinces")
     Call<Result<List<Region>>> getProvinces();
 
-    @GET("regions/{adcode}/children")
-    Call<Result<List<Region>>> getRegionChildren(@Path("adcode") String adcode);
+    @GET("regions/children")
+    Call<Result<List<Region>>> getRegionChildren(
+            @Query("parentAdcode") String parentAdcode);
 
     @GET("projects/filter")
     Call<Result<List<Project>>> filterProjects(@Query("accountId") int accountId,
