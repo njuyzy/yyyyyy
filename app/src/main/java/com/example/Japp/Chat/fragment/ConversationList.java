@@ -233,7 +233,10 @@ public class ConversationList extends Fragment {
                                 String name = member.getUsername() == null
                                         ? "群成员" : member.getUsername();
                                 String representation = member.getRepresentationText();
-                                members.add(representation == null || representation.trim().isEmpty()
+                                boolean isLeader = "LEADER".equalsIgnoreCase(member.getMemberRole())
+                                        || "ADMIN".equalsIgnoreCase(member.getMemberRole());
+                                members.add(isLeader || representation == null
+                                        || representation.trim().isEmpty()
                                         ? name : name + "（" + representation + "）");
                             }
                         }

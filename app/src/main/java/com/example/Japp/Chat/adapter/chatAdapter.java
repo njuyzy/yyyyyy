@@ -1,15 +1,19 @@
 package com.example.Japp.Chat.adapter;
 
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.Japp.R;
+import com.example.Japp.Chat.util.ChatAvatarLoader;
 import com.example.Japp.data.Message;
+import com.example.Japp.data.User;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -18,7 +22,8 @@ import java.util.Locale;
 
 public class chatAdapter extends RecyclerView.Adapter<chatAdapter.ViewHolder> {
 
-    private static final SimpleDateFormat TIME_FMT = new SimpleDateFormat("HH:mm", Locale.getDefault());
+    private static final SimpleDateFormat TIME_FMT =
+            new SimpleDateFormat("HH:mm", Locale.getDefault());
 
     private final List<Message> messages;
     private final String currentUserId;
@@ -31,7 +36,7 @@ public class chatAdapter extends RecyclerView.Adapter<chatAdapter.ViewHolder> {
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        int layoutId = (viewType == 1) ? R.layout.item_chat_right : R.layout.item_chat_left;
+        int layoutId = viewType == 1 ? R.layout.item_chat_right : R.layout.item_chat_left;
         View view = LayoutInflater.from(parent.getContext()).inflate(layoutId, parent, false);
         return new ViewHolder(view);
     }
@@ -39,26 +44,55 @@ public class chatAdapter extends RecyclerView.Adapter<chatAdapter.ViewHolder> {
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Message message = messages.get(position);
-        String name = message.getSender().getUsername();
+        User sender = message.getSender();
+        String name = sender == null ? null : sender.getUsername();
+        if (TextUtils.isEmpty(name)) {
+            name = "群成员";
+        }
 
         holder.txtMessage.setText(message.getContent());
         holder.txtTime.setText(TIME_FMT.format(new Date(message.getTimestamp())));
+        holder.txtName.setText(formatName(name, sender));
+        holder.txtName.setVisibility(View.VISIBLE);
 
-        if (holder.txtName != null) {
-            holder.txtName.setText(name);
-        }
+        bindRoleBadge(holder, sender == null ? null : sender.getMemberRole());
+        bindAvatar(holder, sender, name);
+    }
 
-        if (holder.txtAvatar != null) {
-            boolean isSelf = getItemViewType(position) == 1;
-            if (isSelf) {
-                holder.txtAvatar.setText("我");
-            } else {
-                String initial = (name != null && !name.isEmpty())
-                        ? String.valueOf(name.charAt(0)).toUpperCase(Locale.getDefault())
-                        : "?";
-                holder.txtAvatar.setText(initial);
-            }
+    private void bindRoleBadge(ViewHolder holder, String memberRole) {
+        if ("PUBLISHER".equalsIgnoreCase(memberRole)
+                || "OWNER".equalsIgnoreCase(memberRole)) {
+            holder.txtRoleBadge.setText("群主");
+            holder.txtRoleBadge.setBackgroundResource(R.drawable.bg_chat_role_owner);
+            holder.txtRoleBadge.setVisibility(View.VISIBLE);
+        } else if ("LEADER".equalsIgnoreCase(memberRole)
+                || "ADMIN".equalsIgnoreCase(memberRole)) {
+            holder.txtRoleBadge.setText("领队");
+            holder.txtRoleBadge.setBackgroundResource(R.drawable.bg_chat_role_leader);
+            holder.txtRoleBadge.setVisibility(View.VISIBLE);
+        } else {
+            holder.txtRoleBadge.setVisibility(View.GONE);
         }
+    }
+
+    private void bindAvatar(ViewHolder holder, User sender, String name) {
+        ChatAvatarLoader.bind(
+                holder.imgAvatar,
+                holder.txtAvatar,
+                sender == null ? null : sender.getAvatarUrl(),
+                name);
+    }
+
+    private static String formatName(String name, User sender) {
+        String role = sender == null ? null : sender.getMemberRole();
+        if ("LEADER".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role)) {
+            return name;
+        }
+        Integer representedCount = sender == null ? null : sender.getRepresentedCount();
+        if (representedCount == null) {
+            return name;
+        }
+        return name + "（" + Math.max(0, representedCount) + "人）";
     }
 
     @Override
@@ -69,15 +103,14 @@ public class chatAdapter extends RecyclerView.Adapter<chatAdapter.ViewHolder> {
     @Override
     public int getItemViewType(int position) {
         Message message = messages.get(position);
-        return message.getSender().getId().equals(currentUserId) ? 1 : 0;
+        User sender = message.getSender();
+        return sender != null && currentUserId.equals(sender.getId()) ? 1 : 0;
     }
-
 
     public void addMessage(Message message) {
         messages.add(message);
         notifyItemInserted(messages.size() - 1);
     }
-
 
     public void updateMessages(List<Message> newMessages) {
         messages.clear();
@@ -85,24 +118,29 @@ public class chatAdapter extends RecyclerView.Adapter<chatAdapter.ViewHolder> {
         notifyDataSetChanged();
     }
 
-
     public Message getLastMessage() {
-        if (messages.isEmpty()) return null;
+        if (messages.isEmpty()) {
+            return null;
+        }
         return messages.get(messages.size() - 1);
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView txtName;
-        TextView txtMessage;
-        TextView txtTime;
-        TextView txtAvatar;
+        final TextView txtName;
+        final TextView txtMessage;
+        final TextView txtTime;
+        final TextView txtAvatar;
+        final TextView txtRoleBadge;
+        final ImageView imgAvatar;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
-            txtName    = itemView.findViewById(R.id.txtName);
+            txtName = itemView.findViewById(R.id.txtName);
             txtMessage = itemView.findViewById(R.id.txtMessage);
-            txtTime    = itemView.findViewById(R.id.txtTime);
-            txtAvatar  = itemView.findViewById(R.id.txtAvatar);
+            txtTime = itemView.findViewById(R.id.txtTime);
+            txtAvatar = itemView.findViewById(R.id.txtAvatar);
+            txtRoleBadge = itemView.findViewById(R.id.txtRoleBadge);
+            imgAvatar = itemView.findViewById(R.id.imgAvatar);
         }
     }
 }

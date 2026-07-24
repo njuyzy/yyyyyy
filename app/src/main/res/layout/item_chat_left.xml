@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 对方消息 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -7,16 +6,17 @@
     android:gravity="top"
     android:orientation="horizontal"
     android:paddingStart="14dp"
-    android:paddingTop="6dp"
+    android:paddingTop="7dp"
     android:paddingEnd="56dp"
-    android:paddingBottom="6dp">
+    android:paddingBottom="7dp">
 
     <FrameLayout
-        android:layout_width="36dp"
-        android:layout_height="36dp"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
         android:layout_marginTop="2dp"
-        android:layout_marginEnd="8dp"
-        android:background="@drawable/bg_chat_avatar_peer">
+        android:layout_marginEnd="9dp"
+        android:background="@drawable/bg_chat_avatar_peer"
+        android:clipToOutline="true">
 
         <TextView
             android:id="@+id/txtAvatar"
@@ -26,6 +26,14 @@
             android:textColor="@color/white"
             android:textSize="14sp"
             android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/imgAvatar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@string/avatar"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
     </FrameLayout>
 
     <LinearLayout
@@ -33,20 +41,45 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/txtName"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="3dp"
-            android:textColor="@color/chat_name_other"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/txtName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxWidth="150dp"
+                android:maxLines="1"
+                android:textColor="@color/chat_name_other"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/txtRoleBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="5dp"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:paddingStart="5dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="5dp"
+                android:paddingBottom="2dp"
+                android:textColor="@color/white"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </LinearLayout>
 
         <com.google.android.material.card.MaterialCardView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             app:cardBackgroundColor="@color/chat_bubble_other"
-            app:cardCornerRadius="18dp"
+            app:cardCornerRadius="16dp"
             app:cardElevation="1dp"
             app:strokeColor="#E6EDF7"
             app:strokeWidth="1dp">
@@ -58,9 +91,9 @@
                 android:lineSpacingMultiplier="1.25"
                 android:maxWidth="240dp"
                 android:paddingStart="14dp"
-                android:paddingTop="11dp"
+                android:paddingTop="10dp"
                 android:paddingEnd="14dp"
-                android:paddingBottom="11dp"
+                android:paddingBottom="10dp"
                 android:textColor="@color/chat_text_other"
                 android:textSize="15sp" />
         </com.google.android.material.card.MaterialCardView>

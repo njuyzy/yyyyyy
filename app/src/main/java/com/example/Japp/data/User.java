@@ -17,6 +17,8 @@ public class User implements Serializable {
     }
 
     private String ImgUrl;
+    private String memberRole;
+    private Integer representedCount;
     public User(String name,String phone,String password){
         id= Generate_id();
         this.name=name;
@@ -55,6 +57,30 @@ public class User implements Serializable {
         return Phone;
     }
 
+    public String getAvatarUrl() {
+        return ImgUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.ImgUrl = avatarUrl;
+    }
+
+    public String getMemberRole() {
+        return memberRole;
+    }
+
+    public void setMemberRole(String memberRole) {
+        this.memberRole = memberRole;
+    }
+
+    public Integer getRepresentedCount() {
+        return representedCount;
+    }
+
+    public void setRepresentedCount(Integer representedCount) {
+        this.representedCount = representedCount;
+    }
+
 
     public String getPassword() {
         return password;
@@ -89,6 +115,7 @@ public class User implements Serializable {
         user.setName(account.getUsername());
         user.setPhone(account.getPhone());
         user.setPassword(account.getPasswordHash());
+        user.setAvatarUrl(account.getAvatarUrl());
         return user;
     }
 

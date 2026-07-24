@@ -132,6 +132,10 @@ public interface UserService {
     @POST("projects/{id}/accept")
     Call<Result> acceptProject(@Path("id") int projectId);
 
+    @POST("projects/{id}/status")
+    Call<Result> updateProjectStatus(@Path("id") int projectId,
+                                     @Query("status") String status);
+
     @POST("chat/sessions")
     Call<Result<ChatSession>> createChatSession(@Body CreateSessionRequest request);
 
