@@ -41,6 +41,7 @@ public class TagGridAdapter extends RecyclerView.Adapter<TagGridAdapter.Holder> 
     private final List<String> tags = new ArrayList<>();
     private final Set<String> selectedTags = new HashSet<>();
     private OnTagSelectedChangeListener listener;
+    private boolean singleSelection;
 
     // 标签名 -> drawable 资源名映射
     private static final Map<String, Integer> TAG_ICON_MAP = new HashMap<>();
@@ -74,8 +75,30 @@ public class TagGridAdapter extends RecyclerView.Adapter<TagGridAdapter.Holder> 
         this.listener = listener;
     }
 
+    public void setSingleSelection(boolean singleSelection) {
+        this.singleSelection = singleSelection;
+        if (singleSelection && selectedTags.size() > 1) {
+            String first = selectedTags.iterator().next();
+            selectedTags.clear();
+            selectedTags.add(first);
+            notifyDataSetChanged();
+        }
+    }
+
     public Set<String> getSelectedTags() {
         return new HashSet<>(selectedTags);
+    }
+
+    public void setSelectedTags(Set<String> values) {
+        selectedTags.clear();
+        if (values != null && !values.isEmpty()) {
+            if (singleSelection) {
+                selectedTags.add(values.iterator().next());
+            } else {
+                selectedTags.addAll(values);
+            }
+        }
+        notifyDataSetChanged();
     }
 
     public void clearSelection() {
@@ -118,9 +141,12 @@ public class TagGridAdapter extends RecyclerView.Adapter<TagGridAdapter.Holder> 
             if (selectedTags.contains(tag)) {
                 selectedTags.remove(tag);
             } else {
+                if (singleSelection) {
+                    selectedTags.clear();
+                }
                 selectedTags.add(tag);
             }
-            notifyItemChanged(position);
+            notifyDataSetChanged();
             if (listener != null) {
                 listener.onTagSelectedChange(new HashSet<>(selectedTags));
             }

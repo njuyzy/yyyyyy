@@ -413,6 +413,7 @@ public class TeamList extends Fragment {
             return;
         }
         tagAdapter = new TagGridAdapter();
+        tagAdapter.setSingleSelection(true);
         tagGrid.setLayoutManager(new GridLayoutManager(requireContext(), 3,
                 GridLayoutManager.HORIZONTAL, false));
         tagGrid.setAdapter(tagAdapter);
@@ -715,6 +716,7 @@ public class TeamList extends Fragment {
 
         String[] tagNames = getResources().getStringArray(R.array.route_tag_names);
         if (chipGroupTags != null) {
+            chipGroupTags.setSingleSelection(true);
             for (String tag : tagNames) {
                 Chip chip = new Chip(requireContext());
                 chip.setText(tag);
@@ -774,6 +776,9 @@ public class TeamList extends Fragment {
 
             filterTags.clear();
             filterTags.addAll(getSelectedTags(chipGroupTags));
+            if (tagAdapter != null) {
+                tagAdapter.setSelectedTags(filterTags);
+            }
 
             int statusIndex = spinnerStatus.getSelectedItemPosition();
             if (statusIndex >= 0 && statusIndex < statusValues.length) {
@@ -1008,20 +1013,6 @@ public class TeamList extends Fragment {
                 || filterHasLeader != null;
     }
 
-    private ProjectUiHelper.ProjectFilterCriteria buildFilterCriteria() {
-        ProjectUiHelper.ProjectFilterCriteria criteria = new ProjectUiHelper.ProjectFilterCriteria();
-        criteria.keyword = filterKeyword;
-        criteria.regionAdcode = filterRegionCode;
-        criteria.tags = new HashSet<>(filterTags);
-        criteria.status = filterStatus;
-        criteria.dateFrom = filterDateFrom;
-        criteria.dateTo = filterDateTo;
-        criteria.hasLeader = filterHasLeader;
-        // 拼单页「可加入」是业务硬性约束，不参与 OR；在本地结果上再裁剪
-        criteria.joinableOnly = null;
-        return criteria;
-    }
-
     private void loadTeams() {
         if (!SessionHelper.isLoggedIn(requireContext())) {
             stopRefreshing();
@@ -1064,8 +1055,20 @@ public class TeamList extends Fragment {
         int requestedPage = append ? availablePage + 1 : 1;
         loadingAvailable = true;
 
-        // 使用数据库筛选接口稳定分页，避免个性化推荐遗漏新发布订单。
-        service.getJoinableProjects(accountId, requestedPage, AVAILABLE_PAGE_SIZE, false)
+        service.filterProjects(
+                        accountId,
+                        requestedPage,
+                        AVAILABLE_PAGE_SIZE,
+                        filterKeyword,
+                        backendRegionCode(),
+                        selectedFilterTag(),
+                        filterStatus,
+                        filterDateFrom,
+                        filterDateTo,
+                        null,
+                        null,
+                        filterHasLeader,
+                        false)
                 .enqueue(new Callback<Result<List<Project>>>() {
                     @Override
                     public void onResponse(@NonNull Call<Result<List<Project>>> call,
@@ -1098,8 +1101,7 @@ public class TeamList extends Fragment {
                         }
                         availablePage = requestedPage;
                         hasMoreAvailable = projects.size() >= AVAILABLE_PAGE_SIZE;
-                        List<Project> filtered = ProjectUiHelper.filterProjectsByAnyMatch(
-                                projects, buildFilterCriteria());
+                        List<Project> filtered = filterProvinceLocallyIfNeeded(projects);
                         // 自己发布的待接单路线放到独立区域，不在公共列表中重复显示。
                         List<Project> joinable = new ArrayList<>();
                         for (Project project : filtered) {
@@ -1149,11 +1151,18 @@ public class TeamList extends Fragment {
         loadingMyPending = true;
         btnMoreMine.setEnabled(false);
 
-        service.getOwnedJoinableProjects(
-                        accountId,
+        service.filterProjects(
                         accountId,
                         requestedPage,
                         MY_PENDING_PAGE_SIZE,
+                        filterKeyword,
+                        backendRegionCode(),
+                        selectedFilterTag(),
+                        filterStatus,
+                        filterDateFrom,
+                        filterDateTo,
+                        accountId,
+                        null,
                         false,
                         true)
                 .enqueue(new Callback<Result<List<Project>>>() {
@@ -1180,6 +1189,7 @@ public class TeamList extends Fragment {
                         }
                         myPendingPage = requestedPage;
                         hasMoreMyPending = projects.size() >= MY_PENDING_PAGE_SIZE;
+                        projects = filterProvinceLocallyIfNeeded(projects);
                         List<Project> waitingForLeader = new ArrayList<>();
                         for (Project project : projects) {
                             if (project.getOwnerAccountId() == accountId
@@ -1188,9 +1198,12 @@ public class TeamList extends Fragment {
                                 waitingForLeader.add(project);
                             }
                         }
-                        appendProjects(waitingForLeader, myPendingItems,
+                        int added = appendProjects(waitingForLeader, myPendingItems,
                                 myPendingProjectIds, myPendingAdapter);
                         updateMyPendingSection();
+                        if (added == 0 && hasMoreMyPending) {
+                            loadMyPendingPage(true, generation);
+                        }
                     }
 
                     @Override
@@ -1208,6 +1221,37 @@ public class TeamList extends Fragment {
                         updateMyPendingSection();
                     }
                 });
+    }
+
+    @Nullable
+    private String selectedFilterTag() {
+        return filterTags.isEmpty() ? null : filterTags.iterator().next();
+    }
+
+    @Nullable
+    private String backendRegionCode() {
+        return isProvinceRegionCode(filterRegionCode) ? null : filterRegionCode;
+    }
+
+    private List<Project> filterProvinceLocallyIfNeeded(List<Project> projects) {
+        if (!isProvinceRegionCode(filterRegionCode)) {
+            return projects;
+        }
+        List<Project> matched = new ArrayList<>();
+        String prefix = filterRegionCode.substring(0, 2);
+        for (Project project : projects) {
+            if (project != null && !TextUtils.isEmpty(project.getRegionAdcode())
+                    && project.getRegionAdcode().startsWith(prefix)) {
+                matched.add(project);
+            }
+        }
+        return matched;
+    }
+
+    private boolean isProvinceRegionCode(@Nullable String regionCode) {
+        return !TextUtils.isEmpty(regionCode)
+                && regionCode.length() >= 6
+                && regionCode.endsWith("0000");
     }
 
     private int appendProjects(List<Project> projects,

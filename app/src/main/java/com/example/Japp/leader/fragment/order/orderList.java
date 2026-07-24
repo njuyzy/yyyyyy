@@ -10,6 +10,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -32,7 +33,6 @@ import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.Project;
-import com.example.Japp.network.models.ProjectPage;
 import com.example.Japp.network.models.Region;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
@@ -45,6 +45,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
 
@@ -84,7 +85,7 @@ public class orderList extends Fragment {
     private String filterDateFrom;
     private String filterDateTo;
     private Boolean filterHasLeader;
-    private Boolean filterOnlyAvailable;
+    private Boolean filterOnlyAvailable = Boolean.TRUE;
 
     private List<Region> provinces = new ArrayList<>();
     private List<Region> cities = new ArrayList<>();
@@ -136,10 +137,7 @@ public class orderList extends Fragment {
 
         // 搜索按钮
         if (btnSearch != null) {
-            btnSearch.setOnClickListener(v -> {
-                // TODO: 跳转到搜索界面
-                Toast.makeText(requireContext(), "搜索功能开发中", Toast.LENGTH_SHORT).show();
-            });
+            btnSearch.setOnClickListener(v -> showSearchDialog());
         }
 
         return view;
@@ -159,9 +157,37 @@ public class orderList extends Fragment {
         dialog.show();
     }
 
+    private void showSearchDialog() {
+        EditText input = new EditText(requireContext());
+        input.setSingleLine(true);
+        input.setHint("输入关键词");
+        input.setText(filterKeyword == null ? "" : filterKeyword);
+        input.setSelection(input.length());
+        int horizontalPadding = Math.round(
+                20f * getResources().getDisplayMetrics().density);
+        input.setPadding(horizontalPadding, 0, horizontalPadding, 0);
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("搜索路线")
+                .setView(input)
+                .setNegativeButton("取消", null)
+                .setNeutralButton("清空", (dialog, which) -> {
+                    filterKeyword = null;
+                    loadOrders();
+                })
+                .setPositiveButton("搜索", (dialog, which) -> {
+                    String keyword = input.getText() == null
+                            ? "" : input.getText().toString().trim();
+                    filterKeyword = keyword.isEmpty() ? null : keyword;
+                    loadOrders();
+                })
+                .show();
+    }
+
     private void setupTagGrid() {
         if (tagGrid == null) return;
         tagAdapter = new TagGridAdapter();
+        tagAdapter.setSingleSelection(true);
         tagGrid.setLayoutManager(new GridLayoutManager(requireContext(), 3,
                 GridLayoutManager.HORIZONTAL, false));
         tagGrid.setAdapter(tagAdapter);
@@ -215,6 +241,7 @@ public class orderList extends Fragment {
 
         String[] tagNames = getResources().getStringArray(R.array.route_tag_names);
         if (chipGroupTags != null) {
+            chipGroupTags.setSingleSelection(true);
             for (String tag : tagNames) {
                 Chip chip = new Chip(requireContext());
                 chip.setText(tag);
@@ -278,6 +305,9 @@ public class orderList extends Fragment {
 
             filterTags.clear();
             filterTags.addAll(getSelectedTags(chipGroupTags));
+            if (tagAdapter != null) {
+                tagAdapter.setSelectedTags(filterTags);
+            }
 
             int statusIndex = spinnerStatus.getSelectedItemPosition();
             if (statusIndex >= 0 && statusIndex < statusValues.length) {
@@ -499,24 +529,11 @@ public class orderList extends Fragment {
         filterDateFrom = null;
         filterDateTo = null;
         filterHasLeader = null;
-        filterOnlyAvailable = null;
+        filterOnlyAvailable = Boolean.TRUE;
         cities.clear();
         if (tagAdapter != null) {
             tagAdapter.clearSelection();
         }
-    }
-
-    private ProjectUiHelper.ProjectFilterCriteria buildFilterCriteria() {
-        ProjectUiHelper.ProjectFilterCriteria criteria = new ProjectUiHelper.ProjectFilterCriteria();
-        criteria.keyword = filterKeyword;
-        criteria.regionAdcode = filterRegionCode;
-        criteria.tags = new HashSet<>(filterTags);
-        criteria.status = filterStatus;
-        criteria.dateFrom = filterDateFrom;
-        criteria.dateTo = filterDateTo;
-        criteria.hasLeader = filterHasLeader;
-        criteria.joinableOnly = Boolean.TRUE.equals(filterOnlyAvailable) ? Boolean.TRUE : null;
-        return criteria;
     }
 
     private void loadOrders() {
@@ -532,12 +549,24 @@ public class orderList extends Fragment {
             swipeRefresh.setRefreshing(true);
         }
 
-        // 拉取较宽结果集，再按「任一条件命中」做本地 OR 筛选
-        service.getAvailableProjects(1, 100)
-                .enqueue(new Callback<Result<ProjectPage>>() {
+        service.filterProjects(
+                        accountId,
+                        1,
+                        100,
+                        filterKeyword,
+                        backendRegionCode(),
+                        selectedFilterTag(),
+                        filterStatus,
+                        filterDateFrom,
+                        filterDateTo,
+                        null,
+                        null,
+                        filterHasLeader,
+                        Boolean.TRUE.equals(filterOnlyAvailable))
+                .enqueue(new Callback<Result<List<Project>>>() {
                     @Override
-                    public void onResponse(@NonNull Call<Result<ProjectPage>> call,
-                                           @NonNull Response<Result<ProjectPage>> response) {
+                    public void onResponse(@NonNull Call<Result<List<Project>>> call,
+                                           @NonNull Response<Result<List<Project>>> response) {
                         if (!isAdded()) {
                             return;
                         }
@@ -551,13 +580,11 @@ public class orderList extends Fragment {
                             adapter.setItems(new ArrayList<>());
                             return;
                         }
-                        ProjectPage page = response.body().getData();
-                        List<Project> projects = page == null ? null : page.getItems();
+                        List<Project> projects = response.body().getData();
                         if (projects == null) {
                             projects = new ArrayList<>();
                         }
-                        List<Project> filtered = ProjectUiHelper.filterProjectsByAnyMatch(
-                                projects, buildFilterCriteria());
+                        List<Project> filtered = filterProvinceLocallyIfNeeded(projects);
                         if (filtered.isEmpty()) {
                             showEmpty("暂无符合条件的路线");
                             adapter.setItems(new ArrayList<>());
@@ -567,7 +594,8 @@ public class orderList extends Fragment {
                     }
 
                     @Override
-                    public void onFailure(@NonNull Call<Result<ProjectPage>> call, @NonNull Throwable t) {
+                    public void onFailure(@NonNull Call<Result<List<Project>>> call,
+                                          @NonNull Throwable t) {
                         if (!isAdded()) {
                             return;
                         }
@@ -576,6 +604,37 @@ public class orderList extends Fragment {
                         adapter.setItems(new ArrayList<>());
                     }
                 });
+    }
+
+    @Nullable
+    private String selectedFilterTag() {
+        return filterTags.isEmpty() ? null : filterTags.iterator().next();
+    }
+
+    @Nullable
+    private String backendRegionCode() {
+        return isProvinceRegionCode(filterRegionCode) ? null : filterRegionCode;
+    }
+
+    private List<Project> filterProvinceLocallyIfNeeded(List<Project> projects) {
+        if (!isProvinceRegionCode(filterRegionCode)) {
+            return projects;
+        }
+        List<Project> matched = new ArrayList<>();
+        String prefix = filterRegionCode.substring(0, 2);
+        for (Project project : projects) {
+            if (project != null && !TextUtils.isEmpty(project.getRegionAdcode())
+                    && project.getRegionAdcode().startsWith(prefix)) {
+                matched.add(project);
+            }
+        }
+        return matched;
+    }
+
+    private boolean isProvinceRegionCode(@Nullable String regionCode) {
+        return !TextUtils.isEmpty(regionCode)
+                && regionCode.length() >= 6
+                && regionCode.endsWith("0000");
     }
 
     private void verifySessionAfterLeaderUnauthorized() {

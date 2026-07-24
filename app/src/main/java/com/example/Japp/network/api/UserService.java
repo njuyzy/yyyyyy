@@ -77,27 +77,6 @@ public interface UserService {
     Call<Result<ProjectPage>> getAvailableProjects(@Query("pageNum") int pageNum,
                                                    @Query("pageSize") int pageSize);
 
-    @GET("projects/filter")
-    Call<Result<List<Project>>> getJoinableProjects(@Query("accountId") int accountId,
-                                                    @Query("pageNum") int pageNum,
-                                                    @Query("pageSize") int pageSize,
-                                                    @Query("onlyAvailable") boolean onlyAvailable);
-
-    @GET("projects/filter")
-    Call<Result<List<Project>>> getOwnedJoinableProjects(@Query("accountId") int accountId,
-                                                         @Query("ownerAccountId") int ownerAccountId,
-                                                         @Query("pageNum") int pageNum,
-                                                         @Query("pageSize") int pageSize,
-                                                         @Query("hasLeader") boolean hasLeader,
-                                                         @Query("onlyAvailable") boolean onlyAvailable);
-
-    @GET("projects/filter")
-    Call<Result<List<Project>>> getOwnedProjects(@Query("accountId") int accountId,
-                                                 @Query("ownerAccountId") int ownerAccountId,
-                                                 @Query("pageNum") int pageNum,
-                                                 @Query("pageSize") int pageSize,
-                                                 @Query("onlyAvailable") boolean onlyAvailable);
-
     @GET("regions/provinces")
     Call<Result<List<Region>>> getProvinces();
 
@@ -115,6 +94,8 @@ public interface UserService {
                                               @Query("status") String status,
                                               @Query("departureDateFrom") String departureDateFrom,
                                               @Query("departureDateTo") String departureDateTo,
+                                              @Query("ownerAccountId") Integer ownerAccountId,
+                                              @Query("leaderAccountId") Integer leaderAccountId,
                                               @Query("hasLeader") Boolean hasLeader,
                                               @Query("onlyAvailable") Boolean joinableOnly);
 
