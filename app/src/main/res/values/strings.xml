@@ -104,6 +104,13 @@
     <string name="route_publish">发布拼单</string>
     <string name="route_assistant_name">路线助手</string>
 
+    <!-- Leader order list -->
+    <string name="leader_order_toolbar_title">可选路线</string>
+    <string name="leader_order_my_serving_title">我正在服务的路线</string>
+    <string name="leader_order_my_serving_expand">展开我正在服务的路线</string>
+    <string name="leader_order_my_serving_collapse">收起我正在服务的路线</string>
+    <string name="leader_order_available_title">可接的订单</string>
+
     <!-- Order filter -->
     <string name="order_filter_title">筛选路线</string>
     <string name="order_filter_keyword_hint">搜索标题或关键词</string>

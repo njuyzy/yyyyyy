@@ -1,17 +1,23 @@
 package com.example.Japp.leader.fragment.order;
 
+import android.animation.ValueAnimator;
 import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.ListView;
+import android.widget.PopupWindow;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -42,20 +48,19 @@ import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
 import com.example.Japp.util.InsetDividerDecoration;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
-import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -63,17 +68,56 @@ import retrofit2.Response;
 
 public class orderList extends Fragment {
 
+    private static final String TAG = "LeaderOrderListApi";
+    private static final int AVAILABLE_PAGE_SIZE = 15;
+    private static final int MY_SERVING_PAGE_SIZE = 3;
+    // 防止客户端过滤导致整页 0 命中而无限递归拉取下一页。
+    private static final int MAX_AVAILABLE_PAGES = 10;
+    private static final int MAX_MY_SERVING_PAGES = 5;
+    private static final int MAX_CONSECUTIVE_EMPTY_PAGES = 3;
+
     private RecyclerView recycler;
+    private RecyclerView myPendingRecycler;
     private SwipeRefreshLayout swipeRefresh;
     private TextView txtEmpty;
+    private TextView btnMoreMine;
+    private TextView txtMyPendingCount;
+    private View myPendingSection;
+    private View myPendingHeader;
+    private View myPendingContent;
+    private ImageView imgMyPendingExpand;
+    private View availableSection;
+    private View inlineSearchContainer;
+    private View searchDismissOverlay;
+    private View toolbarTitle;
+    private ImageButton btnSearch;
     private ImageButton btnFilter;
+    private TextInputEditText editInlineSearch;
     private TeamListAdapter adapter;
+    private TeamListAdapter myPendingAdapter;
     private UserService service;
     private final List<TeamCardItem> teamItems = new ArrayList<>();
+    private final List<TeamCardItem> myPendingItems = new ArrayList<>();
+    private final Set<Integer> teamProjectIds = new HashSet<>();
+    private final Set<Integer> myPendingProjectIds = new HashSet<>();
+    private final Map<Integer, RoutePresentation> routeCache = new HashMap<>();
+    private int availablePage;
+    private int myPendingPage;
+    private int loadGeneration;
+    private boolean loadingAvailable;
+    private boolean loadingMyPending;
+    private boolean hasMoreAvailable = true;
+    private boolean hasMoreMyPending = true;
+    private int myPendingSectionHeight;
+    private int availableOverlayOffset;
+    private boolean tagFiltersVisible;
+    private boolean myPendingExpanded;
+    private int consecutiveEmptyAvailablePages;
+    private int consecutiveEmptyMyPendingPages;
+    private ValueAnimator tagGridAnimator;
 
     private RecyclerView tagGrid;
     private TextView txtCurrentCity;
-    private ImageButton btnSearch;
     private TagGridAdapter tagAdapter;
 
     private String filterKeyword;
@@ -85,7 +129,6 @@ public class orderList extends Fragment {
     private String filterDateFrom;
     private String filterDateTo;
     private Boolean filterHasLeader;
-    private Boolean filterOnlyAvailable = Boolean.TRUE;
 
     private List<Region> provinces = new ArrayList<>();
     private List<Region> cities = new ArrayList<>();
@@ -103,44 +146,149 @@ public class orderList extends Fragment {
         View view = inflater.inflate(R.layout.leader_fragment_order_list, container, false);
 
         recycler = view.findViewById(R.id.recycler);
+        myPendingRecycler = view.findViewById(R.id.myPendingRecycler);
         swipeRefresh = view.findViewById(R.id.swipeRefresh);
         txtEmpty = view.findViewById(R.id.txtEmpty);
+        btnMoreMine = view.findViewById(R.id.btnMoreMine);
+        txtMyPendingCount = view.findViewById(R.id.txtMyPendingCount);
+        myPendingSection = view.findViewById(R.id.myPendingSection);
+        myPendingHeader = view.findViewById(R.id.myPendingHeader);
+        myPendingContent = view.findViewById(R.id.myPendingContent);
+        imgMyPendingExpand = view.findViewById(R.id.imgMyPendingExpand);
+        availableSection = view.findViewById(R.id.availableSection);
+        inlineSearchContainer = view.findViewById(R.id.inlineSearchContainer);
+        searchDismissOverlay = view.findViewById(R.id.searchDismissOverlay);
+        toolbarTitle = view.findViewById(R.id.toolbarTitle);
+        btnSearch = view.findViewById(R.id.btnSearch);
         btnFilter = view.findViewById(R.id.btnFilter);
+        editInlineSearch = view.findViewById(R.id.editInlineSearch);
         tagGrid = view.findViewById(R.id.tagGrid);
         txtCurrentCity = view.findViewById(R.id.txtCurrentCity);
-        btnSearch = view.findViewById(R.id.btnSearch);
 
         service = ApiClient.getClient().create(UserService.class);
         adapter = new TeamListAdapter();
-        adapter.setOnTeamClickListener(item -> {
+        myPendingAdapter = new TeamListAdapter();
+        TeamListAdapter.OnTeamClickListener clickListener = item -> {
             Intent intent = new Intent(requireContext(), orderDetailActivity.class);
             intent.putExtra(orderDetailActivity.EXTRA_PROJECT_JSON, new Gson().toJson(item.getProject()));
             detailLauncher.launch(intent);
-        });
+        };
+        adapter.setOnTeamClickListener(clickListener);
+        myPendingAdapter.setOnTeamClickListener(clickListener);
 
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         recycler.setAdapter(adapter);
         recycler.addItemDecoration(new InsetDividerDecoration(requireContext(), 14, 16));
+        myPendingRecycler.setLayoutManager(new LinearLayoutManager(requireContext()));
+        myPendingRecycler.setAdapter(myPendingAdapter);
+        myPendingRecycler.addItemDecoration(new InsetDividerDecoration(requireContext(), 14, 16));
+        recycler.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+                updateAvailableOverlayForScroll(dy);
+                if (dy <= 0 || loadingAvailable || !hasMoreAvailable) {
+                    return;
+                }
+                LinearLayoutManager manager = (LinearLayoutManager) recyclerView.getLayoutManager();
+                if (manager != null
+                        && manager.findLastVisibleItemPosition() >= adapter.getItemCount() - 3) {
+                    loadAvailablePage(true, loadGeneration);
+                }
+            }
+        });
 
         if (swipeRefresh != null) {
             swipeRefresh.setOnRefreshListener(this::loadOrders);
+            swipeRefresh.setOnChildScrollUpCallback((parent, child) ->
+                    availableOverlayOffset > 0 || recycler.canScrollVertically(-1));
         }
-        if (btnFilter != null) {
-            btnFilter.setOnClickListener(v -> showFilterSheet());
-        }
-
-        // 初始化标签网格
-        setupTagGrid();
-
-        // 设置当前城市
-        loadCurrentCity();
-
-        // 搜索按钮
         if (btnSearch != null) {
-            btnSearch.setOnClickListener(v -> showSearchDialog());
+            btnSearch.setOnClickListener(v -> {
+                if (inlineSearchContainer.getVisibility() == View.VISIBLE) {
+                    hideInlineSearch(true);
+                } else {
+                    showInlineSearch();
+                }
+            });
         }
+        btnFilter.setOnClickListener(v -> toggleTagFilters());
+        searchDismissOverlay.setOnClickListener(v -> hideInlineSearch(true));
+        editInlineSearch.setOnEditorActionListener((v, actionId, event) -> {
+            hideInlineSearch(true);
+            return true;
+        });
+        if (btnMoreMine != null) {
+            btnMoreMine.setOnClickListener(v -> loadMyServingPage(true, loadGeneration));
+        }
+        myPendingHeader.setOnClickListener(v -> toggleMyPendingSection());
+        txtCurrentCity.setOnClickListener(v -> showCityPicker());
+
+        setupTagGrid();
+        restoreCitySelection();
 
         return view;
+    }
+
+    private void toggleMyPendingSection() {
+        myPendingExpanded = !myPendingExpanded;
+        myPendingContent.setVisibility(myPendingExpanded ? View.VISIBLE : View.GONE);
+        imgMyPendingExpand.animate()
+                .rotation(myPendingExpanded ? 90f : 0f)
+                .setDuration(160L)
+                .start();
+        imgMyPendingExpand.setContentDescription(
+                myPendingExpanded
+                        ? getString(R.string.leader_order_my_serving_collapse)
+                        : getString(R.string.leader_order_my_serving_expand));
+        availableOverlayOffset = 0;
+        syncAvailableOverlayPosition();
+    }
+
+    private void toggleTagFilters() {
+        if (tagGridAnimator != null) {
+            tagGridAnimator.cancel();
+        }
+        int targetHeight = Math.round(180f * getResources().getDisplayMetrics().density);
+        int startHeight = tagGrid.getVisibility() == View.VISIBLE
+                ? tagGrid.getHeight() : 0;
+        tagFiltersVisible = !tagFiltersVisible;
+
+        if (tagFiltersVisible) {
+            ViewGroup.LayoutParams params = tagGrid.getLayoutParams();
+            params.height = 0;
+            tagGrid.setLayoutParams(params);
+            tagGrid.setVisibility(View.VISIBLE);
+            tagGrid.setAlpha(0f);
+            tagGrid.setTranslationY(-18f);
+            tagGridAnimator = ValueAnimator.ofInt(0, targetHeight);
+        } else {
+            startHeight = Math.max(0, startHeight);
+            tagGridAnimator = ValueAnimator.ofInt(startHeight, 0);
+        }
+        btnFilter.setRotation(0f);
+
+        tagGridAnimator.setDuration(tagFiltersVisible ? 210L : 180L);
+        tagGridAnimator.addUpdateListener(animation -> {
+            int height = (int) animation.getAnimatedValue();
+            ViewGroup.LayoutParams params = tagGrid.getLayoutParams();
+            params.height = height;
+            tagGrid.setLayoutParams(params);
+            float progress = targetHeight == 0 ? 1f : height / (float) targetHeight;
+            tagGrid.setAlpha(progress);
+            tagGrid.setTranslationY(-18f * (1f - progress));
+        });
+        tagGridAnimator.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(android.animation.Animator animation) {
+                if (!tagFiltersVisible) {
+                    tagGrid.setVisibility(View.GONE);
+                }
+                tagGrid.setAlpha(1f);
+                tagGrid.setTranslationY(0f);
+            }
+        });
+        tagGridAnimator.start();
     }
 
     @Override
@@ -149,43 +297,124 @@ public class orderList extends Fragment {
         loadOrders();
     }
 
-    private void showFilterSheet() {
-        BottomSheetDialog dialog = new BottomSheetDialog(requireContext());
-        View content = LayoutInflater.from(requireContext()).inflate(R.layout.popup_filter_menu, null);
-        dialog.setContentView(content);
-        setupFilterSheet(content, dialog);
-        dialog.show();
+    private void showInlineSearch() {
+        if (inlineSearchContainer.getVisibility() == View.VISIBLE) {
+            editInlineSearch.requestFocus();
+            return;
+        }
+        editInlineSearch.setText(filterKeyword == null ? "" : filterKeyword);
+        editInlineSearch.setSelection(editInlineSearch.length());
+        searchDismissOverlay.setVisibility(View.VISIBLE);
+        toolbarTitle.animate().cancel();
+        txtCurrentCity.animate().cancel();
+        toolbarTitle.animate()
+                .alpha(0f)
+                .translationY(-18f)
+                .translationX(-24f)
+                .setDuration(170L)
+                .start();
+        txtCurrentCity.animate()
+                .alpha(0f)
+                .translationY(-18f)
+                .translationX(-18f)
+                .setDuration(170L)
+                .start();
+        btnFilter.animate().cancel();
+        btnFilter.animate()
+                .alpha(0f)
+                .translationY(-18f)
+                .setDuration(150L)
+                .start();
+        inlineSearchContainer.setVisibility(View.VISIBLE);
+        inlineSearchContainer.setAlpha(0f);
+        inlineSearchContainer.setScaleX(0.28f);
+        inlineSearchContainer.setTranslationX(54f);
+        inlineSearchContainer.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .translationX(0f)
+                .setDuration(190L)
+                .start();
+        editInlineSearch.postDelayed(() -> {
+            if (!isAdded() || inlineSearchContainer.getVisibility() != View.VISIBLE) {
+                return;
+            }
+            editInlineSearch.requestFocus();
+            InputMethodManager inputMethodManager = (InputMethodManager)
+                    requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+            inputMethodManager.showSoftInput(editInlineSearch, InputMethodManager.SHOW_IMPLICIT);
+        }, 120L);
     }
 
-    private void showSearchDialog() {
-        EditText input = new EditText(requireContext());
-        input.setSingleLine(true);
-        input.setHint("输入关键词");
-        input.setText(filterKeyword == null ? "" : filterKeyword);
-        input.setSelection(input.length());
-        int horizontalPadding = Math.round(
-                20f * getResources().getDisplayMetrics().density);
-        input.setPadding(horizontalPadding, 0, horizontalPadding, 0);
+    private void hideInlineSearch(boolean applyKeyword) {
+        if (inlineSearchContainer.getVisibility() != View.VISIBLE) {
+            return;
+        }
+        String nextKeyword = editInlineSearch.getText() == null
+                ? "" : editInlineSearch.getText().toString().trim();
+        String normalizedKeyword = nextKeyword.isEmpty() ? null : nextKeyword;
+        boolean keywordChanged = !TextUtils.equals(filterKeyword, normalizedKeyword);
+        if (applyKeyword) {
+            filterKeyword = normalizedKeyword;
+            clearLegacySearchFilters();
+        }
+        searchDismissOverlay.setVisibility(View.GONE);
+        editInlineSearch.clearFocus();
+        toolbarTitle.animate().cancel();
+        txtCurrentCity.animate().cancel();
+        toolbarTitle.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .translationX(0f)
+                .setStartDelay(40L)
+                .setDuration(180L)
+                .start();
+        txtCurrentCity.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .translationX(0f)
+                .setStartDelay(40L)
+                .setDuration(180L)
+                .start();
+        btnFilter.animate().cancel();
+        btnFilter.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setStartDelay(40L)
+                .setDuration(170L)
+                .start();
+        InputMethodManager inputMethodManager = (InputMethodManager)
+                requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+        inputMethodManager.hideSoftInputFromWindow(editInlineSearch.getWindowToken(), 0);
+        inlineSearchContainer.animate()
+                .alpha(0f)
+                .scaleX(0.3f)
+                .translationX(54f)
+                .setDuration(150L)
+                .withEndAction(() -> {
+                    inlineSearchContainer.setVisibility(View.GONE);
+                    inlineSearchContainer.setAlpha(1f);
+                    inlineSearchContainer.setScaleX(1f);
+                    inlineSearchContainer.setTranslationX(0f);
+                })
+                .start();
+        if (applyKeyword && keywordChanged) {
+            loadOrders();
+        }
+    }
 
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle("搜索路线")
-                .setView(input)
-                .setNegativeButton("取消", null)
-                .setNeutralButton("清空", (dialog, which) -> {
-                    filterKeyword = null;
-                    loadOrders();
-                })
-                .setPositiveButton("搜索", (dialog, which) -> {
-                    String keyword = input.getText() == null
-                            ? "" : input.getText().toString().trim();
-                    filterKeyword = keyword.isEmpty() ? null : keyword;
-                    loadOrders();
-                })
-                .show();
+    private void clearLegacySearchFilters() {
+        filterStatus = null;
+        filterStatusLabel = null;
+        filterDateFrom = null;
+        filterDateTo = null;
+        filterHasLeader = null;
     }
 
     private void setupTagGrid() {
-        if (tagGrid == null) return;
+        if (tagGrid == null) {
+            return;
+        }
         tagAdapter = new TagGridAdapter();
         tagAdapter.setSingleSelection(true);
         tagGrid.setLayoutManager(new GridLayoutManager(requireContext(), 3,
@@ -204,16 +433,268 @@ public class orderList extends Fragment {
         });
     }
 
-    private void loadCurrentCity() {
-        if (txtCurrentCity == null) return;
-        SharedPreferences prefs = requireContext().getSharedPreferences("user_pref", android.content.Context.MODE_PRIVATE);
-        String regionCode = prefs.getString("region_code", "");
-        String city = ProjectUiHelper.regionAdcodeToCity(regionCode);
-        if (city.isEmpty() || city.equals(regionCode)) {
+    private void restoreCitySelection() {
+        if (txtCurrentCity == null) {
+            return;
+        }
+        SharedPreferences prefs = requireContext().getSharedPreferences("leader_pref",
+                android.content.Context.MODE_PRIVATE);
+        if (prefs.contains("leader_order_region_code")) {
+            filterRegionCode = prefs.getString("leader_order_region_code", "");
+            filterRegionLabel = prefs.getString("leader_order_region_label", "");
+        } else {
+            filterRegionCode = prefs.getString("region_code", "");
+            filterRegionLabel = ProjectUiHelper.regionAdcodeToCity(filterRegionCode);
+            if (TextUtils.equals(filterRegionCode, filterRegionLabel)) {
+                filterRegionCode = null;
+                filterRegionLabel = null;
+            }
+        }
+        if (TextUtils.isEmpty(filterRegionCode)) {
+            filterRegionCode = null;
+        }
+        updateCurrentCityLabel();
+    }
+
+    private void updateCurrentCityLabel() {
+        String city = filterRegionLabel;
+        if (!TextUtils.isEmpty(city)) {
+            int separator = city.lastIndexOf(" · ");
+            if (separator >= 0 && separator + 3 < city.length()) {
+                city = city.substring(separator + 3);
+            }
+        }
+        if (TextUtils.isEmpty(city) && !TextUtils.isEmpty(filterRegionCode)) {
+            city = ProjectUiHelper.regionAdcodeToCity(filterRegionCode);
+        }
+        if (TextUtils.isEmpty(city) || city.equals(filterRegionCode)) {
             txtCurrentCity.setText("全国");
         } else {
             txtCurrentCity.setText(city);
         }
+    }
+
+    private void showCityPicker() {
+        View content = LayoutInflater.from(requireContext())
+                .inflate(R.layout.popup_city_picker, null);
+        ListView listProvince = content.findViewById(R.id.listProvince);
+        PopupWindow popup = new PopupWindow(content, dpToPx(168), dpToPx(356), true);
+        popup.setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        popup.setOutsideTouchable(true);
+        popup.setElevation(dpToPx(8));
+        PopupWindow[] cityPopupHolder = new PopupWindow[1];
+        popup.setOnDismissListener(() -> {
+            if (cityPopupHolder[0] != null && cityPopupHolder[0].isShowing()) {
+                cityPopupHolder[0].dismiss();
+            }
+        });
+
+        loadCityPickerProvinces(listProvince, popup, cityPopupHolder);
+        popup.showAsDropDown(txtCurrentCity, 0, dpToPx(2));
+    }
+
+    private void loadCityPickerProvinces(ListView listProvince,
+                                         PopupWindow provincePopup,
+                                         PopupWindow[] cityPopupHolder) {
+        service.getProvinces().enqueue(new Callback<Result<List<Region>>>() {
+            @Override
+            public void onResponse(@NonNull Call<Result<List<Region>>> call,
+                                   @NonNull Response<Result<List<Region>>> response) {
+                if (!isAdded() || !response.isSuccessful() || response.body() == null
+                        || response.body().getCode() != 1) {
+                    return;
+                }
+                provinces = response.body().getData() == null
+                        ? new ArrayList<>() : response.body().getData();
+                List<String> names = new ArrayList<>();
+                names.add("全国");
+                for (Region province : provinces) {
+                    names.add(province.getName());
+                }
+                ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+                        android.R.layout.simple_list_item_activated_1, names);
+                listProvince.setAdapter(adapter);
+                listProvince.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+
+                int initialPosition = 0;
+                if (!TextUtils.isEmpty(filterRegionCode)) {
+                    for (int i = 0; i < provinces.size(); i++) {
+                        Region province = provinces.get(i);
+                        if (filterRegionCode.startsWith(province.getAdcode().substring(0, 2))) {
+                            initialPosition = i + 1;
+                            break;
+                        }
+                    }
+                }
+                listProvince.setItemChecked(initialPosition, true);
+                listProvince.setSelection(initialPosition);
+
+                listProvince.setOnItemClickListener((parent, view, position, id) -> {
+                    if (position == 0) {
+                        applyCitySelection(null, null);
+                        provincePopup.dismiss();
+                        return;
+                    }
+                    Region province = provinces.get(position - 1);
+                    listProvince.setOnTouchListener((lockedView, event) -> true);
+                    showCitySubmenu(view, province, listProvince,
+                            provincePopup, cityPopupHolder);
+                });
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Result<List<Region>>> call,
+                                  @NonNull Throwable t) {
+                if (isAdded()) {
+                    Toast.makeText(requireContext(), "城市列表加载失败", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+    }
+
+    private void showCitySubmenu(View selectedProvinceView,
+                                 Region province,
+                                 ListView listProvince,
+                                 PopupWindow provincePopup,
+                                 PopupWindow[] cityPopupHolder) {
+        if (cityPopupHolder[0] != null && cityPopupHolder[0].isShowing()) {
+            cityPopupHolder[0].dismiss();
+        }
+        View cityContent = LayoutInflater.from(requireContext())
+                .inflate(R.layout.popup_city_submenu, null);
+        ListView listCity = cityContent.findViewById(R.id.listCity);
+        PopupWindow cityPopup = new PopupWindow(
+                cityContent, dpToPx(168), dpToPx(356), false);
+        cityPopup.setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        cityPopup.setOutsideTouchable(false);
+        cityPopup.setElevation(dpToPx(9));
+        cityPopup.setOnDismissListener(() -> {
+            listProvince.setOnTouchListener(null);
+            if (provincePopup.isShowing()) {
+                provincePopup.dismiss();
+            }
+        });
+        cityPopupHolder[0] = cityPopup;
+        cityPopup.showAsDropDown(selectedProvinceView,
+                selectedProvinceView.getWidth(), -selectedProvinceView.getHeight());
+        loadCityPickerCities(listCity, province, cityPopup, provincePopup);
+    }
+
+    private void loadCityPickerCities(ListView listCity,
+                                      Region province,
+                                      PopupWindow cityPopup,
+                                      PopupWindow provincePopup) {
+        listCity.setTag(province.getAdcode());
+        service.getRegionChildren(province.getAdcode())
+                .enqueue(new Callback<Result<List<Region>>>() {
+            @Override
+            public void onResponse(@NonNull Call<Result<List<Region>>> call,
+                                   @NonNull Response<Result<List<Region>>> response) {
+                if (!isAdded() || !cityPopup.isShowing()
+                        || !TextUtils.equals(province.getAdcode(),
+                                String.valueOf(listCity.getTag()))) {
+                    return;
+                }
+                boolean successful = response.isSuccessful() && response.body() != null
+                        && response.body().getCode() == 1;
+                cities = successful && response.body().getData() != null
+                        ? response.body().getData() : new ArrayList<>();
+                if (!successful) {
+                    Toast.makeText(requireContext(),
+                            "城市列表加载失败", Toast.LENGTH_SHORT).show();
+                } else if (cities.isEmpty()) {
+                    Toast.makeText(requireContext(),
+                            "暂无城市数据", Toast.LENGTH_SHORT).show();
+                }
+                bindCityPickerList(
+                        listCity, province, cities, cityPopup, provincePopup);
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Result<List<Region>>> call,
+                                  @NonNull Throwable t) {
+                if (isAdded() && cityPopup.isShowing()
+                        && TextUtils.equals(province.getAdcode(),
+                                String.valueOf(listCity.getTag()))) {
+                    Toast.makeText(requireContext(),
+                            "城市列表加载失败", Toast.LENGTH_SHORT).show();
+                    bindCityPickerList(listCity, province, new ArrayList<>(),
+                            cityPopup, provincePopup);
+                }
+            }
+        });
+    }
+
+    private void bindCityPickerList(ListView listCity,
+                                    Region province,
+                                    List<Region> cityList,
+                                    PopupWindow cityPopup,
+                                    PopupWindow provincePopup) {
+        List<String> names = new ArrayList<>();
+        names.add("全省");
+        for (Region city : cityList) {
+            names.add(city.getName());
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_list_item_activated_1, names);
+        listCity.setAdapter(adapter);
+        listCity.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+
+        int initialPosition = 0;
+        if (!TextUtils.isEmpty(filterRegionCode)) {
+            for (int i = 0; i < cityList.size(); i++) {
+                if (filterRegionCode.equals(cityList.get(i).getAdcode())) {
+                    initialPosition = i + 1;
+                    break;
+                }
+            }
+        }
+        listCity.setItemChecked(initialPosition, true);
+        listCity.setSelection(initialPosition);
+        listCity.setOnItemClickListener((parent, view, position, id) -> {
+            applyCitySelection(province,
+                    position == 0 ? null : cityList.get(position - 1));
+            cityPopup.dismiss();
+            provincePopup.dismiss();
+        });
+    }
+
+    private void applyCitySelection(@Nullable Region province, @Nullable Region city) {
+        if (province == null) {
+            filterRegionCode = null;
+            filterRegionLabel = null;
+        } else if (city == null) {
+            filterRegionCode = province.getAdcode();
+            filterRegionLabel = province.getName();
+        } else {
+            filterRegionCode = city.getAdcode();
+            filterRegionLabel = province.getName() + " · " + city.getName();
+        }
+        saveCitySelection();
+        updateCurrentCityLabel();
+        loadOrders();
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
+    }
+
+    private void saveCitySelection() {
+        requireContext().getSharedPreferences("leader_pref", android.content.Context.MODE_PRIVATE)
+                .edit()
+                .putString("leader_order_region_code",
+                        filterRegionCode == null ? "" : filterRegionCode)
+                .putString("leader_order_region_label",
+                        filterRegionLabel == null ? "" : filterRegionLabel)
+                .apply();
+    }
+
+    private void showFilterSheet() {
+        BottomSheetDialog dialog = new BottomSheetDialog(requireContext());
+        View content = LayoutInflater.from(requireContext()).inflate(R.layout.popup_filter_menu, null);
+        dialog.setContentView(content);
+        setupFilterSheet(content, dialog);
+        dialog.show();
     }
 
     private void setupFilterSheet(View content, BottomSheetDialog dialog) {
@@ -223,11 +704,16 @@ public class orderList extends Fragment {
         ChipGroup chipGroupTags = content.findViewById(R.id.chipGroupTags);
         Spinner spinnerStatus = content.findViewById(R.id.spinnerStatus);
         Spinner spinnerHasLeader = content.findViewById(R.id.spinnerHasLeader);
-        MaterialCheckBox cbOnlyAvailable = content.findViewById(R.id.cbOnlyAvailable);
+        View cbOnlyAvailable = content.findViewById(R.id.cbOnlyAvailable);
         TextInputEditText etDateFrom = content.findViewById(R.id.etDateFrom);
         TextInputEditText etDateTo = content.findViewById(R.id.etDateTo);
         View btnReset = content.findViewById(R.id.btnReset);
         View btnConfirm = content.findViewById(R.id.btnConfirm);
+
+        // 领队端始终只看可接路线，隐藏 cbOnlyAvailable 开关。
+        if (cbOnlyAvailable != null) {
+            cbOnlyAvailable.setVisibility(View.GONE);
+        }
 
         if (etKeyword != null && filterKeyword != null) {
             etKeyword.setText(filterKeyword);
@@ -279,10 +765,6 @@ public class orderList extends Fragment {
             spinnerHasLeader.setSelection(1);
         } else {
             spinnerHasLeader.setSelection(2);
-        }
-
-        if (cbOnlyAvailable != null) {
-            cbOnlyAvailable.setChecked(Boolean.TRUE.equals(filterOnlyAvailable));
         }
 
         loadProvinceSpinner(spinnerProvince, spinnerCity);
@@ -339,9 +821,6 @@ public class orderList extends Fragment {
                 filterHasLeader = null;
             }
 
-            filterOnlyAvailable = cbOnlyAvailable != null && cbOnlyAvailable.isChecked()
-                    ? Boolean.TRUE : null;
-
             loadOrders();
             dialog.dismiss();
         });
@@ -394,7 +873,7 @@ public class orderList extends Fragment {
             }
 
             @Override
-            public void onFailure(@NonNull Call<Result<List<Region>>> call, @NonNull Throwable t) {
+            public void onFailure(@NonNull Call<Result<List<Region>>> call, Throwable t) {
             }
         });
     }
@@ -439,7 +918,7 @@ public class orderList extends Fragment {
             }
 
             @Override
-            public void onFailure(@NonNull Call<Result<List<Region>>> call, @NonNull Throwable t) {
+            public void onFailure(@NonNull Call<Result<List<Region>>> call, Throwable t) {
                 if (isAdded()) {
                     bindCitySpinner(spinnerCity, new ArrayList<>(), false);
                 }
@@ -529,11 +1008,20 @@ public class orderList extends Fragment {
         filterDateFrom = null;
         filterDateTo = null;
         filterHasLeader = null;
-        filterOnlyAvailable = Boolean.TRUE;
         cities.clear();
         if (tagAdapter != null) {
             tagAdapter.clearSelection();
         }
+    }
+
+    private boolean hasActiveFilters() {
+        return !TextUtils.isEmpty(filterKeyword)
+                || !TextUtils.isEmpty(filterRegionCode)
+                || !filterTags.isEmpty()
+                || !TextUtils.isEmpty(filterStatus)
+                || !TextUtils.isEmpty(filterDateFrom)
+                || !TextUtils.isEmpty(filterDateTo)
+                || filterHasLeader != null;
     }
 
     private void loadOrders() {
@@ -541,18 +1029,57 @@ public class orderList extends Fragment {
             stopRefreshing();
             showEmpty("请先登录后查看可接路线");
             adapter.setItems(new ArrayList<>());
+            myPendingAdapter.setItems(new ArrayList<>());
+            myPendingSection.setVisibility(View.GONE);
             return;
         }
 
-        int accountId = SessionHelper.getAccountId(requireContext());
+        int generation = ++loadGeneration;
+        availablePage = 0;
+        myPendingPage = 0;
+        hasMoreAvailable = true;
+        hasMoreMyPending = true;
+        availableOverlayOffset = 0;
+        loadingAvailable = false;
+        loadingMyPending = false;
+        consecutiveEmptyAvailablePages = 0;
+        consecutiveEmptyMyPendingPages = 0;
+        teamItems.clear();
+        myPendingItems.clear();
+        teamProjectIds.clear();
+        myPendingProjectIds.clear();
+        adapter.setItems(new ArrayList<>());
+        myPendingAdapter.setItems(new ArrayList<>());
+        myPendingSection.setVisibility(View.GONE);
+        btnMoreMine.setVisibility(View.GONE);
+        syncAvailableOverlayPosition();
         if (swipeRefresh != null) {
             swipeRefresh.setRefreshing(true);
         }
+        loadMyServingPage(false, generation);
+        loadAvailablePage(false, generation);
+    }
 
+    private void loadAvailablePage(boolean append, int generation) {
+        if (loadingAvailable || (append && !hasMoreAvailable) || generation != loadGeneration) {
+            return;
+        }
+        int accountId = SessionHelper.getAccountId(requireContext());
+        int requestedPage = append ? availablePage + 1 : 1;
+        // 防止客户端过滤掉整页导致死循环。
+        if (append && requestedPage > MAX_AVAILABLE_PAGES) {
+            hasMoreAvailable = false;
+            stopRefreshing();
+            updateAvailableEmptyState();
+            return;
+        }
+        loadingAvailable = true;
+
+        // 领队"可接订单"列表：仅显示尚未指派领队的路线且当前可加入。
         service.filterProjects(
                         accountId,
-                        1,
-                        100,
+                        requestedPage,
+                        AVAILABLE_PAGE_SIZE,
                         filterKeyword,
                         backendRegionCode(),
                         selectedFilterTag(),
@@ -562,46 +1089,184 @@ public class orderList extends Fragment {
                         null,
                         null,
                         filterHasLeader,
-                        Boolean.TRUE.equals(filterOnlyAvailable))
+                        true)
                 .enqueue(new Callback<Result<List<Project>>>() {
                     @Override
                     public void onResponse(@NonNull Call<Result<List<Project>>> call,
                                            @NonNull Response<Result<List<Project>>> response) {
-                        if (!isAdded()) {
+                        if (!isAdded() || generation != loadGeneration) {
                             return;
                         }
-                        stopRefreshing();
+                        loadingAvailable = false;
                         if (response.code() == 401) {
+                            stopRefreshing();
                             verifySessionAfterLeaderUnauthorized();
                             return;
                         }
                         if (!response.isSuccessful() || response.body() == null || response.body().getCode() != 1) {
-                            showEmpty("加载失败，下拉刷新重试");
-                            adapter.setItems(new ArrayList<>());
+                            stopRefreshing();
+                            if (teamItems.isEmpty()) {
+                                showEmpty("加载失败，下拉刷新重试");
+                            } else {
+                                Toast.makeText(requireContext(), "加载下一页失败", Toast.LENGTH_SHORT).show();
+                            }
                             return;
                         }
                         List<Project> projects = response.body().getData();
                         if (projects == null) {
                             projects = new ArrayList<>();
                         }
+                        availablePage = requestedPage;
+                        hasMoreAvailable = projects.size() >= AVAILABLE_PAGE_SIZE
+                                && requestedPage < MAX_AVAILABLE_PAGES;
                         List<Project> filtered = filterProvinceLocallyIfNeeded(projects);
-                        if (filtered.isEmpty()) {
-                            showEmpty("暂无符合条件的路线");
-                            adapter.setItems(new ArrayList<>());
+                        // 过滤掉不可接单的路线（例如已有人接）。
+                        List<Project> acceptList = new ArrayList<>();
+                        for (Project project : filtered) {
+                            if (ProjectUiHelper.isJoinable(project)
+                                    && !ProjectUiHelper.hasAssignedLeader(project.getLeaderAccountId())) {
+                                acceptList.add(project);
+                            }
+                        }
+                        int added = appendProjects(acceptList, teamItems, teamProjectIds, adapter);
+                        updateAvailableEmptyState();
+
+                        if (added > 0) {
+                            consecutiveEmptyAvailablePages = 0;
+                        } else {
+                            consecutiveEmptyAvailablePages++;
+                            // 连续多页均无命中，避免无谓请求；超过上限即停止。
+                            if (consecutiveEmptyAvailablePages >= MAX_CONSECUTIVE_EMPTY_PAGES) {
+                                hasMoreAvailable = false;
+                                stopRefreshing();
+                                updateAvailableEmptyState();
+                                return;
+                            }
+                        }
+                        if (!hasMoreAvailable) {
+                            stopRefreshing();
+                            updateAvailableEmptyState();
                             return;
                         }
-                        enrichProjects(filtered);
+                        // 当前页可能全部都不命中过滤条件，继续取下一页。
+                        if (added == 0) {
+                            loadAvailablePage(true, generation);
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<Result<List<Project>>> call, @NonNull Throwable t) {
+                        if (!isAdded() || generation != loadGeneration) {
+                            return;
+                        }
+                        loadingAvailable = false;
+                        stopRefreshing();
+                        Log.e(TAG, "available orders request failed", t);
+                        if (teamItems.isEmpty()) {
+                            showEmpty("网络错误，下拉刷新重试");
+                        } else {
+                            Toast.makeText(requireContext(), "加载下一页失败", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+    }
+
+    private void loadMyServingPage(boolean append, int generation) {
+        if (loadingMyPending || (append && !hasMoreMyPending) || generation != loadGeneration) {
+            return;
+        }
+        int accountId = SessionHelper.getAccountId(requireContext());
+        int requestedPage = append ? myPendingPage + 1 : 1;
+        if (append && requestedPage > MAX_MY_SERVING_PAGES) {
+            hasMoreMyPending = false;
+            updateMyPendingSection();
+            return;
+        }
+        loadingMyPending = true;
+        btnMoreMine.setEnabled(false);
+
+        // 领队"我正在服务的路线"：leaderAccountId 为当前账号的订单。
+        service.filterProjects(
+                        accountId,
+                        requestedPage,
+                        MY_SERVING_PAGE_SIZE,
+                        filterKeyword,
+                        backendRegionCode(),
+                        selectedFilterTag(),
+                        filterStatus,
+                        filterDateFrom,
+                        filterDateTo,
+                        null,
+                        accountId,
+                        null,
+                        null)
+                .enqueue(new Callback<Result<List<Project>>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<Result<List<Project>>> call,
+                                           @NonNull Response<Result<List<Project>>> response) {
+                        if (!isAdded() || generation != loadGeneration) {
+                            return;
+                        }
+                        loadingMyPending = false;
+                        btnMoreMine.setEnabled(true);
+                        if (response.code() == 401) {
+                            stopRefreshing();
+                            verifySessionAfterLeaderUnauthorized();
+                            updateMyPendingSection();
+                            return;
+                        }
+                        if (!response.isSuccessful() || response.body() == null
+                                || response.body().getCode() != 1) {
+                            if (append) {
+                                Toast.makeText(requireContext(), "加载我正在服务的路线失败",
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                            updateMyPendingSection();
+                            return;
+                        }
+                        List<Project> projects = response.body().getData();
+                        if (projects == null) {
+                            projects = new ArrayList<>();
+                        }
+                        myPendingPage = requestedPage;
+                        hasMoreMyPending = projects.size() >= MY_SERVING_PAGE_SIZE
+                                && requestedPage < MAX_MY_SERVING_PAGES;
+                        projects = filterProvinceLocallyIfNeeded(projects);
+                        int added = appendProjects(projects, myPendingItems,
+                                myPendingProjectIds, myPendingAdapter);
+                        updateMyPendingSection();
+                        if (added > 0) {
+                            consecutiveEmptyMyPendingPages = 0;
+                        } else {
+                            consecutiveEmptyMyPendingPages++;
+                            if (consecutiveEmptyMyPendingPages >= MAX_CONSECUTIVE_EMPTY_PAGES) {
+                                hasMoreMyPending = false;
+                                updateMyPendingSection();
+                                return;
+                            }
+                        }
+                        if (!hasMoreMyPending) {
+                            updateMyPendingSection();
+                            return;
+                        }
+                        if (added == 0) {
+                            loadMyServingPage(true, generation);
+                        }
                     }
 
                     @Override
                     public void onFailure(@NonNull Call<Result<List<Project>>> call,
                                           @NonNull Throwable t) {
-                        if (!isAdded()) {
+                        if (!isAdded() || generation != loadGeneration) {
                             return;
                         }
-                        stopRefreshing();
-                        showEmpty("网络错误，下拉刷新重试");
-                        adapter.setItems(new ArrayList<>());
+                        loadingMyPending = false;
+                        btnMoreMine.setEnabled(true);
+                        if (append) {
+                            Toast.makeText(requireContext(), "加载我正在服务的路线失败",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                        updateMyPendingSection();
                     }
                 });
     }
@@ -635,6 +1300,70 @@ public class orderList extends Fragment {
         return !TextUtils.isEmpty(regionCode)
                 && regionCode.length() >= 6
                 && regionCode.endsWith("0000");
+    }
+
+    private int appendProjects(List<Project> projects,
+                               List<TeamCardItem> target,
+                               Set<Integer> targetIds,
+                               TeamListAdapter targetAdapter) {
+        int added = 0;
+        List<TeamCardItem> newItems = new ArrayList<>();
+        for (Project project : projects) {
+            if (project == null || !targetIds.add(project.getId())) {
+                continue;
+            }
+            TeamCardItem item = new TeamCardItem(project);
+            item.setCity(ProjectUiHelper.regionAdcodeToCity(project.getRegionAdcode()));
+            target.add(item);
+            newItems.add(item);
+            added++;
+        }
+        target.sort((left, right) -> ProjectUiHelper.compareProjectsByStatus(
+                left.getProject(), right.getProject()));
+        targetAdapter.setItems(new ArrayList<>(target));
+        for (TeamCardItem item : newItems) {
+            enrichRoute(item, target, targetAdapter);
+        }
+        return added;
+    }
+
+    private void enrichRoute(TeamCardItem item,
+                             List<TeamCardItem> target,
+                             TeamListAdapter targetAdapter) {
+        int routeId = item.getProject().getRouteId();
+        if (routeId <= 0) {
+            return;
+        }
+        RoutePresentation cached = routeCache.get(routeId);
+        if (cached != null) {
+            item.setRouteSummary(cached.summary);
+            item.setDuration(cached.duration);
+            targetAdapter.setItems(new ArrayList<>(target));
+            return;
+        }
+        service.getRouteNodes(routeId).enqueue(new Callback<Result<List<RouteNode>>>() {
+            @Override
+            public void onResponse(@NonNull Call<Result<List<RouteNode>>> call,
+                                   @NonNull Response<Result<List<RouteNode>>> response) {
+                if (!isAdded() || !response.isSuccessful() || response.body() == null
+                        || response.body().getCode() != 1) {
+                    return;
+                }
+                List<RouteNode> nodes = response.body().getData();
+                RoutePresentation presentation = new RoutePresentation(
+                        ProjectUiHelper.buildRouteSummary(nodes),
+                        ProjectUiHelper.formatDuration(ProjectUiHelper.sumDurationMinutes(nodes)));
+                routeCache.put(routeId, presentation);
+                item.setRouteSummary(presentation.summary);
+                item.setDuration(presentation.duration);
+                targetAdapter.setItems(new ArrayList<>(target));
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Result<List<RouteNode>>> call, @NonNull Throwable t) {
+                Log.w(TAG, "route summary request failed, routeId=" + routeId, t);
+            }
+        });
     }
 
     private void verifySessionAfterLeaderUnauthorized() {
@@ -675,74 +1404,71 @@ public class orderList extends Fragment {
         });
     }
 
-    private void enrichProjects(List<Project> projects) {
-        ProjectUiHelper.sortProjectsByStatus(projects);
-        teamItems.clear();
-        List<TeamCardItem> temp = new ArrayList<>();
-        for (Project project : projects) {
-            TeamCardItem item = new TeamCardItem(project);
-            item.setCity(ProjectUiHelper.regionAdcodeToCity(project.getRegionAdcode()));
-            temp.add(item);
-            teamItems.add(item);
-        }
-        adapter.setItems(temp);
-        txtEmpty.setVisibility(View.GONE);
-        recycler.setVisibility(View.VISIBLE);
-
-        AtomicInteger done = new AtomicInteger(0);
-        int total = projects.size();
-        for (int i = 0; i < projects.size(); i++) {
-            final int index = i;
-            Project project = projects.get(i);
-            TeamCardItem item = temp.get(index);
-
-            service.getAccount(project.getOwnerAccountId()).enqueue(new Callback<Result<Account>>() {
-                @Override
-                public void onResponse(@NonNull Call<Result<Account>> call, @NonNull Response<Result<Account>> response) {
-                    if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
-                        Account account = response.body().getData();
-                        if (account != null) {
-                            item.setOwnerName(account.getUsername());
-                        }
-                    }
-                    fetchRoute(item, project.getRouteId(), done, total);
-                }
-
-                @Override
-                public void onFailure(@NonNull Call<Result<Account>> call, @NonNull Throwable t) {
-                    fetchRoute(item, project.getRouteId(), done, total);
-                }
-            });
+    private void updateAvailableEmptyState() {
+        if (teamItems.isEmpty()) {
+            if (hasActiveFilters()) {
+                showEmpty("暂无符合条件的可接订单");
+            } else if (!hasMoreAvailable) {
+                showEmpty("暂无其他可接订单");
+            } else {
+                showEmpty("正在加载可接订单…");
+            }
+        } else {
+            txtEmpty.setVisibility(View.GONE);
+            recycler.setVisibility(View.VISIBLE);
         }
     }
 
-    private void fetchRoute(TeamCardItem item, int routeId, AtomicInteger done, int total) {
-        service.getRouteNodes(routeId).enqueue(new Callback<Result<List<RouteNode>>>() {
-            @Override
-            public void onResponse(@NonNull Call<Result<List<RouteNode>>> call,
-                                   @NonNull Response<Result<List<RouteNode>>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
-                    List<RouteNode> nodes = response.body().getData();
-                    item.setRouteSummary(ProjectUiHelper.buildRouteSummary(nodes));
-                    item.setDuration(ProjectUiHelper.formatDuration(ProjectUiHelper.sumDurationMinutes(nodes)));
-                }
-                checkRefresh(done, total);
-            }
+    private void updateMyPendingSection() {
+        boolean visible = !myPendingItems.isEmpty();
+        myPendingSection.setVisibility(visible ? View.VISIBLE : View.GONE);
+        btnMoreMine.setVisibility(visible && hasMoreMyPending ? View.VISIBLE : View.GONE);
+        myPendingContent.setVisibility(
+                visible && myPendingExpanded ? View.VISIBLE : View.GONE);
+        imgMyPendingExpand.setRotation(myPendingExpanded ? 90f : 0f);
+        imgMyPendingExpand.setContentDescription(
+                myPendingExpanded
+                        ? getString(R.string.leader_order_my_serving_collapse)
+                        : getString(R.string.leader_order_my_serving_expand));
+        txtMyPendingCount.setText(myPendingItems.size() + " 条");
+        syncAvailableOverlayPosition();
+    }
 
-            @Override
-            public void onFailure(@NonNull Call<Result<List<RouteNode>>> call, @NonNull Throwable t) {
-                checkRefresh(done, total);
+    private void updateAvailableOverlayForScroll(int dy) {
+        if (dy == 0 || myPendingSectionHeight <= 0 || availableSection == null) {
+            return;
+        }
+        int nextOffset = Math.max(0,
+                Math.min(myPendingSectionHeight, availableOverlayOffset + dy));
+        if (nextOffset == availableOverlayOffset) {
+            return;
+        }
+        availableOverlayOffset = nextOffset;
+        availableSection.setTranslationY(myPendingSectionHeight - availableOverlayOffset);
+    }
+
+    private void syncAvailableOverlayPosition() {
+        if (myPendingSection == null || availableSection == null) {
+            return;
+        }
+        myPendingSection.post(() -> {
+            if (!isAdded()) {
+                return;
             }
+            myPendingSectionHeight = myPendingSection.getVisibility() == View.VISIBLE
+                    ? myPendingSection.getHeight() : 0;
+            availableOverlayOffset = Math.min(availableOverlayOffset, myPendingSectionHeight);
+            availableSection.setTranslationY(myPendingSectionHeight - availableOverlayOffset);
         });
     }
 
-    private void checkRefresh(AtomicInteger done, int total) {
-        if (done.incrementAndGet() == total && isAdded()) {
-            requireActivity().runOnUiThread(() -> {
-                teamItems.sort((left, right) -> ProjectUiHelper.compareProjectsByStatus(
-                        left.getProject(), right.getProject()));
-                adapter.setItems(new ArrayList<>(teamItems));
-            });
+    private static final class RoutePresentation {
+        final String summary;
+        final String duration;
+
+        RoutePresentation(String summary, String duration) {
+            this.summary = summary;
+            this.duration = duration;
         }
     }
 

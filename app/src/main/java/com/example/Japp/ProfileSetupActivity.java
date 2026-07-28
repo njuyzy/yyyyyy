@@ -159,6 +159,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+
         btnSubmit.setOnClickListener(v -> {
             clearAllErrors();
 
@@ -212,7 +214,6 @@ public class ProfileSetupActivity extends AppCompatActivity {
             intent.putExtra(EXTRA_PASSWORD, password);
             intent.putExtra(EXTRA_CODE, code);
             startActivity(intent);
-            finish();
         });
     }
 

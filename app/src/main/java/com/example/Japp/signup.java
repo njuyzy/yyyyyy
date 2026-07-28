@@ -267,10 +267,6 @@ private int countdown = 60;
 
             @Override
             public void afterTextChanged(Editable s) {
-                // 验证码输入满6位自动跳转到注册
-                if (s.length() == 6) {
-                    Signup.callOnClick();
-                }
             }
         });
 
@@ -305,6 +301,7 @@ private int countdown = 60;
         etPassword.setOnFocusChangeListener(focusChangeListener);
         etConfirmPassword.setOnFocusChangeListener(focusChangeListener);
         etCode.setOnFocusChangeListener(focusChangeListener);
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
     }
 
     private void setupListeners() {

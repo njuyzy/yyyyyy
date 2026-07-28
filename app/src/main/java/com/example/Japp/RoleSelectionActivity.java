@@ -59,6 +59,7 @@ public class RoleSelectionActivity extends AppCompatActivity {
         cardUser = findViewById(R.id.cardUser);
         cardLeader = findViewById(R.id.cardLeader);
         cardBoth = findViewById(R.id.cardBoth);
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
 
         if (!readExtras()) {
             startActivity(new Intent(RoleSelectionActivity.this, signup.class));
@@ -271,6 +272,7 @@ public class RoleSelectionActivity extends AppCompatActivity {
         } else {
             intent = new Intent(RoleSelectionActivity.this, LeaderMainActivity.class);
         }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
     }

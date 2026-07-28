@@ -21,7 +21,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -36,6 +35,7 @@ import com.example.Japp.PersonalInfoActivity;
 import com.example.Japp.RoleSelectionActivity;
 import com.example.Japp.SettingsActivity;
 import com.example.Japp.MainActivity;
+import com.example.Japp.leader.LeaderHistoryRouteActivity;
 import com.example.Japp.user.UserMainActivity;
 import com.example.Japp.user.util.SessionHelper;
 import com.example.Japp.network.ApiClient;
@@ -58,11 +58,10 @@ public class profile extends Fragment {
 
     private static final int REQUEST_PERSONAL_INFO = 1003;
 
-    private LinearLayout switchMode, check_review;
-    private TextView btnPersonalInfo;
-    private LinearLayout btnLogout;
-    private LinearLayout btnSettings, btnOverallReview;
-    private LinearLayout btnOrderReceived, btnOrderInProgress, btnOrderToReview, btnOrderCompleted;
+    private View switchMode, check_review;
+    private View btnPersonalInfo, btnHistoryRoute, btnShareApp, btnAboutUs;
+    private View btnLogout, btnSettings, btnOverallReview;
+    private View btnOrderReceived, btnOrderInProgress, btnOrderToReview, btnOrderCompleted;
     private ImageView ivAvatar;
     private TextView txtName;
     private TextView txtStats;
@@ -80,6 +79,9 @@ public class profile extends Fragment {
         check_review = view.findViewById(R.id.btnViewReviews);
         switchMode = view.findViewById(R.id.btnSwitchRole);
         btnPersonalInfo = view.findViewById(R.id.btnPersonalInfo);
+        btnHistoryRoute = view.findViewById(R.id.btnHistoryRoute);
+        btnShareApp = view.findViewById(R.id.btnShareApp);
+        btnAboutUs = view.findViewById(R.id.btnAboutUs);
         btnLogout = view.findViewById(R.id.btnLogout);
         btnSettings = view.findViewById(R.id.btnSettings);
         btnOverallReview = view.findViewById(R.id.btnOverallReview);
@@ -93,49 +95,39 @@ public class profile extends Fragment {
         txtCompletedOrders = view.findViewById(R.id.txtCompletedOrders);
         txtRating = view.findViewById(R.id.txtRating);
 
-        // 加载本地存储的图片
         loadImageFromLocal();
         bindProfileInfo();
 
-        // 主要修改：为头像图片添加点击事件
-        ivAvatar.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showImagePickerDialog();
-            }
-        });
+        ivAvatar.setOnClickListener(v -> showImagePickerDialog());
 
         if (!canSwitchRole()) {
             switchMode.setVisibility(View.GONE);
         } else {
-            switchMode.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    switchMode();
-                }
-            });
+            switchMode.setOnClickListener(v -> switchMode());
         }
 
-        check_review.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                review targetFragment = new review();
-                FragmentTransaction transaction = getParentFragmentManager().beginTransaction();
-                transaction.replace(R.id.container, targetFragment);
-                transaction.addToBackStack(null);
-                transaction.commit();
-            }
+        check_review.setOnClickListener(v -> {
+            review targetFragment = new review();
+            FragmentTransaction transaction = getParentFragmentManager().beginTransaction();
+            transaction.replace(R.id.container, targetFragment);
+            transaction.addToBackStack(null);
+            transaction.commit();
         });
 
         btnPersonalInfo.setOnClickListener(v ->
                 startActivityForResult(new Intent(requireContext(), PersonalInfoActivity.class), REQUEST_PERSONAL_INFO));
 
-        btnSettings.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startActivity(new Intent(requireContext(), SettingsActivity.class));
-            }
-        });
+        btnHistoryRoute.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), LeaderHistoryRouteActivity.class)));
+
+        btnSettings.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), SettingsActivity.class)));
+
+        btnShareApp.setOnClickListener(v ->
+                Toast.makeText(requireContext(), "功能开发中，敬请期待", Toast.LENGTH_SHORT).show());
+
+        btnAboutUs.setOnClickListener(v ->
+                Toast.makeText(requireContext(), "研学导览 · 领队端", Toast.LENGTH_SHORT).show());
 
         btnOverallReview.setOnClickListener(v ->
                 Toast.makeText(requireContext(), "综合评价", Toast.LENGTH_SHORT).show());
@@ -152,12 +144,7 @@ public class profile extends Fragment {
         btnOrderCompleted.setOnClickListener(v ->
                 Toast.makeText(requireContext(), "已完成", Toast.LENGTH_SHORT).show());
 
-        btnLogout.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                logout();
-            }
-        });
+        btnLogout.setOnClickListener(v -> logout());
 
         return view;
     }
@@ -289,11 +276,23 @@ public class profile extends Fragment {
                 if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
                     Account account = response.body().getData();
                     if (account != null) {
+                        String avatarUrl = account.getAvatarUrl();
+                        if (!TextUtils.isEmpty(avatarUrl)) {
+                            prefs.edit().putString("avatar_url", avatarUrl).apply();
+                        }
+
                         String regionCode = account.getRegionCode();
                         if (regionCode != null && !regionCode.trim().isEmpty()) {
                             prefs.edit().putString("region_code", regionCode).apply();
                             txtStats.setText(regionCodeToName(regionCode));
+                            if (TextUtils.isEmpty(prefs.getString("avatar_url", ""))) {
+                                loadImageFromLocal();
+                            }
                             return;
+                        }
+
+                        if (!TextUtils.isEmpty(avatarUrl)) {
+                            loadImageFromLocal();
                         }
                     }
                 }

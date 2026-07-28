@@ -3,9 +3,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#1E72FF">
+    android:background="#FFFFFF">
 
-    <!-- 顶部标题：个人中心 -->
     <TextView
         android:id="@+id/txtTitle"
         android:layout_width="wrap_content"
@@ -13,19 +12,20 @@
         android:layout_marginStart="20dp"
         android:layout_marginTop="36dp"
         android:text="个人中心"
-        android:textColor="@color/white"
-        android:textSize="22sp"
+        android:textColor="#121212"
+        android:textSize="24sp"
         android:textStyle="bold"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- 可向下滑动的卡片 -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollView"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginTop="20dp"
+        android:clipToPadding="false"
         android:fillViewport="true"
+        android:overScrollMode="never"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -34,7 +34,7 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="#FFFFFF"
+            app:cardBackgroundColor="#F7F8FC"
             app:cardCornerRadius="20dp"
             app:cardElevation="0dp">
 
@@ -45,9 +45,8 @@
                 android:paddingStart="18dp"
                 android:paddingTop="20dp"
                 android:paddingEnd="18dp"
-                android:paddingBottom="24dp">
+                android:paddingBottom="28dp">
 
-                <!-- 用户信息行：头像 + 用户名 + 城市 / 右侧 个人信息 > -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -56,9 +55,10 @@
 
                     <ImageView
                         android:id="@+id/ivAvatar"
-                        android:layout_width="64dp"
-                        android:layout_height="64dp"
+                        android:layout_width="72dp"
+                        android:layout_height="72dp"
                         android:background="@drawable/avatar_background"
+                        android:contentDescription="头像"
                         android:padding="2dp"
                         android:scaleType="centerCrop"
                         android:src="@drawable/ic_default_avatar" />
@@ -74,9 +74,9 @@
                             android:id="@+id/txtName"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="用户名"
+                            android:text="用户"
                             android:textColor="#121212"
-                            android:textSize="18sp"
+                            android:textSize="20sp"
                             android:textStyle="bold" />
 
                         <TextView
@@ -84,23 +84,102 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="所在城市"
-                            android:textColor="#666666"
+                            android:text="所在地区"
+                            android:textColor="#6E7480"
                             android:textSize="14sp" />
                     </LinearLayout>
 
-                    <TextView
-                        android:id="@+id/btnPersonalInfo"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="?selectableItemBackground"
+                    <ImageButton
+                        android:id="@+id/btnSettings"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?selectableItemBackgroundBorderless"
+                        android:contentDescription="设置"
                         android:padding="8dp"
-                        android:text="个人信息 >"
-                        android:textColor="#999999"
-                        android:textSize="14sp" />
+                        android:src="@drawable/baseline_settings_24"
+                        app:tint="#666666" />
                 </LinearLayout>
 
-                <!-- 统计行：待完成订单 / 已完成订单 / 领队评分 -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    app:cardBackgroundColor="#FFFFFF"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:strokeColor="#EEF0F4"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <LinearLayout
+                            android:id="@+id/btnPersonalInfo"
+                            android:layout_width="match_parent"
+                            android:layout_height="56dp"
+                            android:background="?selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingStart="18dp"
+                            android:paddingEnd="18dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="个人信息"
+                                android:textColor="#121212"
+                                android:textSize="16sp" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text=">"
+                                android:textColor="#999999"
+                                android:textSize="18sp" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginStart="18dp"
+                            android:layout_marginEnd="18dp"
+                            android:background="#EEF0F4" />
+
+                        <LinearLayout
+                            android:id="@+id/btnHistoryRoute"
+                            android:layout_width="match_parent"
+                            android:layout_height="56dp"
+                            android:background="?selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingStart="18dp"
+                            android:paddingEnd="18dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="历史路线"
+                                android:textColor="#121212"
+                                android:textSize="16sp" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text=">"
+                                android:textColor="#999999"
+                                android:textSize="18sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -195,7 +274,6 @@
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- 我的订单 -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -225,6 +303,8 @@
                             android:layout_width="match_parent"
                             android:layout_height="56dp"
                             android:background="?selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="18dp"
@@ -249,6 +329,8 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
+                            android:layout_marginStart="18dp"
+                            android:layout_marginEnd="18dp"
                             android:background="#EEF0F4" />
 
                         <LinearLayout
@@ -256,6 +338,8 @@
                             android:layout_width="match_parent"
                             android:layout_height="56dp"
                             android:background="?selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="18dp"
@@ -280,6 +364,8 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
+                            android:layout_marginStart="18dp"
+                            android:layout_marginEnd="18dp"
                             android:background="#EEF0F4" />
 
                         <LinearLayout
@@ -287,6 +373,8 @@
                             android:layout_width="match_parent"
                             android:layout_height="56dp"
                             android:background="?selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="18dp"
@@ -311,6 +399,8 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
+                            android:layout_marginStart="18dp"
+                            android:layout_marginEnd="18dp"
                             android:background="#EEF0F4" />
 
                         <LinearLayout
@@ -318,6 +408,8 @@
                             android:layout_width="match_parent"
                             android:layout_height="56dp"
                             android:background="?selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="18dp"
@@ -341,7 +433,6 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- 我的评价 -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -371,6 +462,8 @@
                             android:layout_width="match_parent"
                             android:layout_height="56dp"
                             android:background="?selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="18dp"
@@ -395,6 +488,8 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
+                            android:layout_marginStart="18dp"
+                            android:layout_marginEnd="18dp"
                             android:background="#EEF0F4" />
 
                         <LinearLayout
@@ -402,6 +497,8 @@
                             android:layout_width="match_parent"
                             android:layout_height="56dp"
                             android:background="?selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="18dp"
@@ -425,12 +522,50 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- 其他 -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/btnSwitchRole"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?selectableItemBackground"
+                    app:cardBackgroundColor="#FFFFFF"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:strokeColor="#EEF0F4"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="18dp"
+                        android:paddingEnd="18dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="切换身份"
+                            android:textColor="#121212"
+                            android:textSize="16sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=">"
+                            android:textColor="#999999"
+                            android:textSize="18sp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="24dp"
-                    android:text="其他"
+                    android:text="设置反馈"
                     android:textColor="#121212"
                     android:textSize="16sp"
                     android:textStyle="bold" />
@@ -451,10 +586,12 @@
                         android:orientation="vertical">
 
                         <LinearLayout
-                            android:id="@+id/btnSettings"
+                            android:id="@+id/btnShareApp"
                             android:layout_width="match_parent"
                             android:layout_height="56dp"
                             android:background="?selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="18dp"
@@ -464,7 +601,7 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="设置中心"
+                                android:text="分享应用"
                                 android:textColor="#121212"
                                 android:textSize="16sp" />
 
@@ -479,13 +616,17 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
+                            android:layout_marginStart="18dp"
+                            android:layout_marginEnd="18dp"
                             android:background="#EEF0F4" />
 
                         <LinearLayout
-                            android:id="@+id/btnSwitchRole"
+                            android:id="@+id/btnAboutUs"
                             android:layout_width="match_parent"
                             android:layout_height="56dp"
                             android:background="?selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="18dp"
@@ -495,7 +636,7 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="切换身份"
+                                android:text="关于我们"
                                 android:textColor="#121212"
                                 android:textSize="16sp" />
 
@@ -510,6 +651,8 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
+                            android:layout_marginStart="18dp"
+                            android:layout_marginEnd="18dp"
                             android:background="#EEF0F4" />
 
                         <LinearLayout
@@ -517,6 +660,8 @@
                             android:layout_width="match_parent"
                             android:layout_height="56dp"
                             android:background="?selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="18dp"
@@ -542,4 +687,5 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
     </androidx.core.widget.NestedScrollView>
+
 </androidx.constraintlayout.widget.ConstraintLayout>
