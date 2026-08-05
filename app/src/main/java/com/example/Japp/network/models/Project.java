@@ -139,6 +139,7 @@ public class Project {
     public String getLeaderName() { return leaderName; }
     public String getAvailabilityStatus() { return availabilityStatus; }
     public String getViewerRole() { return viewerRole; }
+    public void setViewerRole(String viewerRole) { this.viewerRole = viewerRole; }
     public boolean isCanAccept() { return canAccept; }
     public boolean isCanJoin() { return canJoin; }
     public Long getGroupId() { return groupId; }

@@ -33,9 +33,10 @@ import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.AccountLeaderProfile;
+import com.example.Japp.network.models.Region;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.requests.IntroRequest;
-import com.example.Japp.network.models.requests.UpdateUsernameRequest;
+import com.example.Japp.network.models.requests.UpdateAccountProfileRequest;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
@@ -44,6 +45,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Calendar;
+import java.util.List;
 import java.util.Locale;
 
 import okhttp3.MediaType;
@@ -56,7 +58,6 @@ import retrofit2.Response;
 public class PersonalInfoActivity extends AppCompatActivity {
 
     private static final int SELECT_FILE = 2001;
-    private static final String AVATAR_UPLOAD_URL = "http://10.6.86.86/upload";
     private static final String PREF_GENDER = "personal_gender";
     private static final String PREF_BIRTHDAY = "personal_birthday";
     private static final String PREF_SIGNATURE = "personal_signature";
@@ -73,6 +74,9 @@ public class PersonalInfoActivity extends AppCompatActivity {
     private int accountId = -1;
     private String selectedGender = "";
     private String selectedBirthday = "";
+    private String selectedRegionCode = "";
+    private String selectedProvinceName = "";
+    private String selectedCityName = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -105,6 +109,7 @@ public class PersonalInfoActivity extends AppCompatActivity {
     private void setupListeners() {
         findViewById(R.id.rowAvatar).setOnClickListener(v -> requestImagePermissionAndPick());
         findViewById(R.id.rowGender).setOnClickListener(v -> showGenderDialog());
+        findViewById(R.id.rowRegion).setOnClickListener(v -> loadProvinceOptions());
         findViewById(R.id.rowBirthday).setOnClickListener(v -> showBirthdayPicker());
         btnSave.setOnClickListener(v -> saveProfile());
     }
@@ -112,6 +117,9 @@ public class PersonalInfoActivity extends AppCompatActivity {
     private void loadProfileData() {
         SharedPreferences prefs = getSharedPreferences("user_pref", MODE_PRIVATE);
         accountId = prefs.getInt("account_id", -1);
+        selectedRegionCode = prefs.getString("region_code", "");
+        selectedProvinceName = prefs.getString("region_province", "");
+        selectedCityName = prefs.getString("region_city", "");
 
         etName.setText(parseUsername(prefs.getString("user_inf", "")));
         txtPhone.setText(parsePhone(prefs.getString("user_inf", "")));
@@ -154,6 +162,13 @@ public class PersonalInfoActivity extends AppCompatActivity {
                     txtPhone.setText(account.getPhone());
                 }
                 syncRegionFromAccount(account);
+                getSharedPreferences("user_pref", MODE_PRIVATE)
+                        .edit()
+                        .putString(RoleSelectionActivity.EXTRA_ROLE, account.getRole())
+                        .apply();
+                if (!isLeaderProfileMode() && !TextUtils.isEmpty(account.getIntro())) {
+                    etSignature.setText(account.getIntro());
+                }
                 if (!TextUtils.isEmpty(account.getAvatarUrl())) {
                     getSharedPreferences("user_pref", MODE_PRIVATE)
                             .edit()
@@ -168,6 +183,9 @@ public class PersonalInfoActivity extends AppCompatActivity {
             }
         });
 
+        if (!isLeaderProfileMode()) {
+            return;
+        }
         service.getLeaderProfile(accountId).enqueue(new Callback<Result<AccountLeaderProfile>>() {
             @Override
             public void onResponse(@NonNull Call<Result<AccountLeaderProfile>> call,
@@ -285,9 +303,12 @@ public class PersonalInfoActivity extends AppCompatActivity {
         }
 
         UserService service = ApiClient.getClient().create(UserService.class);
-        service.updateUsername(accountId, new UpdateUsernameRequest(name)).enqueue(new Callback<Result>() {
+        UpdateAccountProfileRequest request =
+                new UpdateAccountProfileRequest(name, selectedRegionCode, null);
+        service.updateAccountProfile(accountId, request).enqueue(new Callback<Result<Account>>() {
             @Override
-            public void onResponse(@NonNull Call<Result> call, @NonNull Response<Result> response) {
+            public void onResponse(@NonNull Call<Result<Account>> call,
+                                   @NonNull Response<Result<Account>> response) {
                 if (!response.isSuccessful() || response.body() == null || response.body().getCode() != 1) {
                     resetSaveButton();
                     String msg = response.body() != null ? response.body().getMsg() : null;
@@ -298,11 +319,12 @@ public class PersonalInfoActivity extends AppCompatActivity {
                 }
 
                 updateLocalUsername(name);
+                persistSelectedRegion();
                 uploadIntro(service, signature, name);
             }
 
             @Override
-            public void onFailure(@NonNull Call<Result> call, @NonNull Throwable t) {
+            public void onFailure(@NonNull Call<Result<Account>> call, @NonNull Throwable t) {
                 resetSaveButton();
                 Toast.makeText(PersonalInfoActivity.this, "网络连接失败，请检查网络", Toast.LENGTH_SHORT).show();
             }
@@ -310,7 +332,10 @@ public class PersonalInfoActivity extends AppCompatActivity {
     }
 
     private void uploadIntro(UserService service, String signature, String name) {
-        service.updateIntro(accountId, new IntroRequest(signature)).enqueue(new Callback<Result>() {
+        Call<Result> call = isLeaderProfileMode()
+                ? service.updateIntro(accountId, new IntroRequest(signature))
+                : service.updateUserIntro(accountId, new IntroRequest(signature));
+        call.enqueue(new Callback<Result>() {
             @Override
             public void onResponse(@NonNull Call<Result> call, @NonNull Response<Result> response) {
                 boolean introSuccess = response.isSuccessful()
@@ -328,6 +353,125 @@ public class PersonalInfoActivity extends AppCompatActivity {
                 finishSaving(true);
             }
         });
+    }
+
+    private boolean isLeaderProfileMode() {
+        SharedPreferences prefs = getSharedPreferences("user_pref", MODE_PRIVATE);
+        String mode = prefs.getString("Mode", "USER");
+        String role = prefs.getString(RoleSelectionActivity.EXTRA_ROLE, "");
+        return "LEADER".equalsIgnoreCase(mode)
+                && ("LEADER".equalsIgnoreCase(role) || "BOTH".equalsIgnoreCase(role));
+    }
+
+    private void loadProvinceOptions() {
+        if (accountId <= 0) {
+            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        UserService service = ApiClient.getClient().create(UserService.class);
+        service.getProvinces().enqueue(new Callback<Result<List<Region>>>() {
+            @Override
+            public void onResponse(@NonNull Call<Result<List<Region>>> call,
+                                   @NonNull Response<Result<List<Region>>> response) {
+                Result<List<Region>> result = response.body();
+                if (!response.isSuccessful() || result == null || result.getCode() != 1
+                        || result.getData() == null || result.getData().isEmpty()) {
+                    Toast.makeText(PersonalInfoActivity.this,
+                            result != null && !TextUtils.isEmpty(result.getMsg())
+                                    ? result.getMsg() : "地区加载失败",
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                showProvinceDialog(result.getData());
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Result<List<Region>>> call,
+                                  @NonNull Throwable t) {
+                Toast.makeText(PersonalInfoActivity.this,
+                        "地区加载失败，请检查网络", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void showProvinceDialog(List<Region> provinces) {
+        String[] names = new String[provinces.size()];
+        for (int i = 0; i < provinces.size(); i++) {
+            names[i] = provinces.get(i).getName();
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("选择省份")
+                .setItems(names, (dialog, which) -> loadCityOptions(provinces.get(which)))
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void loadCityOptions(Region province) {
+        UserService service = ApiClient.getClient().create(UserService.class);
+        service.getRegionChildren(province.getAdcode())
+                .enqueue(new Callback<Result<List<Region>>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<Result<List<Region>>> call,
+                                           @NonNull Response<Result<List<Region>>> response) {
+                        Result<List<Region>> result = response.body();
+                        List<Region> cities = result == null ? null : result.getData();
+                        if (!response.isSuccessful() || result == null || result.getCode() != 1) {
+                            Toast.makeText(PersonalInfoActivity.this,
+                                    result != null && !TextUtils.isEmpty(result.getMsg())
+                                            ? result.getMsg() : "城市加载失败",
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        if (cities == null || cities.isEmpty()) {
+                            selectRegion(province, province);
+                            return;
+                        }
+                        showCityDialog(province, cities);
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<Result<List<Region>>> call,
+                                          @NonNull Throwable t) {
+                        Toast.makeText(PersonalInfoActivity.this,
+                                "城市加载失败，请检查网络", Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private void showCityDialog(Region province, List<Region> cities) {
+        String[] names = new String[cities.size()];
+        for (int i = 0; i < cities.size(); i++) {
+            names[i] = cities.get(i).getName();
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("选择城市")
+                .setItems(names, (dialog, which) -> selectRegion(province, cities.get(which)))
+                .setNegativeButton("返回", (dialog, which) -> loadProvinceOptions())
+                .show();
+    }
+
+    private void selectRegion(Region province, Region city) {
+        selectedRegionCode = city.getAdcode();
+        selectedProvinceName = province.getName();
+        selectedCityName = city.getName();
+        txtRegion.setText(province.getName().equals(city.getName())
+                ? city.getName() : province.getName() + " " + city.getName());
+    }
+
+    private void persistSelectedRegion() {
+        if (TextUtils.isEmpty(selectedRegionCode)) {
+            return;
+        }
+        SharedPreferences.Editor editor = getSharedPreferences("user_pref", MODE_PRIVATE)
+                .edit()
+                .putString("region_code", selectedRegionCode);
+        if (!TextUtils.isEmpty(selectedProvinceName)) {
+            editor.putString("region_province", selectedProvinceName);
+        }
+        if (!TextUtils.isEmpty(selectedCityName)) {
+            editor.putString("region_city", selectedCityName);
+        }
+        editor.apply();
     }
 
     private void resetSaveButton() {
@@ -610,7 +754,7 @@ public class PersonalInfoActivity extends AppCompatActivity {
         RequestBody requestBody = RequestBody.create(MediaType.parse("image/*"), tempFile);
         MultipartBody.Part imagePart = MultipartBody.Part.createFormData("image", tempFile.getName(), requestBody);
         UserService service = ApiClient.getClient().create(UserService.class);
-        service.uploadAvatar(AVATAR_UPLOAD_URL, imagePart).enqueue(new Callback<Result<String>>() {
+        service.uploadFile(imagePart).enqueue(new Callback<Result<String>>() {
             @Override
             public void onResponse(@NonNull Call<Result<String>> call, @NonNull Response<Result<String>> response) {
                 tempFile.delete();
@@ -618,12 +762,13 @@ public class PersonalInfoActivity extends AppCompatActivity {
                 if (response.isSuccessful() && result != null && result.getCode() == 1) {
                     String url = result.getData();
                     if (!TextUtils.isEmpty(url)) {
-                        getSharedPreferences("user_pref", MODE_PRIVATE)
-                                .edit()
-                                .putString("avatar_url", url)
-                                .apply();
-                        Toast.makeText(PersonalInfoActivity.this, "头像已更新", Toast.LENGTH_SHORT).show();
+                        persistRemoteAvatar(url);
                     }
+                } else {
+                    Toast.makeText(PersonalInfoActivity.this,
+                            result != null && !TextUtils.isEmpty(result.getMsg())
+                                    ? result.getMsg() : "头像上传失败",
+                            Toast.LENGTH_SHORT).show();
                 }
             }
 
@@ -633,6 +778,43 @@ public class PersonalInfoActivity extends AppCompatActivity {
                 Toast.makeText(PersonalInfoActivity.this, "头像上传失败", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void persistRemoteAvatar(String url) {
+        if (accountId <= 0) {
+            return;
+        }
+        UpdateAccountProfileRequest request = new UpdateAccountProfileRequest();
+        request.setAvatarUrl(url);
+        UserService service = ApiClient.getClient().create(UserService.class);
+        service.updateAccountProfile(accountId, request)
+                .enqueue(new Callback<Result<Account>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<Result<Account>> call,
+                                           @NonNull Response<Result<Account>> response) {
+                        Result<Account> result = response.body();
+                        if (response.isSuccessful() && result != null && result.getCode() == 1) {
+                            getSharedPreferences("user_pref", MODE_PRIVATE)
+                                    .edit()
+                                    .putString("avatar_url", url)
+                                    .apply();
+                            Toast.makeText(PersonalInfoActivity.this,
+                                    "头像已更新", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(PersonalInfoActivity.this,
+                                    result != null && !TextUtils.isEmpty(result.getMsg())
+                                            ? result.getMsg() : "头像资料同步失败",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<Result<Account>> call,
+                                          @NonNull Throwable t) {
+                        Toast.makeText(PersonalInfoActivity.this,
+                                "头像资料同步失败", Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 
     private void loadAvatarFromLocal() {
@@ -665,12 +847,17 @@ public class PersonalInfoActivity extends AppCompatActivity {
         if (account == null || TextUtils.isEmpty(account.getRegionCode())) {
             return;
         }
+        selectedRegionCode = account.getRegionCode();
         SharedPreferences prefs = getSharedPreferences("user_pref", MODE_PRIVATE);
-        prefs.edit()
-                .putString("region_code", account.getRegionCode())
-                .remove("region_province")
-                .remove("region_city")
-                .apply();
+        String localRegionCode = prefs.getString("region_code", "");
+        SharedPreferences.Editor editor = prefs.edit()
+                .putString("region_code", account.getRegionCode());
+        if (!account.getRegionCode().equals(localRegionCode)) {
+            selectedProvinceName = "";
+            selectedCityName = "";
+            editor.remove("region_province").remove("region_city");
+        }
+        editor.apply();
         txtRegion.setText(resolveRegionDisplay(prefs));
     }
 }

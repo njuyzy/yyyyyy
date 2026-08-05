@@ -57,7 +57,8 @@ public class ApiClient {
                                     }
                                     builder.header("Authorization", normalized);
                                 }
-                                if (request.url().encodedPath().startsWith("/routes/ai/")) {
+                                if (request.url().encodedPath().startsWith("/routes/ai/")
+                                        || request.url().encodedPath().equals("/routes/optimize")) {
                                     return chain.withReadTimeout(
                                                     AI_ROUTE_READ_TIMEOUT_SECONDS,
                                                     TimeUnit.SECONDS)

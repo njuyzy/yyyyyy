@@ -21,6 +21,9 @@ import com.example.Japp.network.models.requests.UpdateUsernameRequest;
 import com.example.Japp.network.models.requests.LoginRequest;
 import com.example.Japp.network.models.requests.RegisterRequest;
 import com.example.Japp.network.models.requests.SendChatMessageRequest;
+import com.example.Japp.network.models.requests.UpdateAccountProfileRequest;
+import com.example.Japp.network.models.requests.UpdateAccountRoleRequest;
+import com.example.Japp.network.models.requests.UpdatePasswordRequest;
 
 import java.util.List;
 
@@ -32,6 +35,7 @@ import retrofit2.http.POST;
 import retrofit2.http.Part;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
+import retrofit2.http.PUT;
 import retrofit2.http.Url;
 import okhttp3.MultipartBody;
 
@@ -45,6 +49,22 @@ public interface UserService {
 
     @GET("accounts/{id}")
     Call<Result<Account>> getAccount(@Path("id") int id);
+
+    @PUT("accounts/{id}")
+    Call<Result<Account>> updateAccountProfile(@Path("id") int id,
+                                               @Body UpdateAccountProfileRequest request);
+
+    @PUT("accounts/{id}/role")
+    Call<Result<JsonElement>> updateAccountRole(@Path("id") int id,
+                                                @Body UpdateAccountRoleRequest request);
+
+    @PUT("accounts/{id}/password")
+    Call<Result> updatePassword(@Path("id") int id,
+                                @Body UpdatePasswordRequest request);
+
+    @PUT("accounts/{id}/userIntro")
+    Call<Result> updateUserIntro(@Path("id") int id,
+                                 @Body IntroRequest request);
 
     @GET("accounts/{id}/leaderProfile")
     Call<Result<AccountLeaderProfile>> getLeaderProfile(@Path("id") int id);
@@ -65,6 +85,10 @@ public interface UserService {
     @POST
     Call<Result<String>> uploadAvatar(@Url String url, @Part MultipartBody.Part image);
 
+    @Multipart
+    @POST("upload")
+    Call<Result<String>> uploadFile(@Part MultipartBody.Part image);
+
     @GET("projects")
     Call<Result<List<Project>>> getProjects(@Query("accountId") int accountId,
                                             @Query("pageNum") int pageNum,
@@ -76,6 +100,12 @@ public interface UserService {
     @GET("projects/available")
     Call<Result<ProjectPage>> getAvailableProjects(@Query("pageNum") int pageNum,
                                                    @Query("pageSize") int pageSize);
+
+    @GET("projects/mine")
+    Call<Result<ProjectPage>> getMyProjects(@Query("relation") String relation,
+                                            @Query("status") String status,
+                                            @Query("pageNum") int pageNum,
+                                            @Query("pageSize") int pageSize);
 
     @GET("regions/provinces")
     Call<Result<List<Region>>> getProvinces();
@@ -113,8 +143,15 @@ public interface UserService {
                                             @Query("message") String message,
                                             @Query("accountId") Integer accountId);
 
+    @POST("routes/optimize")
+    Call<Result<JsonElement>> optimizeRoute(@Body List<RouteNode> routeNodes,
+                                            @Query("message") String message);
+
     @POST("routes/manual")
     Call<Result<JsonElement>> createManualRoute(@Body List<RouteNode> routeNodes);
+
+    @POST("attractions/sync/{poiId}")
+    Call<Result<JsonElement>> syncAttraction(@Path("poiId") String poiId);
 
     @GET("routes/{id}")
     Call<Result<List<RouteNode>>> getRouteNodes(@Path("id") int routeId);
@@ -129,8 +166,14 @@ public interface UserService {
     @POST("projects/{id}/join")
     Call<Result> joinProject(@Path("id") int projectId, @Body JoinProjectRequest request);
 
+    @POST("projects/{id}/quit")
+    Call<Result> quitProject(@Path("id") int projectId);
+
     @POST("projects/{id}/accept")
     Call<Result> acceptProject(@Path("id") int projectId);
+
+    @POST("projects/{id}/abandon")
+    Call<Result> abandonProject(@Path("id") int projectId);
 
     @POST("projects/{id}/status")
     Call<Result> updateProjectStatus(@Path("id") int projectId,

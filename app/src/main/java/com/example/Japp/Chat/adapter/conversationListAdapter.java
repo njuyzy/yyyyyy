@@ -77,10 +77,23 @@ public class conversationListAdapter extends RecyclerView.Adapter<conversationLi
 
         int unreadCount = conversation.getUnRead_num();
         if (unreadCount > 0) {
+            boolean newlyVisible = holder.UnreadMessage.getVisibility() != View.VISIBLE;
             holder.UnreadMessage.setVisibility(View.VISIBLE);
             String unreadText = unreadCount > 99 ? "99+" : String.valueOf(unreadCount);
             holder.UnreadMessage.setText(unreadText);
+            if (newlyVisible) {
+                holder.UnreadMessage.setAlpha(0f);
+                holder.UnreadMessage.setScaleX(0.8f);
+                holder.UnreadMessage.setScaleY(0.8f);
+                holder.UnreadMessage.animate()
+                        .alpha(1f)
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(160L)
+                        .start();
+            }
         } else {
+            holder.UnreadMessage.animate().cancel();
             holder.UnreadMessage.setVisibility(View.GONE);
         }
 

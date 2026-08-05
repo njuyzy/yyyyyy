@@ -1,5 +1,6 @@
 package com.example.Japp.Chat;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -14,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.Japp.Chat.adapter.ChatMemberAdapter;
 import com.example.Japp.Chat.adapter.chatAdapter;
+import com.example.Japp.Chat.util.ChatUnreadManager;
 import com.example.Japp.R;
 import com.example.Japp.data.Conversation;
 import com.example.Japp.data.Message;
@@ -21,13 +23,16 @@ import com.example.Japp.data.User;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.ChatGroupMember;
+import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.ServerChatMessage;
 import com.example.Japp.network.models.requests.SendChatMessageRequest;
 import com.example.Japp.user.util.SessionHelper;
+import com.example.Japp.user.TeamDetailActivity;
+import com.example.Japp.leader.orderDetailActivity;
 import com.example.Japp.util.DisplayCutoutAdapter;
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -59,8 +64,7 @@ public class chatActivity extends AppCompatActivity {
     private View memberScrim;
     private TextView txtMemberPanelTitle;
     private ChatMemberAdapter memberAdapter;
-    private MaterialButton btnCancelTrip;
-    private View cancelTripDivider;
+    private MaterialButton btnViewTrip;
     private boolean memberPanelOpen;
     private boolean automaticGreetingInFlight;
     private boolean automaticGreetingSent;
@@ -106,8 +110,7 @@ public class chatActivity extends AppCompatActivity {
         memberPanel = findViewById(R.id.memberPanel);
         memberScrim = findViewById(R.id.memberScrim);
         txtMemberPanelTitle = findViewById(R.id.txtMemberPanelTitle);
-        btnCancelTrip = findViewById(R.id.btnCancelTrip);
-        cancelTripDivider = findViewById(R.id.cancelTripDivider);
+        btnViewTrip = findViewById(R.id.btnViewTrip);
     }
 
     private void setupRecyclerView() {
@@ -129,7 +132,7 @@ public class chatActivity extends AppCompatActivity {
         btnMembers.setOnClickListener(v -> showMemberPanel());
         btnCloseMembers.setOnClickListener(v -> hideMemberPanel());
         memberScrim.setOnClickListener(v -> hideMemberPanel());
-        btnCancelTrip.setOnClickListener(v -> confirmCancelTrip());
+        btnViewTrip.setOnClickListener(v -> openTripDetails());
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -267,13 +270,8 @@ public class chatActivity extends AppCompatActivity {
         if (memberMe != null) {
             currentUser = memberMe;
         }
-        boolean isPublisher = memberMe != null
-                && ("PUBLISHER".equalsIgnoreCase(memberMe.getMemberRole())
-                || "OWNER".equalsIgnoreCase(memberMe.getMemberRole()));
-        int cancelVisibility = isPublisher && conversation.getProjectId() > 0
-                ? View.VISIBLE : View.GONE;
-        btnCancelTrip.setVisibility(cancelVisibility);
-        cancelTripDivider.setVisibility(cancelVisibility);
+        btnViewTrip.setVisibility(conversation.getProjectId() > 0
+                ? View.VISIBLE : View.GONE);
 
         TextView subtitleView = findViewById(R.id.txtToolbarSubtitle);
         if (subtitleView != null && !membersByAccountId.isEmpty()) {
@@ -335,6 +333,11 @@ public class chatActivity extends AppCompatActivity {
                         if (!messages.isEmpty()) {
                             recycler.scrollToPosition(messages.size() - 1);
                         }
+                        ChatUnreadManager.markSessionRead(
+                                chatActivity.this,
+                                currentAccountId,
+                                conversation.getBackendSessionId(),
+                                serverMessages);
                         maybeSendAutomaticGreeting(serverMessages);
                     }
 
@@ -388,6 +391,14 @@ public class chatActivity extends AppCompatActivity {
                     return;
                 }
                 automaticGreetingSent = true;
+                Long messageId = response.body().getData();
+                if (messageId != null) {
+                    ChatUnreadManager.markSessionRead(
+                            chatActivity.this,
+                            currentAccountId,
+                            conversation.getBackendSessionId(),
+                            messageId);
+                }
                 messages.add(new Message(currentUser, greeting, System.currentTimeMillis()));
                 adapter.notifyItemInserted(messages.size() - 1);
                 recycler.scrollToPosition(messages.size() - 1);
@@ -400,52 +411,53 @@ public class chatActivity extends AppCompatActivity {
         });
     }
 
-    private void confirmCancelTrip() {
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("取消行程")
-                .setMessage("取消后行程将结束，群聊也会被删除且无法继续发送消息。确定继续吗？")
-                .setNegativeButton("暂不取消", null)
-                .setPositiveButton("确认取消", (dialog, which) -> cancelTrip())
-                .show();
-    }
-
-    private void cancelTrip() {
-        btnCancelTrip.setEnabled(false);
-        btnCancelTrip.setText("正在取消…");
-        service.updateProjectStatus(conversation.getProjectId(), "CANCELLED")
-                .enqueue(new Callback<Result>() {
+    private void openTripDetails() {
+        if (conversation.getProjectId() <= 0) {
+            return;
+        }
+        btnViewTrip.setEnabled(false);
+        btnViewTrip.setText("正在加载…");
+        service.getProject(conversation.getProjectId())
+                .enqueue(new Callback<Result<Project>>() {
                     @Override
-                    public void onResponse(Call<Result> call, Response<Result> response) {
+                    public void onResponse(Call<Result<Project>> call,
+                                           Response<Result<Project>> response) {
+                        restoreViewTripButton();
                         if (response.code() == 401) {
                             SessionHelper.handleUnauthorized(chatActivity.this);
                             return;
                         }
                         if (!response.isSuccessful() || response.body() == null
-                                || response.body().getCode() != 1) {
-                            restoreCancelButton();
-                            String message = response.body() == null
-                                    ? "取消行程失败" : response.body().getMsg();
-                            Toast.makeText(chatActivity.this, message, Toast.LENGTH_SHORT).show();
+                                || response.body().getCode() != 1
+                                || response.body().getData() == null) {
+                            Toast.makeText(chatActivity.this,
+                                    "行程详情加载失败", Toast.LENGTH_SHORT).show();
                             return;
                         }
-                        Toast.makeText(chatActivity.this,
-                                "行程已取消，群聊已删除", Toast.LENGTH_SHORT).show();
-                        setResult(RESULT_OK);
-                        finish();
+                        Project project = response.body().getData();
+                        String role = currentUser == null
+                                ? null : currentUser.getMemberRole();
+                        Class<?> target = "LEADER".equalsIgnoreCase(role)
+                                || "ADMIN".equalsIgnoreCase(role)
+                                ? orderDetailActivity.class : TeamDetailActivity.class;
+                        Intent intent = new Intent(chatActivity.this, target);
+                        intent.putExtra(TeamDetailActivity.EXTRA_PROJECT_JSON,
+                                new Gson().toJson(project));
+                        startActivity(intent);
                     }
 
                     @Override
-                    public void onFailure(Call<Result> call, Throwable t) {
-                        restoreCancelButton();
+                    public void onFailure(Call<Result<Project>> call, Throwable t) {
+                        restoreViewTripButton();
                         Toast.makeText(chatActivity.this,
-                                "网络异常，取消失败", Toast.LENGTH_SHORT).show();
+                                "网络异常，加载失败", Toast.LENGTH_SHORT).show();
                     }
                 });
     }
 
-    private void restoreCancelButton() {
-        btnCancelTrip.setEnabled(true);
-        btnCancelTrip.setText("取消行程并删除群聊");
+    private void restoreViewTripButton() {
+        btnViewTrip.setEnabled(true);
+        btnViewTrip.setText("查看行程详情");
     }
 
     private void sendMessage() {
@@ -474,6 +486,14 @@ public class chatActivity extends AppCompatActivity {
                 }
 
                 messages.add(new Message(currentUser, content, System.currentTimeMillis()));
+                Long messageId = response.body().getData();
+                if (messageId != null) {
+                    ChatUnreadManager.markSessionRead(
+                            chatActivity.this,
+                            currentAccountId,
+                            conversation.getBackendSessionId(),
+                            messageId);
+                }
                 adapter.notifyItemInserted(messages.size() - 1);
                 recycler.scrollToPosition(messages.size() - 1);
                 edtInput.setText("");

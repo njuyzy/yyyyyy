@@ -24,6 +24,9 @@ public class Account {
     @SerializedName("avatarUrl")
     private String avatarUrl;
 
+    @SerializedName("intro")
+    private String intro;
+
     @SerializedName("status")
     private int status;
 
@@ -54,6 +57,9 @@ public class Account {
 
     public String getAvatarUrl() { return avatarUrl; }
     public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+
+    public String getIntro() { return intro; }
+    public void setIntro(String intro) { this.intro = intro; }
 
     public int getStatus() { return status; }
     public void setStatus(int status) { this.status = status; }

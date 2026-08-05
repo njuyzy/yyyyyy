@@ -56,6 +56,8 @@ public class PlaceSearchActivity extends AppCompatActivity
     public static final String EXTRA_NAME = "selected_place_name";
     public static final String EXTRA_ADDRESS = "selected_place_address";
     public static final String EXTRA_CITY = "selected_place_city";
+    public static final String EXTRA_ADCODE = "selected_place_adcode";
+    public static final String EXTRA_CITYCODE = "selected_place_citycode";
     public static final String EXTRA_LAT = "selected_place_lat";
     public static final String EXTRA_LNG = "selected_place_lng";
     public static final String EXTRA_PHOTO_URL = "selected_place_photo_url";
@@ -379,6 +381,8 @@ public class PlaceSearchActivity extends AppCompatActivity
         data.putExtra(EXTRA_NAME, valueOr(selectedPoi.getTitle(), "未命名地点"));
         data.putExtra(EXTRA_ADDRESS, selectedPoi.getSnippet());
         data.putExtra(EXTRA_CITY, selectedPoi.getCityName());
+        data.putExtra(EXTRA_ADCODE, selectedPoi.getAdCode());
+        data.putExtra(EXTRA_CITYCODE, selectedPoi.getCityCode());
         data.putExtra(EXTRA_LAT, point.getLatitude());
         data.putExtra(EXTRA_LNG, point.getLongitude());
         data.putExtra(EXTRA_PHOTO_URL, firstPhotoUrl(selectedPoi.getPhotos()));

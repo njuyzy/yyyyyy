@@ -71,6 +71,17 @@ public class RouteChatItem {
                 routeId, roadPolyline, waypoints, publishAllowed);
     }
 
+    static RouteChatItem restore(int type,
+                                 String text,
+                                 long timestamp,
+                                 int routeId,
+                                 List<LatLng> roadPolyline,
+                                 List<LatLng> waypoints,
+                                 boolean publishAllowed) {
+        return new RouteChatItem(type, text, timestamp, routeId,
+                roadPolyline, waypoints, publishAllowed);
+    }
+
     public void setText(String text) {
         this.text = text != null ? text : "";
     }
@@ -109,5 +120,9 @@ public class RouteChatItem {
 
     public boolean canPublish() {
         return type == TYPE_ASSISTANT_ROUTE && routeId > 0 && publishAllowed;
+    }
+
+    boolean isPublishAllowed() {
+        return publishAllowed;
     }
 }

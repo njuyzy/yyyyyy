@@ -1,6 +1,8 @@
 package com.example.Japp.user;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.MenuItem;
 
 import androidx.annotation.NonNull;
@@ -11,13 +13,21 @@ import androidx.lifecycle.Lifecycle;
 
 import com.example.Japp.R;
 import com.example.Japp.Chat.fragment.ConversationList;
+import com.example.Japp.Chat.util.ChatUnreadManager;
+import com.example.Japp.network.ApiClient;
+import com.example.Japp.network.api.UserService;
 import com.example.Japp.user.fragment.joinTeam.TeamList;
 import com.example.Japp.user.fragment.profile.profile;
 import com.example.Japp.user.fragment.route.routeDesign;
 import com.example.Japp.util.DisplayCutoutAdapter;
+import com.example.Japp.user.util.SessionHelper;
+import com.google.android.material.badge.BadgeDrawable;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
-public class UserMainActivity extends AppCompatActivity {
+import java.util.Map;
+
+public class UserMainActivity extends AppCompatActivity
+        implements ConversationList.UnreadCountHost {
 
     private static final String STATE_POSITION = "user_main_position";
     private static final String TAG_ROUTE = "user_route";
@@ -31,6 +41,16 @@ public class UserMainActivity extends AppCompatActivity {
     private ConversationList conversationList;
 
     private BottomNavigationView bottomNavigationView;
+    private UserService unreadService;
+    private boolean unreadRefreshInFlight;
+    private final Handler unreadHandler = new Handler(Looper.getMainLooper());
+    private final Runnable unreadRefreshTask = new Runnable() {
+        @Override
+        public void run() {
+            refreshChatUnread();
+            unreadHandler.postDelayed(this, 15000L);
+        }
+    };
     int position;
 
     @Override
@@ -40,6 +60,7 @@ public class UserMainActivity extends AppCompatActivity {
         DisplayCutoutAdapter.apply(this);
 
         bottomNavigationView = findViewById(R.id.UserBottomNav);
+        unreadService = ApiClient.getClient().create(UserService.class);
         restoreFragments();
 
         bottomNavigationView.setOnNavigationItemSelectedListener(new BottomNavigationView.OnNavigationItemSelectedListener() {
@@ -64,6 +85,64 @@ public class UserMainActivity extends AppCompatActivity {
 
         position = savedInstanceState != null ? savedInstanceState.getInt(STATE_POSITION, 0) : 0;
         selectedFragment(position);
+    }
+
+    private void refreshChatUnread() {
+        int accountId = SessionHelper.getAccountId(this);
+        if (accountId <= 0 || unreadService == null) {
+            updateChatUnreadBadge(0);
+            return;
+        }
+        if (unreadRefreshInFlight) {
+            return;
+        }
+        unreadRefreshInFlight = true;
+        ChatUnreadManager.refresh(
+                this,
+                unreadService,
+                accountId,
+                new ChatUnreadManager.RefreshCallback() {
+                    @Override
+                    public void onRefreshed(Map<Long, Integer> unreadBySession,
+                                            int totalUnread) {
+                        unreadRefreshInFlight = false;
+                        updateChatUnreadBadge(totalUnread);
+                    }
+
+                    @Override
+                    public void onFailure() {
+                        unreadRefreshInFlight = false;
+                    }
+                });
+    }
+
+    @Override
+    public void updateChatUnreadBadge(int unreadCount) {
+        if (bottomNavigationView == null) {
+            return;
+        }
+        if (unreadCount <= 0) {
+            bottomNavigationView.removeBadge(R.id.messages);
+            return;
+        }
+        BadgeDrawable badge = bottomNavigationView.getOrCreateBadge(R.id.messages);
+        badge.setVisible(true);
+        badge.setNumber(unreadCount);
+        badge.setMaxCharacterCount(3);
+        badge.setBadgeGravity(BadgeDrawable.BOTTOM_END);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        unreadHandler.removeCallbacks(unreadRefreshTask);
+        unreadHandler.post(unreadRefreshTask);
+    }
+
+    @Override
+    protected void onPause() {
+        unreadHandler.removeCallbacks(unreadRefreshTask);
+        super.onPause();
     }
 
     private void restoreFragments() {

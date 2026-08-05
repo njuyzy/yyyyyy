@@ -181,8 +181,10 @@
                         android:background="#F0F0F0" />
 
                     <LinearLayout
+                        android:id="@+id/rowRegion"
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
+                        android:background="?selectableItemBackground"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
                         android:paddingStart="20dp"
@@ -205,6 +207,14 @@
                             android:textColor="#121212"
                             android:textColorHint="#BBBBBB"
                             android:textSize="16sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="›"
+                            android:textColor="#BBBBBB"
+                            android:textSize="24sp" />
                     </LinearLayout>
 
                     <View

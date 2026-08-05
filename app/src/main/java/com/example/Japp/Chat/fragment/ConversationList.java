@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.Japp.Chat.adapter.conversationListAdapter;
 import com.example.Japp.Chat.chatActivity;
+import com.example.Japp.Chat.util.ChatUnreadManager;
 import com.example.Japp.R;
 import com.example.Japp.data.Conversation;
 import com.example.Japp.data.User;
@@ -39,6 +40,10 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 public class ConversationList extends Fragment {
+
+    public interface UnreadCountHost {
+        void updateChatUnreadBadge(int unreadCount);
+    }
 
     private RecyclerView recycler;
     private TextView emptyState;
@@ -265,7 +270,16 @@ public class ConversationList extends Fragment {
                             ServerChatMessage last = messages.get(messages.size() - 1);
                             conversation.addMessage(last.getContent());
                         }
+                        conversation.setLatestMessageId(
+                                ChatUnreadManager.latestMessageId(messages));
+                        conversation.setUnRead_num(ChatUnreadManager.calculateUnread(
+                                requireContext(),
+                                currentAccountId,
+                                conversation.getBackendSessionId(),
+                                messages));
+                        sortConversations();
                         adapter.notifyDataSetChanged();
+                        notifyUnreadCount();
                     }
 
                     @Override
@@ -285,6 +299,27 @@ public class ConversationList extends Fragment {
         startActivity(intent);
     }
 
+    private void sortConversations() {
+        conversationList.sort((left, right) -> {
+            boolean leftUnread = left.getUnRead_num() > 0;
+            boolean rightUnread = right.getUnRead_num() > 0;
+            if (leftUnread != rightUnread) {
+                return leftUnread ? -1 : 1;
+            }
+            return Long.compare(right.getLatestMessageId(), left.getLatestMessageId());
+        });
+    }
+
+    private void notifyUnreadCount() {
+        int totalUnread = 0;
+        for (Conversation conversation : conversationList) {
+            totalUnread += conversation.getUnRead_num();
+        }
+        if (getActivity() instanceof UnreadCountHost) {
+            ((UnreadCountHost) getActivity()).updateChatUnreadBadge(totalUnread);
+        }
+    }
+
     private void updateEmptyState() {
         if (emptyState == null || recycler == null) {
             return;
@@ -293,6 +328,9 @@ public class ConversationList extends Fragment {
         emptyState.setText("发布、加入拼单或领队接单后，将自动出现项目群聊");
         emptyState.setVisibility(empty ? View.VISIBLE : View.GONE);
         recycler.setVisibility(empty ? View.GONE : View.VISIBLE);
+        if (empty) {
+            notifyUnreadCount();
+        }
     }
 
     private void showEmptyState(String message) {

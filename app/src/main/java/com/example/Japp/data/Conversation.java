@@ -13,6 +13,7 @@ public class Conversation implements Serializable {
     private String groupName;
     private List<String> memberNames;
     private long backendSessionId;
+    private long latestMessageId;
     private int projectId;
 
     public long getBackendSessionId() {
@@ -21,6 +22,14 @@ public class Conversation implements Serializable {
 
     public void setBackendSessionId(long backendSessionId) {
         this.backendSessionId = backendSessionId;
+    }
+
+    public long getLatestMessageId() {
+        return latestMessageId;
+    }
+
+    public void setLatestMessageId(long latestMessageId) {
+        this.latestMessageId = latestMessageId;
     }
 
     public int getProjectId() {

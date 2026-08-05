@@ -1,5 +1,6 @@
 package com.example.Japp.user;
 
+import android.content.res.ColorStateList;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -12,6 +13,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import com.amap.api.maps.AMap;
 import com.amap.api.maps.MapView;
@@ -325,10 +327,26 @@ public class TeamDetailActivity extends AppCompatActivity {
 
     private void setupJoinButton() {
         int accountId = SessionHelper.getAccountId(this);
+        btnJoin.setVisibility(View.VISIBLE);
+        btnJoin.setEnabled(true);
+        btnJoin.setOnClickListener(null);
+
         if (project.getOwnerAccountId() == accountId) {
-            btnJoin.setVisibility(View.GONE);
+            setupPublisherAction();
             return;
         }
+        if ("PARTICIPANT".equalsIgnoreCase(project.getViewerRole())) {
+            setupParticipantAction();
+            return;
+        }
+        Integer assignedLeaderId = project.getLeaderAccountId();
+        if ("LEADER".equalsIgnoreCase(project.getViewerRole())
+                || (assignedLeaderId != null && assignedLeaderId == accountId)) {
+            setupLeaderAction();
+            return;
+        }
+        stylePrimaryAction();
+        btnJoin.setText("加入拼单");
         if (project.getCurrentMembers() >= project.getMaxMembers()) {
             btnJoin.setEnabled(false);
             btnJoin.setText("已满员");
@@ -341,6 +359,185 @@ public class TeamDetailActivity extends AppCompatActivity {
         }
 
         btnJoin.setOnClickListener(v -> showJoinPartySizeDialog());
+    }
+
+    private void setupPublisherAction() {
+        String status = ProjectUiHelper.normalizeStatus(project.getStatus());
+        btnJoin.setEnabled(true);
+        styleDangerAction();
+        if (ProjectUiHelper.STATUS_DONE.equals(status)) {
+            btnJoin.setEnabled(false);
+            btnJoin.setText("行程已完成");
+            return;
+        }
+        if (ProjectUiHelper.STATUS_CANCELLED.equals(status)) {
+            btnJoin.setEnabled(false);
+            btnJoin.setText("行程已取消");
+            return;
+        }
+        if (ProjectUiHelper.STATUS_IN_PROGRESS.equals(status)) {
+            btnJoin.setEnabled(false);
+            btnJoin.setText("行程进行中");
+            return;
+        }
+        btnJoin.setText("取消行程");
+        btnJoin.setOnClickListener(v -> confirmCancelTrip());
+    }
+
+    private void setupParticipantAction() {
+        btnJoin.setEnabled(true);
+        styleDangerAction();
+        btnJoin.setText("退出行程");
+        btnJoin.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
+                .setTitle("退出行程")
+                .setMessage("退出后将释放你所代表的名额，并同步退出行程群聊。确定继续吗？")
+                .setNegativeButton("暂不退出", null)
+                .setPositiveButton("确认退出", (dialog, which) -> quitTrip())
+                .show());
+    }
+
+    private void setupLeaderAction() {
+        btnJoin.setEnabled(true);
+        styleDangerAction();
+        btnJoin.setText("放弃带队");
+        btnJoin.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
+                .setTitle("放弃带队")
+                .setMessage("放弃后订单将重新开放给其他领队，你也会退出该行程群聊。确定继续吗？")
+                .setNegativeButton("暂不放弃", null)
+                .setPositiveButton("确认放弃", (dialog, which) -> abandonTrip())
+                .show());
+    }
+
+    private void quitTrip() {
+        btnJoin.setEnabled(false);
+        btnJoin.setText("正在退出…");
+        service.quitProject(project.getId()).enqueue(new Callback<Result>() {
+            @Override
+            public void onResponse(Call<Result> call, Response<Result> response) {
+                if (response.code() == 401) {
+                    SessionHelper.handleUnauthorized(TeamDetailActivity.this);
+                    return;
+                }
+                if (!response.isSuccessful() || response.body() == null
+                        || response.body().getCode() != 1) {
+                    setupParticipantAction();
+                    String message = response.body() == null
+                            ? "退出行程失败" : response.body().getMsg();
+                    Toast.makeText(TeamDetailActivity.this,
+                            message, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                setResult(RESULT_OK);
+                Toast.makeText(TeamDetailActivity.this,
+                        "已退出行程和群聊", Toast.LENGTH_SHORT).show();
+                finish();
+            }
+
+            @Override
+            public void onFailure(Call<Result> call, Throwable t) {
+                setupParticipantAction();
+                Toast.makeText(TeamDetailActivity.this,
+                        "网络异常，退出失败", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void abandonTrip() {
+        btnJoin.setEnabled(false);
+        btnJoin.setText("正在放弃…");
+        service.abandonProject(project.getId()).enqueue(new Callback<Result>() {
+            @Override
+            public void onResponse(Call<Result> call, Response<Result> response) {
+                if (response.code() == 401) {
+                    SessionHelper.handleUnauthorized(TeamDetailActivity.this);
+                    return;
+                }
+                if (!response.isSuccessful() || response.body() == null
+                        || response.body().getCode() != 1) {
+                    setupLeaderAction();
+                    String message = response.body() == null
+                            ? "放弃带队失败" : response.body().getMsg();
+                    Toast.makeText(TeamDetailActivity.this,
+                            message, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                setResult(RESULT_OK);
+                Toast.makeText(TeamDetailActivity.this,
+                        "已放弃带队，订单已重新开放", Toast.LENGTH_SHORT).show();
+                finish();
+            }
+
+            @Override
+            public void onFailure(Call<Result> call, Throwable t) {
+                setupLeaderAction();
+                Toast.makeText(TeamDetailActivity.this,
+                        "网络异常，操作失败", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void confirmCancelTrip() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("取消行程")
+                .setMessage("取消后行程将结束，关联群聊也会同步关闭。确定继续吗？")
+                .setNegativeButton("暂不取消", null)
+                .setPositiveButton("确认取消", (dialog, which) -> cancelTrip())
+                .show();
+    }
+
+    private void cancelTrip() {
+        btnJoin.setEnabled(false);
+        btnJoin.setText("正在取消…");
+        service.updateProjectStatus(project.getId(), ProjectUiHelper.STATUS_CANCELLED)
+                .enqueue(new Callback<Result>() {
+                    @Override
+                    public void onResponse(Call<Result> call, Response<Result> response) {
+                        if (response.code() == 401) {
+                            SessionHelper.handleUnauthorized(TeamDetailActivity.this);
+                            return;
+                        }
+                        if (!response.isSuccessful() || response.body() == null
+                                || response.body().getCode() != 1) {
+                            setupPublisherAction();
+                            String message = response.body() == null
+                                    ? "取消行程失败" : response.body().getMsg();
+                            Toast.makeText(TeamDetailActivity.this,
+                                    message, Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        project.setStatus(ProjectUiHelper.STATUS_CANCELLED);
+                        bindProjectHeader();
+                        setupPublisherAction();
+                        setResult(RESULT_OK);
+                        Toast.makeText(TeamDetailActivity.this,
+                                "行程已取消", Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override
+                    public void onFailure(Call<Result> call, Throwable t) {
+                        setupPublisherAction();
+                        Toast.makeText(TeamDetailActivity.this,
+                                "网络异常，取消失败", Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private void stylePrimaryAction() {
+        btnJoin.setBackgroundTintList(ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.accent)));
+        btnJoin.setTextColor(ContextCompat.getColor(this, R.color.white));
+        btnJoin.setStrokeWidth(0);
+    }
+
+    private void styleDangerAction() {
+        int danger = ContextCompat.getColor(this, R.color.status_cancelled);
+        btnJoin.setBackgroundTintList(ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.white)));
+        btnJoin.setTextColor(danger);
+        btnJoin.setStrokeColor(ColorStateList.valueOf(danger));
+        btnJoin.setStrokeWidth(Math.round(getResources().getDisplayMetrics().density));
+        btnJoin.setElevation(0f);
+        btnJoin.setStateListAnimator(null);
     }
 
     private void showJoinPartySizeDialog() {
@@ -396,11 +593,12 @@ public class TeamDetailActivity extends AppCompatActivity {
                 if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
                     Toast.makeText(TeamDetailActivity.this,
                             "加入成功，你代表 " + partySize + " 人", Toast.LENGTH_SHORT).show();
-                    btnJoin.setText("已加入");
+                    project.setViewerRole("PARTICIPANT");
                     project.setCurrentMembers(project.getCurrentMembers() + partySize);
                     saveMyPartySize(partySize);
                     showMyPartySize(partySize);
                     bindProjectHeader();
+                    setupJoinButton();
                     setResult(RESULT_OK);
                 } else {
                     btnJoin.setEnabled(true);
@@ -430,6 +628,9 @@ public class TeamDetailActivity extends AppCompatActivity {
         int partySize = getSharedPreferences("project_party_sizes", MODE_PRIVATE)
                 .getInt(partySizePreferenceKey(), 0);
         if (partySize > 0) {
+            if (project.getOwnerAccountId() != SessionHelper.getAccountId(this)) {
+                project.setViewerRole("PARTICIPANT");
+            }
             showMyPartySize(partySize);
         }
     }

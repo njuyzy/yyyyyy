@@ -2,6 +2,7 @@ package com.example.Japp.leader;
 
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -13,6 +14,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import com.amap.api.maps.model.LatLng;
 import com.example.Japp.R;
@@ -30,6 +32,7 @@ import com.example.Japp.user.util.SessionHelper;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
@@ -352,13 +355,13 @@ public class orderDetailActivity extends AppCompatActivity {
         btnJoin.setEnabled(true);
         btnJoin.setOnClickListener(null);
         btnJoin.setText("接单");
+        stylePrimaryAction();
 
         int accountId = SessionHelper.getAccountId(this);
         Integer leaderId = project.getLeaderAccountId();
         if (ProjectUiHelper.hasAssignedLeader(leaderId)) {
             if (leaderId == accountId) {
-                btnJoin.setEnabled(false);
-                btnJoin.setText("已接单");
+                setupLeaderAction();
             } else {
                 btnJoin.setEnabled(false);
                 btnJoin.setText("已有领队");
@@ -396,6 +399,87 @@ public class orderDetailActivity extends AppCompatActivity {
         btnJoin.setOnClickListener(v -> acceptOrder());
     }
 
+    private void setupLeaderAction() {
+        String status = ProjectUiHelper.normalizeStatus(project.getStatus());
+        if (ProjectUiHelper.STATUS_DONE.equals(status)) {
+            btnJoin.setEnabled(false);
+            btnJoin.setText("已完成");
+            return;
+        }
+        if (ProjectUiHelper.STATUS_CANCELLED.equals(status)) {
+            btnJoin.setEnabled(false);
+            btnJoin.setText("已取消");
+            return;
+        }
+        if (ProjectUiHelper.STATUS_IN_PROGRESS.equals(status)) {
+            btnJoin.setEnabled(false);
+            btnJoin.setText("进行中");
+            return;
+        }
+
+        styleDangerAction();
+        btnJoin.setEnabled(true);
+        btnJoin.setText("放弃带队");
+        btnJoin.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
+                .setTitle("放弃带队")
+                .setMessage("放弃后订单将重新开放给其他领队，你也会退出该行程群聊。确定继续吗？")
+                .setNegativeButton("暂不放弃", null)
+                .setPositiveButton("确认放弃", (dialog, which) -> abandonOrder())
+                .show());
+    }
+
+    private void abandonOrder() {
+        btnJoin.setEnabled(false);
+        btnJoin.setText("正在放弃…");
+        service.abandonProject(project.getId()).enqueue(new Callback<Result>() {
+            @Override
+            public void onResponse(Call<Result> call, Response<Result> response) {
+                if (response.code() == 401) {
+                    SessionHelper.handleUnauthorized(orderDetailActivity.this);
+                    return;
+                }
+                if (!response.isSuccessful() || response.body() == null
+                        || response.body().getCode() != 1) {
+                    setupLeaderAction();
+                    String message = response.body() == null
+                            ? "放弃带队失败" : response.body().getMsg();
+                    Toast.makeText(orderDetailActivity.this,
+                            message, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                setResult(RESULT_OK);
+                Toast.makeText(orderDetailActivity.this,
+                        "已放弃带队，订单已重新开放", Toast.LENGTH_SHORT).show();
+                finish();
+            }
+
+            @Override
+            public void onFailure(Call<Result> call, Throwable t) {
+                setupLeaderAction();
+                Toast.makeText(orderDetailActivity.this,
+                        "网络异常，操作失败", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void stylePrimaryAction() {
+        btnJoin.setBackgroundTintList(ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.accent)));
+        btnJoin.setTextColor(ContextCompat.getColor(this, R.color.white));
+        btnJoin.setStrokeWidth(0);
+    }
+
+    private void styleDangerAction() {
+        int danger = ContextCompat.getColor(this, R.color.status_cancelled);
+        btnJoin.setBackgroundTintList(ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.white)));
+        btnJoin.setTextColor(danger);
+        btnJoin.setStrokeColor(ColorStateList.valueOf(danger));
+        btnJoin.setStrokeWidth(Math.round(getResources().getDisplayMetrics().density));
+        btnJoin.setElevation(0f);
+        btnJoin.setStateListAnimator(null);
+    }
+
     private void acceptOrder() {
         if (!SessionHelper.isLoggedIn(this)) {
             Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
@@ -424,6 +508,7 @@ public class orderDetailActivity extends AppCompatActivity {
                             project.setLeaderAccountId(leaderAccountId);
                             project.setStatus(ProjectUiHelper.STATUS_CONFIRMED);
                             bindProjectHeader();
+                            setupAcceptButton();
                             setResult(RESULT_OK);
                             Toast.makeText(orderDetailActivity.this,
                                     "接单成功，已加入项目群聊", Toast.LENGTH_SHORT).show();

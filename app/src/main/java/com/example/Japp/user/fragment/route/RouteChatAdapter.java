@@ -36,6 +36,8 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     }
 
     private RouteChatListener listener;
+    @Nullable
+    private Runnable dataChangedListener;
     private RecyclerView recyclerView;
     @Nullable
     private Bundle mapCreateBundle;
@@ -52,9 +54,14 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         this.listener = listener;
     }
 
+    public void setDataChangedListener(@Nullable Runnable listener) {
+        dataChangedListener = listener;
+    }
+
     public void addItem(RouteChatItem item) {
         items.add(item);
         notifyItemInserted(items.size() - 1);
+        dispatchDataChanged();
     }
 
     public void updateItemText(int position, String text) {
@@ -63,6 +70,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         }
         items.get(position).setText(text);
         notifyItemChanged(position);
+        dispatchDataChanged();
     }
 
     public void replaceItem(int position, RouteChatItem item) {
@@ -71,6 +79,13 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         }
         items.set(position, item);
         notifyItemChanged(position);
+        dispatchDataChanged();
+    }
+
+    public void replaceAllItems(@NonNull List<RouteChatItem> restoredItems) {
+        items.clear();
+        items.addAll(restoredItems);
+        notifyDataSetChanged();
     }
 
     public int getLastItemPosition() {
@@ -97,6 +112,12 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
 
     public List<RouteChatItem> getItems() {
         return items;
+    }
+
+    private void dispatchDataChanged() {
+        if (dataChangedListener != null) {
+            dataChangedListener.run();
+        }
     }
 
     public void onHostResume() {

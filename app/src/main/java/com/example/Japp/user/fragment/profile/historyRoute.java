@@ -18,6 +18,7 @@ import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.Project;
+import com.example.Japp.network.models.ProjectPage;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.example.Japp.user.TeamDetailActivity;
@@ -76,23 +77,11 @@ public class historyRoute extends Fragment {
             return;
         }
         int accountId = SessionHelper.getAccountId(requireContext());
-        service.filterProjects(
-                        accountId,
-                        1,
-                        30,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        accountId,
-                        null,
-                        null,
-                        false)
-                .enqueue(new Callback<Result<List<Project>>>() {
+        service.getMyProjects("ALL", null, 1, 30)
+                .enqueue(new Callback<Result<ProjectPage>>() {
             @Override
-            public void onResponse(Call<Result<List<Project>>> call, Response<Result<List<Project>>> response) {
+            public void onResponse(Call<Result<ProjectPage>> call,
+                                   Response<Result<ProjectPage>> response) {
                 if (!isAdded()) {
                     return;
                 }
@@ -104,26 +93,32 @@ public class historyRoute extends Fragment {
                     showEmpty("加载失败");
                     return;
                 }
-                List<Project> projects = response.body().getData();
+                ProjectPage page = response.body().getData();
+                List<Project> projects = page == null ? null : page.getItems();
                 if (projects == null || projects.isEmpty()) {
-                    showEmpty("暂无相关项目");
+                    showEmpty("暂无历史路线");
                     return;
                 }
-                List<Project> ownedProjects = new ArrayList<>();
+                List<Project> historyProjects = new ArrayList<>();
                 for (Project project : projects) {
-                    if (project != null && project.getOwnerAccountId() == accountId) {
-                        ownedProjects.add(project);
+                    if (project == null) {
+                        continue;
+                    }
+                    boolean publishedByMe = project.getOwnerAccountId() == accountId;
+                    boolean joinedByMe = "PARTICIPANT".equalsIgnoreCase(project.getViewerRole());
+                    if (publishedByMe || joinedByMe) {
+                        historyProjects.add(project);
                     }
                 }
-                if (ownedProjects.isEmpty()) {
-                    showEmpty("暂无自己发布的路线");
+                if (historyProjects.isEmpty()) {
+                    showEmpty("暂无历史路线");
                     return;
                 }
-                enrichProjects(ownedProjects);
+                enrichProjects(historyProjects);
             }
 
             @Override
-            public void onFailure(Call<Result<List<Project>>> call, Throwable t) {
+            public void onFailure(Call<Result<ProjectPage>> call, Throwable t) {
                 if (isAdded()) {
                     showEmpty("网络错误");
                 }
