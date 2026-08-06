@@ -5,6 +5,8 @@ import com.example.Japp.network.models.AccountLeaderProfile;
 import com.example.Japp.network.models.AccountTagPref;
 import com.example.Japp.network.models.ChatSession;
 import com.example.Japp.network.models.ChatGroupMember;
+import com.example.Japp.network.models.LeaderProfile;
+import com.example.Japp.network.models.LeaderReview;
 import com.example.Japp.network.models.ServerChatMessage;
 import com.example.Japp.network.models.LoginResponse;
 import com.example.Japp.network.models.Project;
@@ -68,6 +70,17 @@ public interface UserService {
 
     @GET("accounts/{id}/leaderProfile")
     Call<Result<AccountLeaderProfile>> getLeaderProfile(@Path("id") int id);
+
+    @GET("leader/profile")
+    Call<Result<LeaderProfile>> getLeaderDashboard();
+
+    /**
+     * 领队收到的用户评价列表（USER_TO_LEADER），按时间倒序。
+     * 响应是普通列表（非分页），服务端按 pageNum/pageSize 切片即可。
+     */
+    @GET("leader/reviews")
+    Call<Result<List<LeaderReview>>> getLeaderReviews(@Query("pageNum") int pageNum,
+                                                     @Query("pageSize") int pageSize);
 
     @POST("accounts/{id}/intro")
     Call<Result> updateIntro(@Path("id") int id, @Body IntroRequest request);

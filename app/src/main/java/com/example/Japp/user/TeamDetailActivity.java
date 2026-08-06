@@ -674,6 +674,22 @@ public class TeamDetailActivity extends AppCompatActivity {
             walkRoutePlanner = null;
         }
         if (mapCreated && routeMapView != null) {
+            if (aMap != null) {
+                try {
+                    aMap.stopAnimation();
+                } catch (Throwable ignored) {
+                }
+            }
+            try {
+                routeMapView.setVisibility(android.view.View.GONE);
+            } catch (Throwable ignored) {
+            }
+            if (routeMapView.getParent() != null) {
+                try {
+                    ((android.view.ViewGroup) routeMapView.getParent()).removeView(routeMapView);
+                } catch (Throwable ignored) {
+                }
+            }
             routeMapView.onDestroy();
             routeMapView = null;
         }

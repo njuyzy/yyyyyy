@@ -187,11 +187,16 @@
                     android:orientation="horizontal">
 
                     <LinearLayout
+                        android:id="@+id/btnPendingOrders"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:background="?selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:gravity="center"
-                        android:orientation="vertical">
+                        android:orientation="vertical"
+                        android:paddingVertical="8dp">
 
                         <TextView
                             android:id="@+id/txtPendingOrders"
@@ -218,11 +223,16 @@
                         android:background="#E6E8EC" />
 
                     <LinearLayout
+                        android:id="@+id/btnCompletedOrders"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:background="?selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:gravity="center"
-                        android:orientation="vertical">
+                        android:orientation="vertical"
+                        android:paddingVertical="8dp">
 
                         <TextView
                             android:id="@+id/txtCompletedOrders"
@@ -249,11 +259,16 @@
                         android:background="#E6E8EC" />
 
                     <LinearLayout
+                        android:id="@+id/btnRating"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:background="?selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:gravity="center"
-                        android:orientation="vertical">
+                        android:orientation="vertical"
+                        android:paddingVertical="8dp">
 
                         <TextView
                             android:id="@+id/txtRating"
@@ -273,254 +288,6 @@
                             android:textSize="13sp" />
                     </LinearLayout>
                 </LinearLayout>
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="26dp"
-                    android:text="我的订单"
-                    android:textColor="#121212"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    app:cardBackgroundColor="#FFFFFF"
-                    app:cardCornerRadius="14dp"
-                    app:cardElevation="0dp"
-                    app:strokeColor="#EEF0F4"
-                    app:strokeWidth="1dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-
-                        <LinearLayout
-                            android:id="@+id/btnOrderReceived"
-                            android:layout_width="match_parent"
-                            android:layout_height="56dp"
-                            android:background="?selectableItemBackground"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingStart="18dp"
-                            android:paddingEnd="18dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="已接单"
-                                android:textColor="#121212"
-                                android:textSize="16sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text=">"
-                                android:textColor="#999999"
-                                android:textSize="18sp" />
-                        </LinearLayout>
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:layout_marginStart="18dp"
-                            android:layout_marginEnd="18dp"
-                            android:background="#EEF0F4" />
-
-                        <LinearLayout
-                            android:id="@+id/btnOrderInProgress"
-                            android:layout_width="match_parent"
-                            android:layout_height="56dp"
-                            android:background="?selectableItemBackground"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingStart="18dp"
-                            android:paddingEnd="18dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="进行中"
-                                android:textColor="#121212"
-                                android:textSize="16sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text=">"
-                                android:textColor="#999999"
-                                android:textSize="18sp" />
-                        </LinearLayout>
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:layout_marginStart="18dp"
-                            android:layout_marginEnd="18dp"
-                            android:background="#EEF0F4" />
-
-                        <LinearLayout
-                            android:id="@+id/btnOrderToReview"
-                            android:layout_width="match_parent"
-                            android:layout_height="56dp"
-                            android:background="?selectableItemBackground"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingStart="18dp"
-                            android:paddingEnd="18dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="待评价"
-                                android:textColor="#121212"
-                                android:textSize="16sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text=">"
-                                android:textColor="#999999"
-                                android:textSize="18sp" />
-                        </LinearLayout>
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:layout_marginStart="18dp"
-                            android:layout_marginEnd="18dp"
-                            android:background="#EEF0F4" />
-
-                        <LinearLayout
-                            android:id="@+id/btnOrderCompleted"
-                            android:layout_width="match_parent"
-                            android:layout_height="56dp"
-                            android:background="?selectableItemBackground"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingStart="18dp"
-                            android:paddingEnd="18dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="已完成"
-                                android:textColor="#121212"
-                                android:textSize="16sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text=">"
-                                android:textColor="#999999"
-                                android:textSize="18sp" />
-                        </LinearLayout>
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="24dp"
-                    android:text="我的评价"
-                    android:textColor="#121212"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    app:cardBackgroundColor="#FFFFFF"
-                    app:cardCornerRadius="14dp"
-                    app:cardElevation="0dp"
-                    app:strokeColor="#EEF0F4"
-                    app:strokeWidth="1dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-
-                        <LinearLayout
-                            android:id="@+id/btnViewReviews"
-                            android:layout_width="match_parent"
-                            android:layout_height="56dp"
-                            android:background="?selectableItemBackground"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingStart="18dp"
-                            android:paddingEnd="18dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="历史评价"
-                                android:textColor="#121212"
-                                android:textSize="16sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text=">"
-                                android:textColor="#999999"
-                                android:textSize="18sp" />
-                        </LinearLayout>
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:layout_marginStart="18dp"
-                            android:layout_marginEnd="18dp"
-                            android:background="#EEF0F4" />
-
-                        <LinearLayout
-                            android:id="@+id/btnOverallReview"
-                            android:layout_width="match_parent"
-                            android:layout_height="56dp"
-                            android:background="?selectableItemBackground"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingStart="18dp"
-                            android:paddingEnd="18dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="综合评价"
-                                android:textColor="#121212"
-                                android:textSize="16sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text=">"
-                                android:textColor="#999999"
-                                android:textSize="18sp" />
-                        </LinearLayout>
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
 
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/btnSwitchRole"

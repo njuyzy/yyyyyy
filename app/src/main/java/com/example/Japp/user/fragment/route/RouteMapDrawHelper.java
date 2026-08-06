@@ -189,7 +189,10 @@ public final class RouteMapDrawHelper {
             return;
         }
         if (points.size() == 1) {
-            aMap.moveCamera(CameraUpdateFactory.newLatLngZoom(points.get(0), 14f));
+            try {
+                aMap.moveCamera(CameraUpdateFactory.newLatLngZoom(points.get(0), 14f));
+            } catch (Throwable ignored) {
+            }
             return;
         }
         LatLngBounds.Builder builder = LatLngBounds.builder();
@@ -197,9 +200,15 @@ public final class RouteMapDrawHelper {
             builder.include(p);
         }
         try {
-            aMap.animateCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), paddingPx));
-        } catch (Exception e) {
-            aMap.moveCamera(CameraUpdateFactory.newLatLngZoom(points.get(0), 13f));
+            // 改用 moveCamera：animateCamera 会在 GLThread 启动异步动画，与 Activity 销毁时
+            // MapView.onDestroy() 在原生层释放 GL 上下文产生竞态，触发 libAMapSDK_MAP_v9_8_3.so
+            // 的 nativeDestroy 崩溃。详情页镜头一次性移动即可，避免该竞态。
+            aMap.moveCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), paddingPx));
+        } catch (Throwable e) {
+            try {
+                aMap.moveCamera(CameraUpdateFactory.newLatLngZoom(points.get(0), 13f));
+            } catch (Throwable ignored) {
+            }
         }
     }
 

@@ -1,13 +1,12 @@
 package com.example.Japp.leader;
 
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -16,9 +15,11 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
+import com.amap.api.maps.AMap;
+import com.amap.api.maps.MapView;
+import com.amap.api.maps.MapsInitializer;
 import com.amap.api.maps.model.LatLng;
 import com.example.Japp.R;
-import com.example.Japp.data.order;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
@@ -31,7 +32,6 @@ import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.gson.Gson;
 
@@ -48,55 +48,91 @@ public class orderDetailActivity extends AppCompatActivity {
 
     public static final String EXTRA_PROJECT_JSON = "project_json";
 
+    private static final String TAG = "LeaderOrderDetail";
+
     private UserService service;
     private Project project;
     private TextView txtTitle;
-    private TextView txtTime;
     private TextView txtMeta;
     private TextView txtOwner;
     private TextView txtStatus;
     private TextView txtRouteDetail;
-    private TextView txtMembers;
     private MaterialButton btnJoin;
-    private LinearLayout routeDetailRow;
     @Nullable
     private FrameLayout mapContainer;
     @Nullable
+    private MapView routeMapView;
+    @Nullable
     private TextView mapTapHint;
     @Nullable
-    private LeaderWalkRoutePlanner walkRoutePlanner;
-    private List<RouteNode> cachedRouteNodes = new ArrayList<>();
-    private final ArrayList<String> walkInstructions = new ArrayList<>();
+    private AMap aMap;
+    private final List<LatLng> routePoints = new ArrayList<>();
     private final List<LatLng> plannedRoadPoints = new ArrayList<>();
+    private final List<RouteNode> cachedRouteNodes = new ArrayList<>();
+    @Nullable
+    private LeaderWalkRoutePlanner walkRoutePlanner;
+    private boolean routePlanningStarted;
+    private boolean mapCreated;
+
+    // 用于在 onDestroy 时取消尚未返回的请求，避免回调访问已销毁的视图
+    @Nullable
+    private Call<?> pendingProjectCall;
+    @Nullable
+    private Call<?> pendingOwnerCall;
+    @Nullable
+    private Call<?> pendingRouteCall;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_leader_order_detail);
 
+        MapsInitializer.updatePrivacyShow(getApplicationContext(), true, true);
+        MapsInitializer.updatePrivacyAgree(getApplicationContext(), true);
+
         service = ApiClient.getClient().create(UserService.class);
-        walkRoutePlanner = new LeaderWalkRoutePlanner(this);
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         toolbar.setNavigationOnClickListener(v -> finish());
 
         txtTitle = findViewById(R.id.txtTitle);
-        txtTime = findViewById(R.id.txtTime);
         txtMeta = findViewById(R.id.txtMeta);
         txtOwner = findViewById(R.id.txtOwner);
         txtStatus = findViewById(R.id.txtStatus);
         txtRouteDetail = findViewById(R.id.txtRouteDetail);
-        txtMembers = findViewById(R.id.txtMembers);
         btnJoin = findViewById(R.id.btnJoin);
-        routeDetailRow = findViewById(R.id.routeDetailRow);
         mapContainer = findViewById(R.id.mapContainer);
+        routeMapView = findViewById(R.id.routeMapView);
         mapTapHint = findViewById(R.id.mapTapHint);
 
-        if (routeDetailRow != null) {
-            routeDetailRow.setOnClickListener(v -> openFullscreenRouteMap());
+        // 完全按用户端 TeamDetailActivity 的策略：未配置 AMap Key 时隐藏地图，避免原生层崩溃
+        if (!hasConfiguredAmapKey()) {
+            if (mapContainer != null) {
+                mapContainer.setVisibility(View.GONE);
+            }
+        } else if (routeMapView != null) {
+            try {
+                routeMapView.onCreate(savedInstanceState);
+                mapCreated = true;
+                aMap = routeMapView.getMap();
+                if (aMap != null) {
+                    aMap.getUiSettings().setZoomControlsEnabled(false);
+                    aMap.getUiSettings().setRotateGesturesEnabled(false);
+                    aMap.getUiSettings().setTiltGesturesEnabled(false);
+                    aMap.setOnMapLoadedListener(this::startRoadRoutePlanning);
+                }
+                walkRoutePlanner = new LeaderWalkRoutePlanner(this);
+            } catch (Throwable t) {
+                Log.w(TAG, "routeMapView.onCreate failed, hide map", t);
+                if (mapContainer != null) {
+                    mapContainer.setVisibility(View.GONE);
+                }
+                aMap = null;
+                mapCreated = false;
+            }
         }
 
-        View.OnClickListener openFullscreen = v -> openFullscreenRouteMap();
+        View.OnClickListener openFullscreen = v -> openFullscreenMap();
         if (mapContainer != null) {
             mapContainer.setOnClickListener(openFullscreen);
         }
@@ -104,7 +140,14 @@ public class orderDetailActivity extends AppCompatActivity {
             mapTapHint.setOnClickListener(openFullscreen);
         }
 
-        project = parseProjectFromIntent();
+        String projectJson = getIntent().getStringExtra(EXTRA_PROJECT_JSON);
+        if (TextUtils.isEmpty(projectJson)) {
+            Toast.makeText(this, "项目数据无效", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        project = new Gson().fromJson(projectJson, Project.class);
         if (project == null) {
             Toast.makeText(this, "项目数据无效", Toast.LENGTH_SHORT).show();
             finish();
@@ -119,10 +162,19 @@ public class orderDetailActivity extends AppCompatActivity {
     }
 
     private void refreshProjectDetail() {
-        service.getProject(project.getId()).enqueue(new Callback<Result<Project>>() {
+        Call<Result<Project>> call = service.getProject(project.getId());
+        pendingProjectCall = call;
+        call.enqueue(new Callback<Result<Project>>() {
             @Override
-            public void onResponse(@NonNull Call<Result<Project>> call, @NonNull Response<Result<Project>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
+            public void onResponse(@NonNull Call<Result<Project>> call,
+                                   @NonNull Response<Result<Project>> response) {
+                if (isFinishing() || isDestroyed()) return;
+                if (response.code() == 401) {
+                    SessionHelper.handleUnauthorized(orderDetailActivity.this);
+                    return;
+                }
+                if (response.isSuccessful() && response.body() != null
+                        && response.body().getCode() == 1) {
                     Project latest = response.body().getData();
                     if (latest != null) {
                         project = latest;
@@ -134,38 +186,10 @@ public class orderDetailActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(@NonNull Call<Result<Project>> call, @NonNull Throwable t) {
+                if (isFinishing() || isDestroyed()) return;
                 setupAcceptButton();
             }
         });
-    }
-
-    @Nullable
-    private Project parseProjectFromIntent() {
-        String projectJson = getIntent().getStringExtra(EXTRA_PROJECT_JSON);
-        if (!TextUtils.isEmpty(projectJson)) {
-            return new Gson().fromJson(projectJson, Project.class);
-        }
-        String orderJson = getIntent().getStringExtra("order_json");
-        if (!TextUtils.isEmpty(orderJson)) {
-            order o = new Gson().fromJson(orderJson, order.class);
-            if (o != null) {
-                return orderToProject(o);
-            }
-        }
-        return null;
-    }
-
-    private Project orderToProject(order o) {
-        Project p = new Project();
-        p.setId(o.getProjectId());
-        p.setRouteId(o.getRouteId());
-        p.setTitle(o.getTitle());
-        p.setDepartureDate(o.getDepartureDate());
-        p.setCreatedAt(o.getCreatedAt());
-        p.setTag(o.getTag());
-        p.setMaxMembers(o.getMaxMembers());
-        p.setCurrentMembers(o.getCurrentMembers());
-        return p;
     }
 
     private void bindProjectHeader() {
@@ -173,54 +197,56 @@ public class orderDetailActivity extends AppCompatActivity {
         txtTitle.setText(title == null || title.isEmpty() ? "研学拼单" : title);
 
         String city = ProjectUiHelper.regionAdcodeToCity(project.getRegionAdcode());
-        txtMeta.setText(city.isEmpty() ? "未知城市" : city);
+        String date = project.getDepartureDate() != null ? project.getDepartureDate() : "待定";
+        txtMeta.setText((city.isEmpty() ? "未知城市" : city)
+                + " · 出发 " + date
+                + "\n已有人数 " + Math.max(0, project.getCurrentMembers())
+                + " / 人数上限 " + Math.max(0, project.getMaxMembers()));
 
-        if (txtMembers != null) {
-            txtMembers.setText(project.getCurrentMembers() + "/" + project.getMaxMembers() + " 人");
-        }
-
-        if (txtTime != null) {
-            String departureTime = project.getDepartureTime();
-            String departureDate = project.getDepartureDate();
-            String timeText;
-            if (!TextUtils.isEmpty(departureTime)) {
-                timeText = (TextUtils.isEmpty(departureDate) ? "当日" : departureDate)
-                        + "  " + departureTime;
-            } else if (!TextUtils.isEmpty(departureDate)) {
-                timeText = departureDate;
-            } else {
-                timeText = "时间待定";
-            }
-            txtTime.setText(timeText);
-        }
-
-        ProjectUiHelper.bindStatusBadge(txtStatus, project.getStatus());
+        txtStatus.setText(ProjectUiHelper.statusLabel(project.getStatus()));
     }
 
     private void loadOwnerName() {
-        service.getAccount(project.getOwnerAccountId()).enqueue(new Callback<Result<Account>>() {
+        Call<Result<Account>> call = service.getAccount(project.getOwnerAccountId());
+        pendingOwnerCall = call;
+        call.enqueue(new Callback<Result<Account>>() {
             @Override
             public void onResponse(Call<Result<Account>> call, Response<Result<Account>> response) {
+                if (isFinishing() || isDestroyed()) return;
+                if (response.code() == 401) {
+                    SessionHelper.handleUnauthorized(orderDetailActivity.this);
+                    return;
+                }
                 if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
                     Account account = response.body().getData();
                     if (account != null) {
-                        txtOwner.setText(account.getUsername());
+                        txtOwner.setText("发起人：" + account.getUsername());
                     }
                 }
             }
 
             @Override
             public void onFailure(Call<Result<Account>> call, Throwable t) {
-                txtOwner.setText("未知");
+                if (isFinishing() || isDestroyed()) return;
+                txtOwner.setText("发起人：未知");
             }
         });
     }
 
     private void loadRouteDetail() {
-        service.getRouteNodes(project.getRouteId()).enqueue(new Callback<Result<List<RouteNode>>>() {
+        Call<Result<List<RouteNode>>> call = service.getRouteNodes(project.getRouteId());
+        pendingRouteCall = call;
+        call.enqueue(new Callback<Result<List<RouteNode>>>() {
             @Override
-            public void onResponse(Call<Result<List<RouteNode>>> call, Response<Result<List<RouteNode>>> response) {
-                if (!response.isSuccessful() || response.body() == null || response.body().getCode() != 1) {
+            public void onResponse(@NonNull Call<Result<List<RouteNode>>> call,
+                                   @NonNull Response<Result<List<RouteNode>>> response) {
+                if (isFinishing() || isDestroyed()) return;
+                if (response.code() == 401) {
+                    SessionHelper.handleUnauthorized(orderDetailActivity.this);
+                    return;
+                }
+                if (!response.isSuccessful() || response.body() == null
+                        || response.body().getCode() != 1) {
                     txtRouteDetail.setText("暂无路线详情");
                     return;
                 }
@@ -230,13 +256,13 @@ public class orderDetailActivity extends AppCompatActivity {
                     return;
                 }
                 Collections.sort(nodes, Comparator.comparingInt(RouteNode::getVisitOrder));
-                cachedRouteNodes = nodes;
                 txtRouteDetail.setText(buildRouteText(nodes));
-                startRoutePlanning(nodes);
+                bindRouteMap(nodes);
             }
 
             @Override
-            public void onFailure(Call<Result<List<RouteNode>>> call, Throwable t) {
+            public void onFailure(@NonNull Call<Result<List<RouteNode>>> call, @NonNull Throwable t) {
+                if (isFinishing() || isDestroyed()) return;
                 txtRouteDetail.setText("路线加载失败");
             }
         });
@@ -258,25 +284,56 @@ public class orderDetailActivity extends AppCompatActivity {
         return sb.toString().trim();
     }
 
-    private void startRoutePlanning(List<RouteNode> nodes) {
-        if (mapContainer == null || walkRoutePlanner == null) {
-            return;
-        }
-        if (!hasConfiguredAmapKey()) {
+    private void bindRouteMap(List<RouteNode> nodes) {
+        cachedRouteNodes.clear();
+        cachedRouteNodes.addAll(nodes);
+        routePoints.clear();
+        routePoints.addAll(RouteMapDrawHelper.extractPointsFromNodes(nodes));
+        plannedRoadPoints.clear();
+        routePlanningStarted = false;
+
+        if (routePoints.size() < 2) {
+            if (mapContainer != null) {
+                mapContainer.setVisibility(View.GONE);
+            }
             return;
         }
 
-        walkRoutePlanner.planSummary(nodes, new LeaderWalkRoutePlanner.Callback() {
+        if (mapContainer != null) {
+            mapContainer.setVisibility(View.VISIBLE);
+        }
+        if (routeMapView != null) {
+            routeMapView.post(this::startRoadRoutePlanning);
+            routeMapView.postDelayed(this::startRoadRoutePlanning, 400);
+        }
+    }
+
+    private void drawRouteOnMap() {
+        if (aMap == null || routePoints.size() < 2) {
+            return;
+        }
+        List<LatLng> line = plannedRoadPoints.size() >= 2
+                ? plannedRoadPoints : routePoints;
+        RouteMapDrawHelper.drawRoute(aMap, line, routePoints);
+    }
+
+    private void startRoadRoutePlanning() {
+        if (aMap == null || cachedRouteNodes.size() < 2
+                || walkRoutePlanner == null || routePlanningStarted) {
+            return;
+        }
+        routePlanningStarted = true;
+        walkRoutePlanner.plan(aMap, cachedRouteNodes, new LeaderWalkRoutePlanner.Callback() {
             @Override
             public void onPlanningStarted() {
-                // 步行指引 UI 已移除，仅在后台规划路径
+                // 保持地图可交互，规划完成后自动替换为道路折线。
             }
 
             @Override
             public void onPlanningFinished(@NonNull String summary,
                                            @NonNull ArrayList<String> instructions,
                                            boolean hadFailures) {
-                handlePlanFinished(summary, instructions, new ArrayList<>(), hadFailures);
+                // 使用带道路折线的重载。
             }
 
             @Override
@@ -284,49 +341,30 @@ public class orderDetailActivity extends AppCompatActivity {
                                            @NonNull ArrayList<String> instructions,
                                            @NonNull List<LatLng> roadPolyline,
                                            boolean hadFailures) {
-                handlePlanFinished(summary, instructions, roadPolyline, hadFailures);
+                if (isFinishing() || isDestroyed()) return;
+                plannedRoadPoints.clear();
+                plannedRoadPoints.addAll(roadPolyline);
+                drawRouteOnMap();
             }
 
             @Override
             public void onPlanningFailed(@NonNull String message) {
-                runOnUiThread(() -> Toast.makeText(orderDetailActivity.this, message, Toast.LENGTH_SHORT).show());
+                if (isFinishing() || isDestroyed()) return;
+                routePlanningStarted = false;
+                drawRouteOnMap();
             }
         });
     }
 
-    private void handlePlanFinished(@NonNull String summary,
-                                    @NonNull ArrayList<String> instructions,
-                                    @NonNull List<LatLng> roadPolyline,
-                                    boolean hadFailures) {
-        runOnUiThread(() -> {
-            if (isFinishing() || isDestroyed()) {
-                return;
-            }
-            walkInstructions.clear();
-            walkInstructions.addAll(instructions);
-            plannedRoadPoints.clear();
-            plannedRoadPoints.addAll(roadPolyline);
-            if (hadFailures) {
-                Toast.makeText(orderDetailActivity.this,
-                        R.string.route_planning_partial_fail, Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void openFullscreenRouteMap() {
-        if (cachedRouteNodes.isEmpty()) {
+    private void openFullscreenMap() {
+        if (routePoints.size() < 2) {
             Toast.makeText(this, R.string.route_map_no_coords, Toast.LENGTH_SHORT).show();
             return;
         }
-        String title = getString(R.string.leader_route_planning_title);
-        List<LatLng> waypoints = RouteMapDrawHelper.extractPointsFromNodes(cachedRouteNodes);
-        // 优先使用高德规划得到的真实道路折线；尚未规划完成时回退为按站点连线
-        if (plannedRoadPoints.size() >= 2) {
-            RouteMapFullscreenActivity.start(this,
-                    new ArrayList<>(plannedRoadPoints), waypoints, title);
-        } else {
-            RouteMapFullscreenActivity.startWithNodes(this, cachedRouteNodes, title);
-        }
+        List<LatLng> line = plannedRoadPoints.size() >= 2
+                ? plannedRoadPoints : routePoints;
+        RouteMapFullscreenActivity.start(this,
+                new ArrayList<>(line), new ArrayList<>(routePoints), txtTitle.getText().toString());
     }
 
     private boolean hasConfiguredAmapKey() {
@@ -347,10 +385,6 @@ public class orderDetailActivity extends AppCompatActivity {
     }
 
     private void setupAcceptButton() {
-        View bottomBar = findViewById(R.id.bottomBar);
-        if (bottomBar != null) {
-            bottomBar.setVisibility(View.VISIBLE);
-        }
         btnJoin.setVisibility(View.VISIBLE);
         btnJoin.setEnabled(true);
         btnJoin.setOnClickListener(null);
@@ -360,7 +394,7 @@ public class orderDetailActivity extends AppCompatActivity {
         int accountId = SessionHelper.getAccountId(this);
         Integer leaderId = project.getLeaderAccountId();
         if (ProjectUiHelper.hasAssignedLeader(leaderId)) {
-            if (leaderId == accountId) {
+            if (leaderId != null && leaderId == accountId) {
                 setupLeaderAction();
             } else {
                 btnJoin.setEnabled(false);
@@ -434,6 +468,7 @@ public class orderDetailActivity extends AppCompatActivity {
         service.abandonProject(project.getId()).enqueue(new Callback<Result>() {
             @Override
             public void onResponse(Call<Result> call, Response<Result> response) {
+                if (isFinishing() || isDestroyed()) return;
                 if (response.code() == 401) {
                     SessionHelper.handleUnauthorized(orderDetailActivity.this);
                     return;
@@ -455,6 +490,7 @@ public class orderDetailActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Call<Result> call, Throwable t) {
+                if (isFinishing() || isDestroyed()) return;
                 setupLeaderAction();
                 Toast.makeText(orderDetailActivity.this,
                         "网络异常，操作失败", Toast.LENGTH_SHORT).show();
@@ -498,13 +534,15 @@ public class orderDetailActivity extends AppCompatActivity {
                 .enqueue(new Callback<Result>() {
                     @Override
                     public void onResponse(Call<Result> call, Response<Result> response) {
+                        if (isFinishing() || isDestroyed()) return;
                         if (response.code() == 401) {
-                            Toast.makeText(orderDetailActivity.this, "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(orderDetailActivity.this,
+                                    "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
                             SessionHelper.handleUnauthorized(orderDetailActivity.this);
                             return;
                         }
-                        if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
-                            btnJoin.setText("已接单");
+                        if (response.isSuccessful() && response.body() != null
+                                && response.body().getCode() == 1) {
                             project.setLeaderAccountId(leaderAccountId);
                             project.setStatus(ProjectUiHelper.STATUS_CONFIRMED);
                             bindProjectHeader();
@@ -514,25 +552,121 @@ public class orderDetailActivity extends AppCompatActivity {
                                     "接单成功，已加入项目群聊", Toast.LENGTH_SHORT).show();
                         } else {
                             btnJoin.setEnabled(true);
-                            String msg = response.body() != null ? response.body().getMsg() : "接单失败";
-                            Toast.makeText(orderDetailActivity.this, msg, Toast.LENGTH_SHORT).show();
+                            String msg = response.body() != null
+                                    ? response.body().getMsg() : "接单失败";
+                            Toast.makeText(orderDetailActivity.this,
+                                    msg, Toast.LENGTH_SHORT).show();
                         }
                     }
 
                     @Override
                     public void onFailure(Call<Result> call, Throwable t) {
+                        if (isFinishing() || isDestroyed()) return;
                         btnJoin.setEnabled(true);
-                        Toast.makeText(orderDetailActivity.this, "网络错误，接单失败", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(orderDetailActivity.this,
+                                "网络错误，接单失败", Toast.LENGTH_SHORT).show();
                     }
                 });
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (mapCreated && routeMapView != null) {
+            try {
+                routeMapView.onResume();
+                startRoadRoutePlanning();
+            } catch (Throwable t) {
+                Log.w(TAG, "routeMapView.onResume failed", t);
+            }
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        if (mapCreated && routeMapView != null) {
+            try {
+                routeMapView.onPause();
+            } catch (Throwable t) {
+                Log.w(TAG, "routeMapView.onPause failed", t);
+            }
+        }
+        super.onPause();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (mapCreated && routeMapView != null) {
+            try {
+                routeMapView.onSaveInstanceState(outState);
+            } catch (Throwable t) {
+                Log.w(TAG, "routeMapView.onSaveInstanceState failed", t);
+            }
+        }
+    }
+
+    @Override
     protected void onDestroy() {
+        cancelCall(pendingProjectCall);
+        cancelCall(pendingOwnerCall);
+        cancelCall(pendingRouteCall);
+        pendingProjectCall = null;
+        pendingOwnerCall = null;
+        pendingRouteCall = null;
+
         if (walkRoutePlanner != null) {
             walkRoutePlanner.cancel();
             walkRoutePlanner = null;
         }
+        if (mapCreated && routeMapView != null) {
+            try {
+                if (aMap != null) {
+                    try {
+                        aMap.stopAnimation();
+                    } catch (Throwable ignored) {
+                    }
+                }
+                // 主动从父容器移除并隐藏，防止 onDestroy 时 Surface 还持有 GL 上下文导致原生层崩溃
+                try {
+                    routeMapView.setVisibility(View.GONE);
+                } catch (Throwable ignored) {
+                }
+                if (routeMapView.getParent() != null) {
+                    try {
+                        ((android.view.ViewGroup) routeMapView.getParent()).removeView(routeMapView);
+                    } catch (Throwable ignored) {
+                    }
+                }
+                routeMapView.onDestroy();
+            } catch (Throwable t) {
+                Log.w(TAG, "routeMapView.onDestroy failed", t);
+            }
+            routeMapView = null;
+            mapCreated = false;
+        }
+        aMap = null;
         super.onDestroy();
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (mapCreated && routeMapView != null) {
+            try {
+                routeMapView.onLowMemory();
+            } catch (Throwable t) {
+                Log.w(TAG, "routeMapView.onLowMemory failed", t);
+            }
+        }
+    }
+
+    private void cancelCall(@Nullable Call<?> call) {
+        if (call != null && !call.isCanceled()) {
+            try {
+                call.cancel();
+            } catch (Throwable ignored) {
+            }
+        }
     }
 }

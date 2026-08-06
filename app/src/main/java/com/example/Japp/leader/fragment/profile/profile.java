@@ -28,7 +28,6 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentTransaction;
 
 import com.example.Japp.R;
 import com.example.Japp.PersonalInfoActivity;
@@ -36,11 +35,14 @@ import com.example.Japp.RoleSelectionActivity;
 import com.example.Japp.SettingsActivity;
 import com.example.Japp.MainActivity;
 import com.example.Japp.leader.LeaderHistoryRouteActivity;
+import com.example.Japp.leader.LeaderOrderListActivity;
+import com.example.Japp.leader.LeaderReviewListActivity;
 import com.example.Japp.user.UserMainActivity;
 import com.example.Japp.user.util.SessionHelper;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
+import com.example.Japp.network.models.LeaderProfile;
 import com.example.Japp.network.models.Result;
 
 import java.io.File;
@@ -58,10 +60,10 @@ public class profile extends Fragment {
 
     private static final int REQUEST_PERSONAL_INFO = 1003;
 
-    private View switchMode, check_review;
+    private View switchMode;
     private View btnPersonalInfo, btnHistoryRoute, btnShareApp, btnAboutUs;
-    private View btnLogout, btnSettings, btnOverallReview;
-    private View btnOrderReceived, btnOrderInProgress, btnOrderToReview, btnOrderCompleted;
+    private View btnLogout, btnSettings;
+    private View btnPendingOrders, btnCompletedOrders, btnRating;
     private ImageView ivAvatar;
     private TextView txtName;
     private TextView txtStats;
@@ -76,7 +78,6 @@ public class profile extends Fragment {
         View view = inflater.inflate(R.layout.leader_fragment_profile, container, false);
 
         ivAvatar = view.findViewById(R.id.ivAvatar);
-        check_review = view.findViewById(R.id.btnViewReviews);
         switchMode = view.findViewById(R.id.btnSwitchRole);
         btnPersonalInfo = view.findViewById(R.id.btnPersonalInfo);
         btnHistoryRoute = view.findViewById(R.id.btnHistoryRoute);
@@ -84,11 +85,9 @@ public class profile extends Fragment {
         btnAboutUs = view.findViewById(R.id.btnAboutUs);
         btnLogout = view.findViewById(R.id.btnLogout);
         btnSettings = view.findViewById(R.id.btnSettings);
-        btnOverallReview = view.findViewById(R.id.btnOverallReview);
-        btnOrderReceived = view.findViewById(R.id.btnOrderReceived);
-        btnOrderInProgress = view.findViewById(R.id.btnOrderInProgress);
-        btnOrderToReview = view.findViewById(R.id.btnOrderToReview);
-        btnOrderCompleted = view.findViewById(R.id.btnOrderCompleted);
+        btnPendingOrders = view.findViewById(R.id.btnPendingOrders);
+        btnCompletedOrders = view.findViewById(R.id.btnCompletedOrders);
+        btnRating = view.findViewById(R.id.btnRating);
         txtName = view.findViewById(R.id.txtName);
         txtStats = view.findViewById(R.id.txtStats);
         txtPendingOrders = view.findViewById(R.id.txtPendingOrders);
@@ -97,6 +96,7 @@ public class profile extends Fragment {
 
         loadImageFromLocal();
         bindProfileInfo();
+        loadLeaderDashboard();
 
         ivAvatar.setOnClickListener(v -> showImagePickerDialog());
 
@@ -105,14 +105,6 @@ public class profile extends Fragment {
         } else {
             switchMode.setOnClickListener(v -> switchMode());
         }
-
-        check_review.setOnClickListener(v -> {
-            review targetFragment = new review();
-            FragmentTransaction transaction = getParentFragmentManager().beginTransaction();
-            transaction.replace(R.id.container, targetFragment);
-            transaction.addToBackStack(null);
-            transaction.commit();
-        });
 
         btnPersonalInfo.setOnClickListener(v ->
                 startActivityForResult(new Intent(requireContext(), PersonalInfoActivity.class), REQUEST_PERSONAL_INFO));
@@ -129,24 +121,29 @@ public class profile extends Fragment {
         btnAboutUs.setOnClickListener(v ->
                 Toast.makeText(requireContext(), "研学导览 · 领队端", Toast.LENGTH_SHORT).show());
 
-        btnOverallReview.setOnClickListener(v ->
-                Toast.makeText(requireContext(), "综合评价", Toast.LENGTH_SHORT).show());
+        btnPendingOrders.setOnClickListener(v -> openOrderList(
+                LeaderOrderListActivity.TYPE_PENDING));
 
-        btnOrderReceived.setOnClickListener(v ->
-                Toast.makeText(requireContext(), "已接单", Toast.LENGTH_SHORT).show());
+        btnCompletedOrders.setOnClickListener(v -> openOrderList(
+                LeaderOrderListActivity.TYPE_COMPLETED));
 
-        btnOrderInProgress.setOnClickListener(v ->
-                Toast.makeText(requireContext(), "进行中", Toast.LENGTH_SHORT).show());
-
-        btnOrderToReview.setOnClickListener(v ->
-                Toast.makeText(requireContext(), "待评价", Toast.LENGTH_SHORT).show());
-
-        btnOrderCompleted.setOnClickListener(v ->
-                Toast.makeText(requireContext(), "已完成", Toast.LENGTH_SHORT).show());
+        btnRating.setOnClickListener(v -> {
+            if (!SessionHelper.isLoggedIn(requireContext())) {
+                Toast.makeText(requireContext(), "请先登录", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            startActivity(new Intent(requireContext(), LeaderReviewListActivity.class));
+        });
 
         btnLogout.setOnClickListener(v -> logout());
 
         return view;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        loadLeaderDashboard();
     }
 
     private void bindProfileInfo() {
@@ -303,6 +300,53 @@ public class profile extends Fragment {
             public void onFailure(Call<Result<Account>> call, Throwable t) {
                 if (!isAdded()) return;
                 Toast.makeText(requireContext(), "获取地区失败，请检查网络", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void openOrderList(int type) {
+        if (!SessionHelper.isLoggedIn(requireContext())) {
+            Toast.makeText(requireContext(), "请先登录", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent intent = new Intent(requireContext(), LeaderOrderListActivity.class);
+        intent.putExtra(LeaderOrderListActivity.EXTRA_TYPE, type);
+        startActivity(intent);
+    }
+
+    private void loadLeaderDashboard() {
+        if (!isAdded()) return;
+        if (!SessionHelper.isLoggedIn(requireContext())) {
+            txtPendingOrders.setText("0");
+            txtCompletedOrders.setText("0");
+            txtRating.setText("5.0");
+            return;
+        }
+        UserService service = ApiClient.getClient().create(UserService.class);
+        service.getLeaderDashboard().enqueue(new Callback<Result<LeaderProfile>>() {
+            @Override
+            public void onResponse(@NonNull Call<Result<LeaderProfile>> call,
+                                   @NonNull Response<Result<LeaderProfile>> response) {
+                if (!isAdded()) return;
+                if (!response.isSuccessful() || response.body() == null
+                        || response.body().getCode() != 1 || response.body().getData() == null) {
+                    return;
+                }
+                LeaderProfile profile = response.body().getData();
+                txtPendingOrders.setText(String.valueOf(profile.getAcceptedProjectCount()
+                        - profile.getCompletedProjectCount()));
+                txtCompletedOrders.setText(String.valueOf(profile.getCompletedProjectCount()));
+                Double avg = profile.getAverageRating();
+                if (avg != null && avg > 0) {
+                    txtRating.setText(String.format(java.util.Locale.getDefault(), "%.1f", avg));
+                } else {
+                    txtRating.setText("5.0");
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Result<LeaderProfile>> call, @NonNull Throwable t) {
+                // 保留默认占位
             }
         });
     }
