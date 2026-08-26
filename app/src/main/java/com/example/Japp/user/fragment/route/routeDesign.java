@@ -118,6 +118,7 @@ public class routeDesign extends Fragment {
     private BottomSheetBehavior<MaterialCardView> routeSheetBehavior;
     private View welcomePanel;
     private Button btnTogglePlaceSearch;
+    private Button btnSaveRoute;
     private Button btnPublishRoute;
     private Button btnSend;
     private EditText editMessage;
@@ -256,6 +257,8 @@ public class routeDesign extends Fragment {
         routeStopsCard = root.findViewById(R.id.routeStopsCard);
         chatArea = root.findViewById(R.id.chatArea);
         btnTogglePlaceSearch = root.findViewById(R.id.btnTogglePlaceSearch);
+        btnSaveRoute = root.findViewById(R.id.btnSaveRoute);
+        btnSaveRoute.setEnabled(false);
         btnPublishRoute = root.findViewById(R.id.btnPublishRoute);
         btnPublishRoute.setEnabled(false);
         txtRouteStopCount = root.findViewById(R.id.txtRouteStopCount);
@@ -284,7 +287,7 @@ public class routeDesign extends Fragment {
         routeSheetBehavior.setFitToContents(false);
         routeSheetBehavior.setExpandedOffset(0);
         routeSheetBehavior.setHalfExpandedRatio(0.58f);
-        routeSheetBehavior.setPeekHeight(dpToPx(352));
+        routeSheetBehavior.setPeekHeight(dpToPx(370));
 
         routeSheetBehavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
             @Override
@@ -350,7 +353,7 @@ public class routeDesign extends Fragment {
             return;
         }
         int collapsedStopsHeight = dpToPx(96);
-        int collapsedChatHeight = dpToPx(58);
+        int collapsedChatHeight = dpToPx(76);
         int fixedContentHeight = dpToPx(215);
         int expandedSectionHeight = Math.max(collapsedStopsHeight,
                 (customRoutePanel.getHeight() - fixedContentHeight) / 2);
@@ -791,6 +794,7 @@ public class routeDesign extends Fragment {
 
     private void setupCustomRouteEditor() {
         btnTogglePlaceSearch.setOnClickListener(v -> launchPlaceSearch());
+        btnSaveRoute.setOnClickListener(v -> saveCurrentRoute());
         btnPublishRoute.setOnClickListener(v -> openPublishDetails());
     }
 
@@ -922,6 +926,9 @@ public class routeDesign extends Fragment {
     }
 
     private void renderEditableStops() {
+        if (btnSaveRoute != null) {
+            btnSaveRoute.setEnabled(!editableRouteNodes.isEmpty());
+        }
         if (routeStopsContainer == null || txtRouteStopCount == null) {
             return;
         }
@@ -1944,6 +1951,45 @@ public class routeDesign extends Fragment {
         launchPublishDetails();
     }
 
+    private void saveCurrentRoute() {
+        if (editableRouteNodes.isEmpty()) {
+            Toast.makeText(requireContext(), "请先添加路线地点", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        renumberRouteNodes();
+        SavedRouteStore.save(requireContext(), copyRouteNodes(editableRouteNodes));
+        persistLocalDraft(true);
+        btnSaveRoute.animate()
+                .scaleX(0.94f)
+                .scaleY(0.94f)
+                .setDuration(90)
+                .withEndAction(() -> btnSaveRoute.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(120)
+                        .start())
+                .start();
+        Toast.makeText(requireContext(), "路线已保存到历史路线", Toast.LENGTH_SHORT).show();
+    }
+
+    private void loadRequestedSavedRoute() {
+        SavedRouteStore.SavedRoute saved = SavedRouteStore.consumePending(requireContext());
+        if (saved == null || adapter == null) return;
+        editableRouteNodes.clear();
+        editableRouteNodes.addAll(saved.getNodes());
+        renumberRouteNodes();
+        publishableRouteId = 0;
+        publishableRouteSummary = null;
+        aiRouteMemoryId = null;
+        adapter.replaceAllItems(Collections.singletonList(
+                RouteChatItem.assistantStatus("已载入保存路线，可继续调整或让路线助手优化。")));
+        renderEditableStops();
+        updateMapFromEditableRoute(true);
+        persistLocalDraft(true);
+        Toast.makeText(requireContext(), "已载入“" + saved.getTitle() + "”",
+                Toast.LENGTH_SHORT).show();
+    }
+
     private void launchPublishDetails() {
 
         String summary = !TextUtils.isEmpty(publishableRouteSummary)
@@ -2061,6 +2107,7 @@ public class routeDesign extends Fragment {
         if (adapter != null) {
             adapter.onHostResume();
         }
+        loadRequestedSavedRoute();
     }
 
     @Override

@@ -1,5 +1,7 @@
 package com.example.Japp.leader;
 
+import com.example.Japp.Chat.util.ChatHistoryStore;
+
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.os.Bundle;
@@ -457,7 +459,7 @@ public class orderDetailActivity extends AppCompatActivity {
         btnJoin.setText("放弃带队");
         btnJoin.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
                 .setTitle("放弃带队")
-                .setMessage("放弃后订单将重新开放给其他领队，你也会退出该行程群聊。确定继续吗？")
+                .setMessage("放弃后订单将重新开放给其他领队；历史聊天仍会保留，但不能继续发消息。确定继续吗？")
                 .setNegativeButton("暂不放弃", null)
                 .setPositiveButton("确认放弃", (dialog, which) -> abandonOrder())
                 .show());
@@ -483,6 +485,9 @@ public class orderDetailActivity extends AppCompatActivity {
                             message, Toast.LENGTH_SHORT).show();
                     return;
                 }
+                ChatHistoryStore.markProjectReadOnly(orderDetailActivity.this,
+                        SessionHelper.getAccountId(orderDetailActivity.this), project.getId(),
+                        "你已放弃带队，聊天记录仅供查看");
                 setResult(RESULT_OK);
                 Toast.makeText(orderDetailActivity.this,
                         "已放弃带队，订单已重新开放", Toast.LENGTH_SHORT).show();
@@ -544,6 +549,8 @@ public class orderDetailActivity extends AppCompatActivity {
                         }
                         if (response.isSuccessful() && response.body() != null
                                 && response.body().getCode() == 1) {
+                            ChatHistoryStore.markProjectActive(orderDetailActivity.this,
+                                    leaderAccountId, project.getId());
                             project.setLeaderAccountId(leaderAccountId);
                             project.setStatus(ProjectUiHelper.STATUS_CONFIRMED);
                             bindProjectHeader();

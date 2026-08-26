@@ -1,5 +1,7 @@
 package com.example.Japp.user;
 
+import com.example.Japp.Chat.util.ChatHistoryStore;
+
 import android.content.res.ColorStateList;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -391,7 +393,7 @@ public class TeamDetailActivity extends AppCompatActivity {
         btnJoin.setText("退出行程");
         btnJoin.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
                 .setTitle("退出行程")
-                .setMessage("退出后将释放你所代表的名额，并同步退出行程群聊。确定继续吗？")
+                .setMessage("退出后将释放你所代表的名额；历史聊天仍会保留，但不能继续发消息。确定继续吗？")
                 .setNegativeButton("暂不退出", null)
                 .setPositiveButton("确认退出", (dialog, which) -> quitTrip())
                 .show());
@@ -403,7 +405,7 @@ public class TeamDetailActivity extends AppCompatActivity {
         btnJoin.setText("放弃带队");
         btnJoin.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
                 .setTitle("放弃带队")
-                .setMessage("放弃后订单将重新开放给其他领队，你也会退出该行程群聊。确定继续吗？")
+                .setMessage("放弃后订单将重新开放给其他领队；历史聊天仍会保留，但不能继续发消息。确定继续吗？")
                 .setNegativeButton("暂不放弃", null)
                 .setPositiveButton("确认放弃", (dialog, which) -> abandonTrip())
                 .show());
@@ -428,9 +430,12 @@ public class TeamDetailActivity extends AppCompatActivity {
                             message, Toast.LENGTH_SHORT).show();
                     return;
                 }
+                ChatHistoryStore.markProjectReadOnly(TeamDetailActivity.this,
+                        SessionHelper.getAccountId(TeamDetailActivity.this), project.getId(),
+                        "你已退出行程，聊天记录仅供查看");
                 setResult(RESULT_OK);
                 Toast.makeText(TeamDetailActivity.this,
-                        "已退出行程和群聊", Toast.LENGTH_SHORT).show();
+                        "已退出行程，历史聊天已转为只读", Toast.LENGTH_SHORT).show();
                 finish();
             }
 
@@ -462,6 +467,9 @@ public class TeamDetailActivity extends AppCompatActivity {
                             message, Toast.LENGTH_SHORT).show();
                     return;
                 }
+                ChatHistoryStore.markProjectReadOnly(TeamDetailActivity.this,
+                        SessionHelper.getAccountId(TeamDetailActivity.this), project.getId(),
+                        "你已放弃带队，聊天记录仅供查看");
                 setResult(RESULT_OK);
                 Toast.makeText(TeamDetailActivity.this,
                         "已放弃带队，订单已重新开放", Toast.LENGTH_SHORT).show();
@@ -480,7 +488,7 @@ public class TeamDetailActivity extends AppCompatActivity {
     private void confirmCancelTrip() {
         new MaterialAlertDialogBuilder(this)
                 .setTitle("取消行程")
-                .setMessage("取消后行程将结束，关联群聊也会同步关闭。确定继续吗？")
+                .setMessage("取消后行程将结束，群聊记录会保留，但所有成员都不能继续发消息。确定继续吗？")
                 .setNegativeButton("暂不取消", null)
                 .setPositiveButton("确认取消", (dialog, which) -> cancelTrip())
                 .show();
@@ -506,6 +514,9 @@ public class TeamDetailActivity extends AppCompatActivity {
                                     message, Toast.LENGTH_SHORT).show();
                             return;
                         }
+                        ChatHistoryStore.markProjectReadOnly(TeamDetailActivity.this,
+                                SessionHelper.getAccountId(TeamDetailActivity.this), project.getId(),
+                                "发布者已取消行程，所有成员仅可查看历史消息");
                         project.setStatus(ProjectUiHelper.STATUS_CANCELLED);
                         bindProjectHeader();
                         setupPublisherAction();
@@ -592,6 +603,8 @@ public class TeamDetailActivity extends AppCompatActivity {
                     return;
                 }
                 if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
+                    ChatHistoryStore.markProjectActive(TeamDetailActivity.this,
+                            SessionHelper.getAccountId(TeamDetailActivity.this), project.getId());
                     Toast.makeText(TeamDetailActivity.this,
                             "加入成功，你代表 " + partySize + " 人", Toast.LENGTH_SHORT).show();
                     project.setViewerRole("PARTICIPANT");

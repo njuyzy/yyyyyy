@@ -47,6 +47,7 @@ public class conversationListAdapter extends RecyclerView.Adapter<conversationLi
         }
 
         List<String> messages = conversation.getMessages();
+        boolean systemConversation = conversation.getBackendSessionId() == -1L;
         String displayName = conversation.getDisplayName();
         holder.UserName.setText(displayName);
 
@@ -55,7 +56,9 @@ public class conversationListAdapter extends RecyclerView.Adapter<conversationLi
         }
         if (holder.avatarContainer != null) {
             holder.avatarContainer.setBackgroundResource(
-                    conversation.isGroup()
+                    conversation.getBackendSessionId() == -1L
+                            ? R.drawable.bg_chat_avatar_system
+                            : conversation.isGroup()
                             ? R.drawable.bg_chat_avatar_group
                             : R.drawable.bg_chat_avatar_peer
             );
@@ -63,17 +66,21 @@ public class conversationListAdapter extends RecyclerView.Adapter<conversationLi
 
         if (messages != null && !messages.isEmpty()) {
             String lastMessage = messages.get(messages.size() - 1);
-            holder.LatestMessage.setText(lastMessage != null ? lastMessage : "");
+            String preview = lastMessage != null ? lastMessage : "";
+            holder.LatestMessage.setText(conversation.isReadOnly() && !systemConversation
+                    ? "只读 · " + preview : preview);
         } else if (conversation.isGroup()) {
             List<String> members = conversation.getMemberNames();
-            holder.LatestMessage.setText(members.isEmpty()
+            holder.LatestMessage.setText(conversation.isReadOnly()
+                    ? "聊天记录仅供查看" : members.isEmpty()
                     ? "群聊已创建"
                     : String.join("、", members));
         } else {
             holder.LatestMessage.setText("暂无消息");
         }
 
-        holder.txtTime.setText(TIME_FMT.format(new Date()));
+        holder.txtTime.setText(systemConversation ? "通知" : conversation.isReadOnly()
+                ? "只读" : TIME_FMT.format(new Date()));
 
         int unreadCount = conversation.getUnRead_num();
         if (unreadCount > 0) {

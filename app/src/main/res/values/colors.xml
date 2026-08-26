@@ -15,6 +15,8 @@
     <color name="chat_time">#9AA3AF</color>
     <color name="chat_avatar_self">#0F9D58</color>
     <color name="chat_avatar_other">#1E72FF</color>
+    <color name="chat_avatar_system">#F5B82E</color>
+    <color name="chat_name_system">#A46600</color>
     <color name="chat_toolbar_bg">#FFFFFF</color>
     <color name="chat_input_bg">#F5F5F5</color>
     <color name="chat_send_btn">#1E72FF</color>
@@ -24,6 +26,11 @@
     <color name="route_primary_dark">#1558C7</color>
     <color name="route_primary_soft">#EAF2FF</color>
     <color name="route_page_bg">#F4F7FC</color>
+    <color name="route_panel_surface">#EEF4FF</color>
+    <color name="route_stops_surface">#FFFFFF</color>
+    <color name="route_assistant_surface">#FFFFFF</color>
+    <color name="route_assistant_message_surface">#FFFFFF</color>
+    <color name="route_assistant_stroke">#D8E4F8</color>
     <color name="route_text_primary">#172033</color>
     <color name="route_text_secondary">#667085</color>
     <color name="route_text_hint">#98A2B3</color>

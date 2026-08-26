@@ -159,6 +159,8 @@ public class TeamList extends Fragment {
         service = ApiClient.getClient().create(UserService.class);
         adapter = new TeamListAdapter();
         myPendingAdapter = new TeamListAdapter();
+        adapter.setFavoriteEnabled(true);
+        myPendingAdapter.setFavoriteEnabled(true);
         TeamListAdapter.OnTeamClickListener clickListener = item -> {
             Intent intent = new Intent(requireContext(), TeamDetailActivity.class);
             intent.putExtra(TeamDetailActivity.EXTRA_PROJECT_JSON, new Gson().toJson(item.getProject()));

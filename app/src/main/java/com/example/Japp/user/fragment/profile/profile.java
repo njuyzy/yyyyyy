@@ -31,6 +31,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.Japp.MainActivity;
+import com.example.Japp.FavoriteOrdersActivity;
 import com.example.Japp.PersonalInfoActivity;
 import com.example.Japp.R;
 import com.example.Japp.RoleSelectionActivity;
@@ -63,6 +64,7 @@ public class profile extends Fragment {
     private View switchMode;
     private View btnPersonalInfo;
     private View btnHistoryRoute;
+    private View btnFavoriteOrders;
     private View btnLogout;
     private ImageView ivAvatar;
     private ImageButton btnSettings;
@@ -78,6 +80,7 @@ public class profile extends Fragment {
         switchMode = view.findViewById(R.id.btnViewReviews);
         btnPersonalInfo = view.findViewById(R.id.btnPersonalInfo);
         btnHistoryRoute = view.findViewById(R.id.btnHistoryRoute);
+        btnFavoriteOrders = view.findViewById(R.id.btnFavoriteOrders);
         btnLogout = view.findViewById(R.id.btnLogout);
         btnSettings = view.findViewById(R.id.btnSettings);
         txtName = view.findViewById(R.id.txtName);
@@ -99,6 +102,8 @@ public class profile extends Fragment {
                         REQUEST_PERSONAL_INFO));
 
         btnHistoryRoute.setOnClickListener(v -> openHistory());
+        btnFavoriteOrders.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), FavoriteOrdersActivity.class)));
 
         btnSettings.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), SettingsActivity.class)));

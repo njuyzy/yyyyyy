@@ -8,6 +8,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.Japp.R;
@@ -76,10 +77,18 @@ public class chatAdapter extends RecyclerView.Adapter<chatAdapter.ViewHolder> {
     }
 
     private void bindAvatar(ViewHolder holder, User sender, String name) {
+        boolean system = sender != null
+                && "SYSTEM".equalsIgnoreCase(sender.getMemberRole());
+        boolean self = sender != null && currentUserId.equals(sender.getId());
+        holder.avatarContainer.setBackgroundResource(system
+                ? R.drawable.bg_chat_avatar_system
+                : self ? R.drawable.bg_chat_avatar_self : R.drawable.bg_chat_avatar_peer);
+        holder.txtName.setTextColor(ContextCompat.getColor(holder.itemView.getContext(),
+                system ? R.color.chat_name_system : R.color.chat_name_other));
         ChatAvatarLoader.bind(
                 holder.imgAvatar,
                 holder.txtAvatar,
-                sender == null ? null : sender.getAvatarUrl(),
+                system || sender == null ? null : sender.getAvatarUrl(),
                 name);
     }
 
@@ -132,6 +141,7 @@ public class chatAdapter extends RecyclerView.Adapter<chatAdapter.ViewHolder> {
         final TextView txtAvatar;
         final TextView txtRoleBadge;
         final ImageView imgAvatar;
+        final View avatarContainer;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -141,6 +151,7 @@ public class chatAdapter extends RecyclerView.Adapter<chatAdapter.ViewHolder> {
             txtAvatar = itemView.findViewById(R.id.txtAvatar);
             txtRoleBadge = itemView.findViewById(R.id.txtRoleBadge);
             imgAvatar = itemView.findViewById(R.id.imgAvatar);
+            avatarContainer = itemView.findViewById(R.id.avatarContainer);
         }
     }
 }

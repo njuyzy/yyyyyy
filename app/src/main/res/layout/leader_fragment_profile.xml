@@ -177,6 +177,7 @@
                                 android:textColor="#999999"
                                 android:textSize="18sp" />
                         </LinearLayout>
+
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 

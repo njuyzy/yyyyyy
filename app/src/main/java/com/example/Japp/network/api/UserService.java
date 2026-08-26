@@ -201,7 +201,10 @@ public interface UserService {
     Call<Result<List<ChatSession>>> getChatSessions();
 
     @GET("chat/sessions/{sessionId}/messages")
-    Call<Result<List<ServerChatMessage>>> getChatMessages(@Path("sessionId") long sessionId);
+    Call<Result<List<ServerChatMessage>>> getChatMessagesPage(
+            @Path("sessionId") long sessionId,
+            @Query("beforeId") Long beforeId,
+            @Query("limit") int limit);
 
     @GET("chat/sessions/{sessionId}/members")
     Call<Result<List<ChatGroupMember>>> getChatMembers(@Path("sessionId") long sessionId);

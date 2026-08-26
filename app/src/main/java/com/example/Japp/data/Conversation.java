@@ -15,6 +15,10 @@ public class Conversation implements Serializable {
     private long backendSessionId;
     private long latestMessageId;
     private int projectId;
+    private String chatStatus;
+    private String currentUserRole;
+    private boolean readOnly;
+    private String readOnlyReason;
 
     public long getBackendSessionId() {
         return backendSessionId;
@@ -39,6 +43,15 @@ public class Conversation implements Serializable {
     public void setProjectId(int projectId) {
         this.projectId = projectId;
     }
+
+    public String getChatStatus() { return chatStatus; }
+    public void setChatStatus(String chatStatus) { this.chatStatus = chatStatus; }
+    public String getCurrentUserRole() { return currentUserRole; }
+    public void setCurrentUserRole(String currentUserRole) { this.currentUserRole = currentUserRole; }
+    public boolean isReadOnly() { return readOnly; }
+    public void setReadOnly(boolean readOnly) { this.readOnly = readOnly; }
+    public String getReadOnlyReason() { return readOnlyReason; }
+    public void setReadOnlyReason(String readOnlyReason) { this.readOnlyReason = readOnlyReason; }
 
     public boolean isGroup() {
         return isGroup;

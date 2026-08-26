@@ -17,6 +17,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.Japp.Chat.adapter.conversationListAdapter;
 import com.example.Japp.Chat.chatActivity;
 import com.example.Japp.Chat.util.ChatUnreadManager;
+import com.example.Japp.Chat.util.ChatHistoryStore;
+import com.example.Japp.Chat.util.ChatMessagePaging;
 import com.example.Japp.R;
 import com.example.Japp.data.Conversation;
 import com.example.Japp.data.User;
@@ -33,7 +35,9 @@ import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.util.InsetDividerDecoration;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -122,27 +126,31 @@ public class ConversationList extends Fragment {
                 }
                 if (!response.isSuccessful() || response.body() == null
                         || response.body().getCode() != 1) {
-                    showEmptyState("会话加载失败，请稍后重试");
+                    showCachedConversations("会话加载失败，请稍后重试");
                     return;
                 }
 
                 List<ChatSession> sessions = response.body().getData();
                 conversationList.clear();
+                conversationList.add(buildSystemConversation());
                 adapter.setListData(conversationList);
-                if (sessions == null || sessions.isEmpty()) {
-                    updateEmptyState();
-                    return;
-                }
-                showEmptyState("正在加载项目会话…");
-                for (ChatSession session : sessions) {
-                    Conversation conversation = buildConversation(session);
-                    conversationList.add(conversation);
-                    if (session.getLatestMessage() != null
-                            && !session.getLatestMessage().trim().isEmpty()) {
-                        conversation.addMessage(session.getLatestMessage());
+                List<ChatHistoryStore.CachedSession> cachedSessions =
+                        ChatHistoryStore.reconcile(requireContext(), currentAccountId, sessions);
+                Set<Long> liveSessionIds = new HashSet<>();
+                if (sessions != null) {
+                    for (ChatSession session : sessions) {
+                        if (session != null) liveSessionIds.add((long) session.getId());
                     }
-                    loadConversationDetails(conversation);
                 }
+                for (ChatHistoryStore.CachedSession cached : cachedSessions) {
+                    Conversation conversation = buildConversation(cached);
+                    conversationList.add(conversation);
+                    applyCachedDetails(conversation, cached);
+                    if (liveSessionIds.contains(cached.sessionId)) {
+                        loadConversationDetails(conversation);
+                    }
+                }
+                refreshSystemConversation();
                 adapter.setListData(conversationList);
                 updateEmptyState();
             }
@@ -150,7 +158,7 @@ public class ConversationList extends Fragment {
             @Override
             public void onFailure(Call<Result<List<ChatSession>>> call, Throwable t) {
                 if (isAdded()) {
-                    showEmptyState("网络异常，会话加载失败");
+                    showCachedConversations("网络异常，会话加载失败");
                 }
             }
         });
@@ -213,12 +221,72 @@ public class ConversationList extends Fragment {
         conversation.setUser_opposite(peer);
         conversation.setBackendSessionId(session.getId());
         conversation.setProjectId(session.getProjectId());
+        conversation.setChatStatus(session.getStatus());
+        conversation.setCurrentUserRole(session.getCurrentUserRole());
         conversation.setGroup(true);
         String title = session.getProjectTitle();
         conversation.setGroupName(title == null || title.trim().isEmpty()
                 ? "项目群聊" : title);
         conversation.setUnRead_num(0);
         return conversation;
+    }
+
+    private Conversation buildConversation(ChatHistoryStore.CachedSession cached) {
+        User peer = new User();
+        peer.setId("0");
+        peer.setName("项目群成员");
+
+        Conversation conversation = new Conversation();
+        conversation.setUser_me(currentUser);
+        conversation.setUser_opposite(peer);
+        conversation.setBackendSessionId(cached.sessionId);
+        conversation.setProjectId(cached.projectId);
+        conversation.setChatStatus(cached.status);
+        conversation.setCurrentUserRole(cached.currentUserRole);
+        conversation.setReadOnly(cached.readOnly);
+        conversation.setReadOnlyReason(cached.readOnlyReason);
+        conversation.setGroup(true);
+        conversation.setGroupName(cached.title == null || cached.title.trim().isEmpty()
+                ? "项目群聊" : cached.title);
+        conversation.setUnRead_num(0);
+        return conversation;
+    }
+
+    private Conversation buildSystemConversation() {
+        User system = new User();
+        system.setId("-1");
+        system.setName("系统通知");
+        system.setMemberRole("SYSTEM");
+
+        Conversation conversation = new Conversation();
+        conversation.setUser_me(currentUser);
+        conversation.setUser_opposite(system);
+        conversation.setBackendSessionId(chatActivity.SYSTEM_NOTIFICATION_SESSION_ID);
+        conversation.setReadOnly(true);
+        conversation.setReadOnlyReason("系统通知仅供查看");
+        applySystemConversationDetails(conversation);
+        return conversation;
+    }
+
+    private void applyCachedDetails(Conversation conversation,
+                                    ChatHistoryStore.CachedSession cached) {
+        List<String> names = new ArrayList<>();
+        if (cached.members != null) {
+            for (ChatGroupMember member : cached.members) {
+                String name = member.getUsername() == null ? "群成员" : member.getUsername();
+                String representation = member.getRepresentationText();
+                boolean leader = "LEADER".equalsIgnoreCase(member.getMemberRole())
+                        || "ADMIN".equalsIgnoreCase(member.getMemberRole());
+                names.add(leader || representation == null || representation.trim().isEmpty()
+                        ? name : name + "（" + representation + "）");
+            }
+        }
+        conversation.setMemberNames(names);
+        applyLatestPreview(conversation, cached.messages);
+        if (conversation.getMessages().isEmpty()
+                && cached.latestMessage != null && !cached.latestMessage.trim().isEmpty()) {
+            conversation.addMessage(cached.latestMessage);
+        }
     }
 
     private void loadConversationDetails(Conversation conversation) {
@@ -245,7 +313,21 @@ public class ConversationList extends Fragment {
                                         ? name : name + "（" + representation + "）");
                             }
                         }
+                        ChatHistoryStore.reconcileMembers(requireContext(), currentAccountId,
+                                conversation.getBackendSessionId(), data);
                         conversation.setMemberNames(members);
+                        ChatHistoryStore.CachedSession refreshed = ChatHistoryStore.find(
+                                requireContext(), currentAccountId,
+                                conversation.getBackendSessionId());
+                        if (refreshed != null) {
+                            applyLatestPreview(conversation, refreshed.messages);
+                            conversation.setUnRead_num(ChatUnreadManager.calculateUnread(
+                                    requireContext(), currentAccountId,
+                                    conversation.getBackendSessionId(), refreshed.messages));
+                            sortConversations();
+                            notifyUnreadCount();
+                        }
+                        refreshSystemConversation();
                         adapter.notifyDataSetChanged();
                     }
 
@@ -255,7 +337,8 @@ public class ConversationList extends Fragment {
                     }
                 });
 
-        service.getChatMessages(conversation.getBackendSessionId())
+        service.getChatMessagesPage(conversation.getBackendSessionId(), null,
+                        ChatMessagePaging.PAGE_SIZE)
                 .enqueue(new Callback<Result<List<ServerChatMessage>>>() {
                     @Override
                     public void onResponse(Call<Result<List<ServerChatMessage>>> call,
@@ -264,14 +347,12 @@ public class ConversationList extends Fragment {
                                 || response.body() == null || response.body().getCode() != 1) {
                             return;
                         }
-                        List<ServerChatMessage> messages = response.body().getData();
-                        conversation.getMessages().clear();
-                        if (messages != null && !messages.isEmpty()) {
-                            ServerChatMessage last = messages.get(messages.size() - 1);
-                            conversation.addMessage(last.getContent());
-                        }
-                        conversation.setLatestMessageId(
-                                ChatUnreadManager.latestMessageId(messages));
+                        List<ServerChatMessage> serverMessages = response.body().getData();
+                        List<ServerChatMessage> messages =
+                                ChatMessagePaging.pageBefore(serverMessages, null);
+                        ChatHistoryStore.saveMessages(requireContext(), currentAccountId,
+                                conversation.getBackendSessionId(), serverMessages);
+                        applyLatestPreview(conversation, messages);
                         conversation.setUnRead_num(ChatUnreadManager.calculateUnread(
                                 requireContext(),
                                 currentAccountId,
@@ -289,8 +370,52 @@ public class ConversationList extends Fragment {
                 });
     }
 
+    private void applyLatestPreview(@NonNull Conversation conversation,
+                                    @Nullable List<ServerChatMessage> backendMessages) {
+        conversation.getMessages().clear();
+        ServerChatMessage backendLast = null;
+        if (backendMessages != null && !backendMessages.isEmpty()) {
+            backendLast = backendMessages.get(backendMessages.size() - 1);
+        }
+        if (backendLast != null) {
+            conversation.addMessage(backendLast.getContent());
+            conversation.setLatestMessageId(backendLast.getId());
+        } else {
+            conversation.setLatestMessageId(0L);
+        }
+    }
+
+    private void refreshSystemConversation() {
+        if (!isAdded()) return;
+        for (Conversation conversation : conversationList) {
+            if (conversation.getBackendSessionId()
+                    == chatActivity.SYSTEM_NOTIFICATION_SESSION_ID) {
+                applySystemConversationDetails(conversation);
+                sortConversations();
+                notifyUnreadCount();
+                return;
+            }
+        }
+    }
+
+    private void applySystemConversationDetails(@NonNull Conversation conversation) {
+        conversation.getMessages().clear();
+        List<ServerChatMessage> notices = ChatHistoryStore.getAllSystemMessages(
+                requireContext(), currentAccountId);
+        if (!notices.isEmpty()) {
+            ServerChatMessage last = notices.get(notices.size() - 1);
+            conversation.addMessage(last.getContent());
+            conversation.setLatestMessageId(last.getId());
+        } else {
+            conversation.addMessage("群聊人员变化会显示在这里");
+            conversation.setLatestMessageId(Long.MAX_VALUE);
+        }
+        conversation.setUnRead_num(ChatHistoryStore.countAllUnreadSystemNotices(
+                requireContext(), currentAccountId));
+    }
+
     private void openConversation(Conversation conversation) {
-        if (conversation == null || conversation.getBackendSessionId() <= 0) {
+        if (conversation == null || conversation.getBackendSessionId() == 0) {
             Toast.makeText(requireContext(), "会话信息无效", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -301,6 +426,11 @@ public class ConversationList extends Fragment {
 
     private void sortConversations() {
         conversationList.sort((left, right) -> {
+            boolean leftSystem = left.getBackendSessionId()
+                    == chatActivity.SYSTEM_NOTIFICATION_SESSION_ID;
+            boolean rightSystem = right.getBackendSessionId()
+                    == chatActivity.SYSTEM_NOTIFICATION_SESSION_ID;
+            if (leftSystem != rightSystem) return leftSystem ? -1 : 1;
             boolean leftUnread = left.getUnRead_num() > 0;
             boolean rightUnread = right.getUnRead_num() > 0;
             if (leftUnread != rightUnread) {
@@ -344,6 +474,25 @@ public class ConversationList extends Fragment {
         }
         if (recycler != null) {
             recycler.setVisibility(View.GONE);
+        }
+    }
+
+    private void showCachedConversations(String emptyMessage) {
+        if (!isAdded() || adapter == null) return;
+        List<ChatHistoryStore.CachedSession> cached =
+                ChatHistoryStore.getAll(requireContext(), currentAccountId);
+        conversationList.clear();
+        conversationList.add(buildSystemConversation());
+        for (ChatHistoryStore.CachedSession item : cached) {
+            Conversation conversation = buildConversation(item);
+            applyCachedDetails(conversation, item);
+            conversationList.add(conversation);
+        }
+        sortConversations();
+        adapter.setListData(conversationList);
+        updateEmptyState();
+        if (!cached.isEmpty()) {
+            Toast.makeText(requireContext(), "当前展示本地聊天记录", Toast.LENGTH_SHORT).show();
         }
     }
 

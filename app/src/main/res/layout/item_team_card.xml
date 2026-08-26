@@ -46,6 +46,17 @@
                     android:textStyle="bold"
                     tools:text="南京博物院研学拼单" />
 
+                <ImageButton
+                    android:id="@+id/btnFavorite"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="收藏订单"
+                    android:padding="7dp"
+                    android:src="@drawable/ic_favorite_outline"
+                    android:visibility="gone" />
+
                 <TextView
                     android:id="@+id/txtStatus"
                     android:layout_width="wrap_content"

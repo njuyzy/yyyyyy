@@ -4,7 +4,9 @@ import android.annotation.SuppressLint;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -22,6 +24,10 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
         void onTeamClick(TeamCardItem item);
     }
 
+    public interface OnFavoriteChangedListener {
+        void onFavoriteChanged(TeamCardItem item, boolean favorite);
+    }
+
     static class Holder extends RecyclerView.ViewHolder {
         final TextView txtTitle;
         final TextView txtCity;
@@ -29,6 +35,7 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
         final TextView txtRoute;
         final TextView txtMeta;
         final TextView txtStatus;
+        final ImageButton btnFavorite;
 
         Holder(@NonNull View itemView) {
             super(itemView);
@@ -38,11 +45,14 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
             txtRoute = itemView.findViewById(R.id.txtRoute);
             txtMeta = itemView.findViewById(R.id.txtMeta);
             txtStatus = itemView.findViewById(R.id.txtStatus);
+            btnFavorite = itemView.findViewById(R.id.btnFavorite);
         }
     }
 
     private final List<TeamCardItem> items = new ArrayList<>();
     private OnTeamClickListener listener;
+    private OnFavoriteChangedListener favoriteChangedListener;
+    private boolean favoriteEnabled;
 
     public void setItems(List<TeamCardItem> data) {
         items.clear();
@@ -54,6 +64,15 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
 
     public void setOnTeamClickListener(OnTeamClickListener listener) {
         this.listener = listener;
+    }
+
+    public void setOnFavoriteChangedListener(OnFavoriteChangedListener listener) {
+        this.favoriteChangedListener = listener;
+    }
+
+    public void setFavoriteEnabled(boolean enabled) {
+        favoriteEnabled = enabled;
+        notifyDataSetChanged();
     }
 
     @NonNull
@@ -95,9 +114,41 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
 
         holder.txtStatus.setText(ProjectUiHelper.statusLabel(project.getStatus()));
 
+        bindFavorite(holder, item);
+
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onTeamClick(item);
+            }
+        });
+    }
+
+    private void bindFavorite(Holder holder, TeamCardItem item) {
+        holder.btnFavorite.setVisibility(favoriteEnabled ? View.VISIBLE : View.GONE);
+        if (!favoriteEnabled) {
+            holder.btnFavorite.setOnClickListener(null);
+            return;
+        }
+        int projectId = item.getProject() == null ? 0 : item.getProject().getId();
+        boolean favorite = FavoriteOrderStore.isFavorite(
+                holder.itemView.getContext(), projectId);
+        holder.btnFavorite.setImageResource(favorite
+                ? R.drawable.ic_favorite_filled : R.drawable.ic_favorite_outline);
+        holder.btnFavorite.setContentDescription(favorite ? "取消收藏" : "收藏订单");
+        holder.btnFavorite.setEnabled(projectId > 0);
+        holder.btnFavorite.setOnClickListener(v -> {
+            boolean newState = FavoriteOrderStore.toggle(v.getContext(), item);
+            holder.btnFavorite.setImageResource(newState
+                    ? R.drawable.ic_favorite_filled : R.drawable.ic_favorite_outline);
+            holder.btnFavorite.setContentDescription(newState ? "取消收藏" : "收藏订单");
+            holder.btnFavorite.animate().cancel();
+            holder.btnFavorite.setScaleX(0.82f);
+            holder.btnFavorite.setScaleY(0.82f);
+            holder.btnFavorite.animate().scaleX(1f).scaleY(1f).setDuration(160).start();
+            Toast.makeText(v.getContext(), newState ? "已收藏" : "已取消收藏",
+                    Toast.LENGTH_SHORT).show();
+            if (favoriteChangedListener != null) {
+                favoriteChangedListener.onFavoriteChanged(item, newState);
             }
         });
     }

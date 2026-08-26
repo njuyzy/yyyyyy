@@ -40,13 +40,13 @@
         android:id="@+id/customRoutePanel"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:cardBackgroundColor="#FCFFFFFF"
+        app:cardBackgroundColor="@color/route_panel_surface"
         app:cardCornerRadius="20dp"
-        app:cardElevation="6dp"
+        app:cardElevation="0dp"
         app:behavior_expandedOffset="0dp"
         app:behavior_fitToContents="false"
         app:behavior_hideable="false"
-        app:behavior_peekHeight="352dp"
+        app:behavior_peekHeight="370dp"
         app:layout_behavior="@string/bottom_sheet_behavior"
         app:strokeColor="@color/route_card_stroke"
         app:strokeWidth="1dp">
@@ -71,33 +71,128 @@
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="32dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="5dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="vertical">
 
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/route_plan_title"
-                    android:textColor="@color/route_text_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="32dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/txtRouteStopCount"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_route_ai_badge"
-                    android:paddingStart="8dp"
-                    android:paddingTop="3dp"
-                    android:paddingEnd="8dp"
-                    android:paddingBottom="3dp"
-                    android:text="@string/route_zero_stops"
-                    android:textColor="@color/route_primary"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/route_plan_title"
+                        android:textColor="@color/route_text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/txtRouteStopCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="7dp"
+                        android:text="@string/route_zero_stops"
+                        android:textColor="@color/route_primary"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnTogglePlaceSearch"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:elevation="1dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="5dp"
+                        android:paddingEnd="5dp"
+                        android:singleLine="true"
+                        android:text="@string/route_add_destination"
+                        android:textAllCaps="false"
+                        android:textColor="@color/route_primary"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        app:backgroundTint="@color/route_primary_soft"
+                        app:cornerRadius="13dp"
+                        app:icon="@drawable/baseline_add_circle_outline_24"
+                        app:iconGravity="textStart"
+                        app:iconPadding="3dp"
+                        app:iconSize="14dp"
+                        app:iconTint="@color/route_primary"
+                        app:strokeColor="@color/route_query_stroke"
+                        app:strokeWidth="1dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSaveRoute"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:enabled="false"
+                        android:elevation="1dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="5dp"
+                        android:paddingEnd="5dp"
+                        android:singleLine="true"
+                        android:text="@string/route_save"
+                        android:textAllCaps="false"
+                        android:textColor="@color/route_save_button_text"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        app:backgroundTint="@color/route_save_button_background"
+                        app:cornerRadius="13dp"
+                        app:icon="@drawable/ic_route_save"
+                        app:iconGravity="textStart"
+                        app:iconPadding="3dp"
+                        app:iconSize="14dp"
+                        app:iconTint="@color/route_save_button_text"
+                        app:strokeColor="@color/route_save_button_stroke"
+                        app:strokeWidth="1dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPublishRoute"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:enabled="false"
+                        android:elevation="1dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="5dp"
+                        android:paddingEnd="5dp"
+                        android:singleLine="true"
+                        android:text="@string/route_publish"
+                        android:textAllCaps="false"
+                        android:textColor="@color/route_publish_button_text"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        app:backgroundTint="@color/route_publish_button_background"
+                        app:cornerRadius="13dp"
+                        app:icon="@drawable/ic_route_publish"
+                        app:iconGravity="textStart"
+                        app:iconPadding="3dp"
+                        app:iconSize="14dp"
+                        app:iconTint="@color/route_publish_button_text" />
+                </LinearLayout>
             </LinearLayout>
 
             <com.google.android.material.card.MaterialCardView
@@ -105,9 +200,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="96dp"
                 android:layout_marginTop="4dp"
-                app:cardBackgroundColor="@color/white"
+                app:cardBackgroundColor="@color/route_stops_surface"
                 app:cardCornerRadius="15dp"
-                app:cardElevation="2dp"
+                app:cardElevation="0dp"
                 app:strokeColor="@color/route_card_stroke"
                 app:strokeWidth="1dp">
 
@@ -187,81 +282,15 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:clipChildren="false"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnTogglePlaceSearch"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1.35"
-                    android:elevation="2dp"
-                    android:gravity="center"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:minHeight="0dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
-                    android:text="@string/route_add_destination"
-                    android:textAllCaps="false"
-                    android:textColor="@color/route_primary"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    app:backgroundTint="@color/route_primary_soft"
-                    app:cornerRadius="14dp"
-                    app:icon="@drawable/baseline_add_circle_outline_24"
-                    app:iconGravity="textStart"
-                    app:iconPadding="6dp"
-                    app:iconSize="17dp"
-                    app:iconTint="@color/route_primary"
-                    app:strokeColor="@color/route_query_stroke"
-                    app:strokeWidth="1dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnPublishRoute"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_weight="0.75"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:minHeight="0dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp"
-                    android:text="@string/route_publish"
-                    android:textAllCaps="false"
-                    android:textColor="@color/route_publish_button_text"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:enabled="false"
-                    android:elevation="3dp"
-                    app:backgroundTint="@color/route_publish_button_background"
-                    app:cornerRadius="14dp"
-                    app:icon="@drawable/ic_route_publish"
-                    app:iconGravity="textStart"
-                    app:iconPadding="5dp"
-                    app:iconSize="16dp"
-                    app:iconTint="@color/route_publish_button_text" />
-            </LinearLayout>
-
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/assistantSectionCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                app:cardBackgroundColor="@color/white"
+                app:cardBackgroundColor="@color/route_assistant_surface"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="3dp"
-                app:strokeColor="@color/route_card_stroke"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/route_assistant_stroke"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -345,7 +374,7 @@
             <FrameLayout
                 android:id="@+id/chatArea"
                 android:layout_width="match_parent"
-                android:layout_height="58dp">
+                android:layout_height="76dp">
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/chatRecyclerView"
@@ -354,7 +383,7 @@
                     android:clipToPadding="false"
                     android:fadeScrollbars="false"
                     android:overScrollMode="ifContentScrolls"
-                    android:paddingBottom="2dp"
+                    android:paddingBottom="8dp"
                     android:scrollbarStyle="insideInset"
                     android:scrollbars="vertical"
                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
