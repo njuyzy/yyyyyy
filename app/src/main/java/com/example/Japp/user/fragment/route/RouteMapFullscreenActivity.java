@@ -21,6 +21,7 @@ import com.example.Japp.network.models.RouteNode;
 import com.google.android.material.appbar.MaterialToolbar;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /** 点击对话气泡内地图后全屏展示路线 */
@@ -48,17 +49,15 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
     public static void startWithNodes(@NonNull Context context,
                                       @Nullable List<RouteNode> nodes,
                                       @Nullable String title) {
-        start(context, RouteMapDrawHelper.extractPointsFromNodes(nodes), title);
+        start(context, Collections.emptyList(),
+                RouteMapDrawHelper.extractPointsFromNodes(nodes), title);
     }
 
     public static void start(@NonNull Context context,
                              @Nullable List<LatLng> roadPoints,
                              @Nullable List<LatLng> waypoints,
                              @Nullable String title) {
-        List<LatLng> safePoints = roadPoints;
-        if (safePoints == null || safePoints.isEmpty()) {
-            safePoints = RouteSampleData.getMockPolyline();
-        }
+        List<LatLng> safePoints = roadPoints != null ? roadPoints : Collections.emptyList();
         double[] lats = new double[safePoints.size()];
         double[] lngs = new double[safePoints.size()];
         for (int i = 0; i < safePoints.size(); i++) {
@@ -150,7 +149,9 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
     }
 
     private void drawRouteSafely() {
-        if (aMap == null || routePoints == null || routePoints.size() < 2) {
+        boolean hasRoad = routePoints != null && routePoints.size() >= 2;
+        boolean hasWaypoints = waypointPoints != null && !waypointPoints.isEmpty();
+        if (aMap == null || (!hasRoad && !hasWaypoints)) {
             return;
         }
         try {
@@ -161,21 +162,21 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
     }
 
     private List<LatLng> readPointsFromIntent() {
-        return readLatLngExtra(EXTRA_LATS, EXTRA_LNGS, true);
+        return readLatLngExtra(EXTRA_LATS, EXTRA_LNGS);
     }
 
     @Nullable
     private List<LatLng> readWaypointsFromIntent() {
-        List<LatLng> points = readLatLngExtra(EXTRA_WAYPOINT_LATS, EXTRA_WAYPOINT_LNGS, false);
+        List<LatLng> points = readLatLngExtra(EXTRA_WAYPOINT_LATS, EXTRA_WAYPOINT_LNGS);
         return points.isEmpty() ? null : points;
     }
 
     @NonNull
-    private List<LatLng> readLatLngExtra(String latKey, String lngKey, boolean fallbackMock) {
+    private List<LatLng> readLatLngExtra(String latKey, String lngKey) {
         double[] lats = getIntent().getDoubleArrayExtra(latKey);
         double[] lngs = getIntent().getDoubleArrayExtra(lngKey);
         if (lats == null || lngs == null || lats.length == 0 || lats.length != lngs.length) {
-            return fallbackMock ? RouteSampleData.getMockPolyline() : new ArrayList<>();
+            return new ArrayList<>();
         }
         List<LatLng> list = new ArrayList<>(lats.length);
         for (int i = 0; i < lats.length; i++) {

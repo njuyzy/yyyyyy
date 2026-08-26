@@ -239,6 +239,7 @@ public class TeamDetailActivity extends AppCompatActivity {
         if (mapContainer != null) {
             mapContainer.setVisibility(View.VISIBLE);
         }
+        drawRouteOnMap();
         if (routeMapView != null) {
             routeMapView.post(this::startRoadRoutePlanning);
             routeMapView.postDelayed(this::startRoadRoutePlanning, 400);
@@ -255,9 +256,8 @@ public class TeamDetailActivity extends AppCompatActivity {
         if (aMap == null || routePoints.size() < 2) {
             return;
         }
-        List<LatLng> line = plannedRoadPoints.size() >= 2
-                ? plannedRoadPoints : routePoints;
-        RouteMapDrawHelper.drawRoute(aMap, line, routePoints);
+        RouteMapDrawHelper.drawRouteWithNodes(
+                aMap, plannedRoadPoints, cachedRouteNodes);
     }
 
     private void startRoadRoutePlanning() {
@@ -269,7 +269,8 @@ public class TeamDetailActivity extends AppCompatActivity {
         walkRoutePlanner.plan(aMap, cachedRouteNodes, new LeaderWalkRoutePlanner.Callback() {
             @Override
             public void onPlanningStarted() {
-                // 保持地图可交互，规划完成后自动替换为道路折线。
+                // 规划完成前只显示站点，避免短暂出现两点直连线。
+                drawRouteOnMap();
             }
 
             @Override
@@ -302,10 +303,10 @@ public class TeamDetailActivity extends AppCompatActivity {
             Toast.makeText(this, R.string.route_map_no_coords, Toast.LENGTH_SHORT).show();
             return;
         }
-        List<LatLng> line = plannedRoadPoints.size() >= 2
-                ? plannedRoadPoints : routePoints;
         RouteMapFullscreenActivity.start(this,
-                new ArrayList<>(line), new ArrayList<>(routePoints), txtTitle.getText().toString());
+                new ArrayList<>(plannedRoadPoints),
+                new ArrayList<>(routePoints),
+                txtTitle.getText().toString());
     }
 
     private boolean hasConfiguredAmapKey() {

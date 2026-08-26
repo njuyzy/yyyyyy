@@ -45,9 +45,24 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/txtAssistantState"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_route_ai_badge"
+            android:paddingStart="7dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="7dp"
+            android:paddingBottom="2dp"
+            android:text="@string/route_ai_state_done"
+            android:textColor="@color/route_primary"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <TextView
             android:id="@+id/txtTime"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="7dp"
             android:textColor="@color/route_text_hint"
             android:textSize="11sp" />
     </LinearLayout>
@@ -78,6 +93,27 @@
                 android:paddingBottom="10dp"
                 android:textColor="@color/route_text_primary"
                 android:textSize="14sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRetry"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:layout_marginStart="8dp"
+                android:elevation="1dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:text="@string/route_ai_retry"
+                android:textAllCaps="false"
+                android:textColor="@color/route_primary"
+                android:textSize="11sp"
+                android:visibility="gone"
+                app:backgroundTint="@color/route_primary_soft"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_route_refresh"
+                app:iconSize="14dp"
+                app:iconTint="@color/route_primary" />
 
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>

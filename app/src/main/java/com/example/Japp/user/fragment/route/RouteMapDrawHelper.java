@@ -66,17 +66,24 @@ public final class RouteMapDrawHelper {
                                      @NonNull List<LatLng> roadPoints,
                                      @Nullable List<LatLng> waypoints,
                                      boolean showOriginMarker) {
-        if (aMap == null || roadPoints.size() < 2) {
+        if (aMap == null) {
+            return null;
+        }
+        List<LatLng> markers = (waypoints != null && !waypoints.isEmpty())
+                ? waypoints : roadPoints;
+        if (roadPoints.isEmpty() && markers.isEmpty()) {
             return null;
         }
         aMap.clear();
-        Polyline polyline = aMap.addPolyline(new PolylineOptions()
-                .addAll(roadPoints)
-                .width(ROUTE_LINE_WIDTH)
-                .color(ROUTE_LINE_COLOR)
-                .geodesic(false));
+        Polyline polyline = null;
+        if (isRoadPolyline(roadPoints, markers)) {
+            polyline = aMap.addPolyline(new PolylineOptions()
+                    .addAll(roadPoints)
+                    .width(ROUTE_LINE_WIDTH)
+                    .color(ROUTE_LINE_COLOR)
+                    .geodesic(false));
+        }
 
-        List<LatLng> markers = (waypoints != null && !waypoints.isEmpty()) ? waypoints : roadPoints;
         if (markers.size() == 1) {
             aMap.addMarker(new MarkerOptions().position(markers.get(0)).title("地点"));
         } else {
@@ -94,7 +101,7 @@ public final class RouteMapDrawHelper {
             }
         }
 
-        fitCamera(aMap, roadPoints, 48);
+        fitCamera(aMap, isRoadPolyline(roadPoints, markers) ? roadPoints : markers, 48);
         return polyline;
     }
 
@@ -105,12 +112,16 @@ public final class RouteMapDrawHelper {
     public static Polyline drawRouteWithNodes(@Nullable AMap aMap,
                                               @NonNull List<LatLng> roadPoints,
                                               @NonNull List<RouteNode> nodes) {
-        if (aMap == null || roadPoints.isEmpty()) {
+        if (aMap == null) {
+            return null;
+        }
+        List<LatLng> nodePoints = extractPointsFromNodes(nodes);
+        if (roadPoints.isEmpty() && nodePoints.isEmpty()) {
             return null;
         }
         aMap.clear();
         Polyline polyline = null;
-        if (roadPoints.size() >= 2) {
+        if (isRoadPolyline(roadPoints, nodePoints)) {
             polyline = aMap.addPolyline(new PolylineOptions()
                     .addAll(roadPoints)
                     .width(ROUTE_LINE_WIDTH)
@@ -135,8 +146,31 @@ public final class RouteMapDrawHelper {
                     .snippet(node.getAddress()));
             marker.setObject(node);
         }
-        fitCamera(aMap, roadPoints, 48);
+        fitCamera(aMap, isRoadPolyline(roadPoints, nodePoints) ? roadPoints : nodePoints, 48);
         return polyline;
+    }
+
+    /**
+     * 道路轨迹通常包含道路形状点；若折线与站点数组完全相同，则它只是站点直连兜底，禁止绘制。
+     */
+    private static boolean isRoadPolyline(@Nullable List<LatLng> roadPoints,
+                                          @Nullable List<LatLng> waypoints) {
+        if (roadPoints == null || roadPoints.size() < 2) {
+            return false;
+        }
+        if (waypoints == null || waypoints.isEmpty() || roadPoints.size() != waypoints.size()) {
+            return true;
+        }
+        for (int i = 0; i < roadPoints.size(); i++) {
+            LatLng road = roadPoints.get(i);
+            LatLng stop = waypoints.get(i);
+            if (road == null || stop == null
+                    || Math.abs(road.latitude - stop.latitude) > 1e-6
+                    || Math.abs(road.longitude - stop.longitude) > 1e-6) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @NonNull

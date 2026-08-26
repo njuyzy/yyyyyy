@@ -114,7 +114,7 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
             routeSearch.setRouteSearchListener(this);
         } catch (AMapException e) {
             routeSearch = null;
-            Toast.makeText(this, "路线服务初始化失败，将使用直线连接", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "路线服务初始化失败，仅显示途经地点", Toast.LENGTH_SHORT).show();
         }
 
         service = ApiClient.getClient().create(UserService.class);
@@ -315,7 +315,6 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
 
     private void startRoutePlanning(List<LatLng> points) {
         if (routeSearch == null) {
-            drawDirectPolyline(points);
             return;
         }
         routePoints.clear();
@@ -356,14 +355,13 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
     }
 
     private void onPlanningFinished() {
-        if (plannedPolylinePoints.size() >= 2) {
+        if (!routeHasFailedSegment && plannedPolylinePoints.size() >= 2) {
             drawPlannedPolyline();
             showWalkPlanPanel();
-        } else if (routePoints.size() >= 2) {
-            drawDirectPolyline(routePoints);
         }
         if (routeHasFailedSegment) {
-            Toast.makeText(this, "部分路段规划失败，已用直线连接", Toast.LENGTH_SHORT).show();
+            hidePlanPanel();
+            Toast.makeText(this, "部分路段规划失败，已隐藏不准确的路线，仅显示途经地点", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -397,14 +395,6 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
                 .width(8f));
     }
 
-    private void drawDirectPolyline(List<LatLng> points) {
-        if (aMap == null || points == null || points.size() < 2) return;
-        aMap.addPolyline(new PolylineOptions()
-                .addAll(points)
-                .color(0xFF1E88E5)
-                .width(8f));
-    }
-
     private LatLonPoint toLatLonPoint(LatLng latLng) {
         return new LatLonPoint(latLng.latitude, latLng.longitude);
     }
@@ -433,10 +423,6 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
                 }
             }
         }
-        if (segmentPoints.isEmpty()) {
-            segmentPoints.add(from);
-            segmentPoints.add(to);
-        }
         return segmentPoints;
     }
 
@@ -449,7 +435,7 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
         String toLabel = getRoutePointLabel(segmentIndex + 1);
         walkInstructions.add("第" + (segmentIndex + 1) + "段：" + fromLabel + " -> " + toLabel);
         if (fallback) {
-            walkInstructions.add("路径规划失败，已改用直线连接至下一站");
+            walkInstructions.add("路径规划失败，该路段暂不展示路线");
             return;
         }
         if (path == null || path.getSteps() == null || path.getSteps().isEmpty()) {
@@ -480,13 +466,7 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
     }
 
     private void appendFallbackSegment() {
-        LatLng from = routePoints.get(currentSegmentIndex);
-        LatLng to = routePoints.get(currentSegmentIndex + 1);
-        List<LatLng> fallback = new ArrayList<>();
-        fallback.add(from);
-        fallback.add(to);
         appendWalkInstructions(null, currentSegmentIndex, true);
-        appendSegmentPoints(fallback);
         routeHasFailedSegment = true;
         currentSegmentIndex++;
         requestNextWalkSegment();
@@ -517,10 +497,15 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
             return;
         }
         WalkPath bestPath = result.getPaths().get(0);
+        List<LatLng> segmentPoints = extractWalkPathPoints(bestPath, from, to);
+        if (segmentPoints.size() < 2) {
+            appendFallbackSegment();
+            return;
+        }
         totalWalkDistance += (int) bestPath.getDistance();
         totalWalkDuration += (int) bestPath.getDuration();
         appendWalkInstructions(bestPath);
-        appendSegmentPoints(extractWalkPathPoints(bestPath, from, to));
+        appendSegmentPoints(segmentPoints);
         currentSegmentIndex++;
         requestNextWalkSegment();
     }
