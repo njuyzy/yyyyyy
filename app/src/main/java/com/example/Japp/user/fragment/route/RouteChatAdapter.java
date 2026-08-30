@@ -1,6 +1,12 @@
 package com.example.Japp.user.fragment.route;
 
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.StyleSpan;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,6 +21,7 @@ import com.amap.api.maps.MapView;
 import com.amap.api.maps.model.LatLng;
 import com.amap.api.maps.model.Polyline;
 import com.example.Japp.R;
+import com.google.android.material.button.MaterialButton;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -33,6 +40,8 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
 
     public interface RouteChatListener {
         default void onMapClick(RouteChatItem item) {}
+
+        default void onRetry(RouteChatItem item) {}
     }
 
     private RouteChatListener listener;
@@ -86,6 +95,16 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         items.clear();
         items.addAll(restoredItems);
         notifyDataSetChanged();
+    }
+
+    public void clearItems() {
+        if (items.isEmpty()) {
+            return;
+        }
+        int oldSize = items.size();
+        items.clear();
+        notifyItemRangeRemoved(0, oldSize);
+        dispatchDataChanged();
     }
 
     public int getLastItemPosition() {
@@ -241,6 +260,8 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     static class AssistantVH extends RecyclerView.ViewHolder {
         final TextView message;
         final TextView time;
+        final TextView state;
+        final MaterialButton retry;
         final View mapContainer;
         final MapView routeMapView;
         final TextView mapTapHint;
@@ -264,6 +285,8 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             this.listener = listener;
             message = itemView.findViewById(R.id.txtMessage);
             time = itemView.findViewById(R.id.txtTime);
+            state = itemView.findViewById(R.id.txtAssistantState);
+            retry = itemView.findViewById(R.id.btnRetry);
             mapContainer = itemView.findViewById(R.id.mapContainer);
             routeMapView = itemView.findViewById(R.id.routeMapView);
             mapTapHint = itemView.findViewById(R.id.mapTapHint);
@@ -271,10 +294,25 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
 
         void bind(@NonNull RouteChatItem item, @NonNull String timeText, @Nullable Bundle mapBundle) {
             if (message != null) {
-                message.setText(item.getText());
+                message.setText(formatAssistantText(item.getText()));
             }
             if (time != null) {
                 time.setText(timeText);
+            }
+            boolean failed = item.isStatus()
+                    && item.getText() != null
+                    && item.getText().startsWith("规划失败");
+            if (state != null) {
+                state.setText(failed ? "需重试" : (item.isStatus() ? "规划中" : "已更新"));
+                state.setTextColor(Color.parseColor(failed ? "#C62828" : "#1E72FF"));
+                state.setBackgroundTintList(ColorStateList.valueOf(
+                        Color.parseColor(failed ? "#FDECEC" : "#EAF2FF")));
+            }
+            if (retry != null) {
+                retry.setVisibility(failed ? View.VISIBLE : View.GONE);
+                retry.setOnClickListener(failed && listener != null
+                        ? v -> listener.onRetry(item)
+                        : null);
             }
             if (mapContainer == null || routeMapView == null || !item.hasPolyline()) {
                 if (mapContainer != null) {
@@ -294,6 +332,21 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             mapResume();
             routeMapView.post(this::redrawRouteIfNeeded);
             routeMapView.postDelayed(this::redrawRouteIfNeeded, 500);
+        }
+
+        @NonNull
+        private CharSequence formatAssistantText(@Nullable String text) {
+            String safeText = text == null ? "" : text;
+            SpannableString styled = new SpannableString(safeText);
+            int firstLineEnd = safeText.indexOf('\n');
+            if (firstLineEnd < 0) {
+                firstLineEnd = safeText.length();
+            }
+            if (firstLineEnd > 0) {
+                styled.setSpan(new StyleSpan(Typeface.BOLD), 0, firstLineEnd,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            return styled;
         }
 
         private void ensureMapCreated(@Nullable Bundle mapBundle) {

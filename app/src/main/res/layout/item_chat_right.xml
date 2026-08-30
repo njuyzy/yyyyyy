@@ -87,6 +87,7 @@
     </LinearLayout>
 
     <FrameLayout
+        android:id="@+id/avatarContainer"
         android:layout_width="38dp"
         android:layout_height="38dp"
         android:layout_marginStart="9dp"

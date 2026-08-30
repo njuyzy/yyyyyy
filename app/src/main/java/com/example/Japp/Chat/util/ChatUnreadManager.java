@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import com.example.Japp.network.api.UserService;
+import com.example.Japp.network.models.ChatGroupMember;
 import com.example.Japp.network.models.ChatSession;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.ServerChatMessage;
@@ -59,7 +60,8 @@ public final class ChatUnreadManager {
                 unread++;
             }
         }
-        preferences.edit().putInt(countKey(accountId, sessionId), unread).apply();
+        preferences.edit().putInt(countKey(accountId, sessionId),
+                unread).apply();
         return unread;
     }
 
@@ -97,7 +99,9 @@ public final class ChatUnreadManager {
                 }
                 if (response.body().getData() == null
                         || response.body().getData().isEmpty()) {
-                    callback.onRefreshed(Collections.emptyMap(), 0);
+                    callback.onRefreshed(Collections.emptyMap(),
+                            ChatHistoryStore.countAllUnreadSystemNotices(
+                                    appContext, accountId));
                     return;
                 }
 
@@ -107,51 +111,8 @@ public final class ChatUnreadManager {
                 AtomicInteger total = new AtomicInteger(0);
                 AtomicBoolean failed = new AtomicBoolean(false);
                 for (ChatSession session : sessions) {
-                    long sessionId = session.getId();
-                    Integer cachedUnread = cachedUnreadIfCurrent(
-                            appContext, accountId, session);
-                    if (cachedUnread != null) {
-                        unreadBySession.put(sessionId, cachedUnread);
-                        total.addAndGet(cachedUnread);
-                        finishOne(pending, unreadBySession, total, failed, callback);
-                        continue;
-                    }
-                    service.getChatMessages(sessionId)
-                            .enqueue(new Callback<Result<List<ServerChatMessage>>>() {
-                                @Override
-                                public void onResponse(
-                                        Call<Result<List<ServerChatMessage>>> call,
-                                        Response<Result<List<ServerChatMessage>>> response) {
-                                    int unread = 0;
-                                    if (response.isSuccessful() && response.body() != null
-                                            && response.body().getCode() == 1) {
-                                        unread = calculateUnread(
-                                                appContext,
-                                                accountId,
-                                                sessionId,
-                                                response.body().getData());
-                                        cacheLatestMarker(
-                                                appContext,
-                                                accountId,
-                                                session,
-                                                unread);
-                                    } else {
-                                        failed.set(true);
-                                    }
-                                    unreadBySession.put(sessionId, unread);
-                                    total.addAndGet(unread);
-                                    finishOne(pending, unreadBySession, total, failed, callback);
-                                }
-
-                                @Override
-                                public void onFailure(
-                                    Call<Result<List<ServerChatMessage>>> call,
-                                        Throwable t) {
-                                    failed.set(true);
-                                    unreadBySession.put(sessionId, 0);
-                                    finishOne(pending, unreadBySession, total, failed, callback);
-                                }
-                            });
+                    refreshSession(appContext, service, accountId, session,
+                            pending, unreadBySession, total, failed, callback);
                 }
             }
 
@@ -160,6 +121,77 @@ public final class ChatUnreadManager {
                 callback.onFailure();
             }
         });
+    }
+
+    private static void refreshSession(Context context, UserService service, int accountId,
+                                       ChatSession session, AtomicInteger pending,
+                                       Map<Long, Integer> unreadBySession, AtomicInteger total,
+                                       AtomicBoolean failed, RefreshCallback callback) {
+        service.getChatMembers(session.getId())
+                .enqueue(new Callback<Result<List<ChatGroupMember>>>() {
+                    @Override
+                    public void onResponse(Call<Result<List<ChatGroupMember>>> call,
+                                           Response<Result<List<ChatGroupMember>>> response) {
+                        if (response.isSuccessful() && response.body() != null
+                                && response.body().getCode() == 1) {
+                            ChatHistoryStore.reconcileMembers(context, accountId,
+                                    session.getId(), response.body().getData());
+                        }
+                        refreshSessionUnread(context, service, accountId, session,
+                                pending, unreadBySession, total, failed, callback);
+                    }
+
+                    @Override
+                    public void onFailure(Call<Result<List<ChatGroupMember>>> call, Throwable t) {
+                        refreshSessionUnread(context, service, accountId, session,
+                                pending, unreadBySession, total, failed, callback);
+                    }
+                });
+    }
+
+    private static void refreshSessionUnread(Context context, UserService service, int accountId,
+                                             ChatSession session, AtomicInteger pending,
+                                             Map<Long, Integer> unreadBySession,
+                                             AtomicInteger total, AtomicBoolean failed,
+                                             RefreshCallback callback) {
+        long sessionId = session.getId();
+        Integer cachedUnread = cachedUnreadIfCurrent(context, accountId, session);
+        if (cachedUnread != null) {
+            unreadBySession.put(sessionId, cachedUnread);
+            total.addAndGet(cachedUnread);
+            finishOne(context, accountId, pending, unreadBySession,
+                    total, failed, callback);
+            return;
+        }
+        service.getChatMessagesPage(sessionId, null, ChatMessagePaging.PAGE_SIZE)
+                .enqueue(new Callback<Result<List<ServerChatMessage>>>() {
+                    @Override
+                    public void onResponse(Call<Result<List<ServerChatMessage>>> call,
+                                           Response<Result<List<ServerChatMessage>>> response) {
+                        int unread = 0;
+                        if (response.isSuccessful() && response.body() != null
+                                && response.body().getCode() == 1) {
+                            List<ServerChatMessage> latestPage = ChatMessagePaging.pageBefore(
+                                    response.body().getData(), null);
+                            unread = calculateUnread(context, accountId, sessionId, latestPage);
+                            cacheLatestMarker(context, accountId, session, unread);
+                        } else {
+                            failed.set(true);
+                        }
+                        unreadBySession.put(sessionId, unread);
+                        total.addAndGet(unread);
+                        finishOne(context, accountId, pending, unreadBySession,
+                                total, failed, callback);
+                    }
+
+                    @Override
+                    public void onFailure(Call<Result<List<ServerChatMessage>>> call, Throwable t) {
+                        failed.set(true);
+                        unreadBySession.put(sessionId, 0);
+                        finishOne(context, accountId, pending, unreadBySession,
+                                total, failed, callback);
+                    }
+                });
     }
 
     public static long latestMessageId(List<ServerChatMessage> messages) {
@@ -181,7 +213,7 @@ public final class ChatUnreadManager {
         }
     }
 
-    private static void finishOne(AtomicInteger pending,
+    private static void finishOne(Context context, int accountId, AtomicInteger pending,
                                   Map<Long, Integer> unreadBySession,
                                   AtomicInteger total,
                                   AtomicBoolean failed,
@@ -190,7 +222,9 @@ public final class ChatUnreadManager {
             if (failed.get()) {
                 callback.onFailure();
             } else {
-                callback.onRefreshed(new HashMap<>(unreadBySession), total.get());
+                callback.onRefreshed(new HashMap<>(unreadBySession), total.get()
+                        + ChatHistoryStore.countAllUnreadSystemNotices(
+                        context, accountId));
             }
         }
     }
@@ -208,7 +242,7 @@ public final class ChatUnreadManager {
             return null;
         }
         String cachedLatest = preferences.getString(latestKey, "");
-        String currentLatest = marker(session);
+        String currentLatest = marker(context, accountId, session);
         return currentLatest.equals(cachedLatest)
                 ? preferences.getInt(countKey, 0) : null;
     }
@@ -216,12 +250,13 @@ public final class ChatUnreadManager {
     private static void cacheLatestMarker(Context context, int accountId,
                                           ChatSession session, int unread) {
         preferences(context).edit()
-                .putString(latestKey(accountId, session.getId()), marker(session))
+                .putString(latestKey(accountId, session.getId()),
+                        marker(context, accountId, session))
                 .putInt(countKey(accountId, session.getId()), unread)
                 .apply();
     }
 
-    private static String marker(ChatSession session) {
+    private static String marker(Context context, int accountId, ChatSession session) {
         String sentAt = session.getLatestMessageAt() == null
                 ? "" : session.getLatestMessageAt();
         String content = session.getLatestMessage() == null

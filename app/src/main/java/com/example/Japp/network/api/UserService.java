@@ -149,16 +149,18 @@ public interface UserService {
     Call<Result<JsonElement>> publishRoute(@Path("id") int routeId,
                                            @Body CreateProjectRequest request);
 
-    // 后端约定：POST /routes/ai/{memoryId}?message=...&accountId=...
-    // 成功时 data 为路线 ID（数字）
+    // 统一 AI 路线接口：不传请求体时生成路线，传入已有地点时优化路线。
+    // 两种方式成功时 data 均为路线 ID（数字）。
     @POST("routes/ai/{memoryId}")
     Call<Result<JsonElement>> planRouteByAi(@Path("memoryId") String memoryId,
                                             @Query("message") String message,
                                             @Query("accountId") Integer accountId);
 
-    @POST("routes/optimize")
-    Call<Result<JsonElement>> optimizeRoute(@Body List<RouteNode> routeNodes,
-                                            @Query("message") String message);
+    @POST("routes/ai/{memoryId}")
+    Call<Result<JsonElement>> optimizeRouteByAi(@Path("memoryId") String memoryId,
+                                                @Query("message") String message,
+                                                @Query("accountId") Integer accountId,
+                                                @Body List<RouteNode> routeNodes);
 
     @POST("routes/manual")
     Call<Result<JsonElement>> createManualRoute(@Body List<RouteNode> routeNodes);
@@ -199,7 +201,10 @@ public interface UserService {
     Call<Result<List<ChatSession>>> getChatSessions();
 
     @GET("chat/sessions/{sessionId}/messages")
-    Call<Result<List<ServerChatMessage>>> getChatMessages(@Path("sessionId") long sessionId);
+    Call<Result<List<ServerChatMessage>>> getChatMessagesPage(
+            @Path("sessionId") long sessionId,
+            @Query("beforeId") Long beforeId,
+            @Query("limit") int limit);
 
     @GET("chat/sessions/{sessionId}/members")
     Call<Result<List<ChatGroupMember>>> getChatMembers(@Path("sessionId") long sessionId);

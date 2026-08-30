@@ -25,7 +25,9 @@ public class RouteChatItem {
                           List<LatLng> polylinePoints, List<LatLng> waypointPoints,
                           boolean publishAllowed) {
         this.type = type;
-        this.text = text;
+        this.text = type == TYPE_ASSISTANT_ROUTE
+                ? hideInternalRouteId(text)
+                : (text != null ? text : "");
         this.timestamp = timestamp;
         this.routeId = routeId;
         this.publishAllowed = publishAllowed;
@@ -84,6 +86,18 @@ public class RouteChatItem {
 
     public void setText(String text) {
         this.text = text != null ? text : "";
+    }
+
+    /** 兼容本地已保存的旧消息，路线 ID 仅供内部发布流程使用。 */
+    private static String hideInternalRouteId(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text
+                .replaceAll("(?m)^\\s*路线编号[：:]\\s*\\d+\\s*(?:\\r?\\n)?", "")
+                .replaceAll("[（(]ID\\s*[：:]\\s*\\d+[）)]", "")
+                .replaceAll("\\n{3,}", "\\n\\n")
+                .trim();
     }
 
     public int getType() {

@@ -99,12 +99,17 @@
     <string name="route_location_locating">定位中…</string>
     <string name="route_location_permission_needed">开启定位后显示当前位置</string>
     <string name="route_center_my_location">回到当前位置</string>
-    <string name="route_add_destination">＋  搜索并添加目的地</string>
+    <string name="route_add_destination">添加地点</string>
     <string name="route_close_place_search">收起地点搜索</string>
     <string name="route_location_outside_service">当前位置超出地图服务范围</string>
     <string name="route_ai_panel_title">AI 路线助手</string>
     <string name="route_ai_input_hint">描述想如何优化，或新建一条路线</string>
     <string name="route_ai_optimize_hint">例如：减少步行，增加一个博物馆</string>
+    <string name="route_ai_empty_state">告诉我城市、时长和研学偏好</string>
+    <string name="route_ai_context_new">新建路线</string>
+    <string name="route_ai_state_done">已更新</string>
+    <string name="route_ai_retry">重新尝试</string>
+    <string name="route_ai_new_conversation">新对话</string>
     <string name="route_ai_assistant_badge">智能研学助手</string>
     <string name="route_try_suggestions">试试这些路线</string>
     <string name="route_send_desc">发送</string>
@@ -117,6 +122,7 @@
     <string name="route_chip_suzhou">苏州 亲子自然探索</string>
     <string name="route_chip_shanghai">上海 博物馆一日游</string>
     <string name="route_publish">发布拼单</string>
+    <string name="route_save">保存路线</string>
     <string name="route_assistant_name">路线助手</string>
 
     <!-- Leader order list -->

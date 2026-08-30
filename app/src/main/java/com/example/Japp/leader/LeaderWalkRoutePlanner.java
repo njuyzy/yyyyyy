@@ -14,7 +14,9 @@ import com.amap.api.maps.model.PolylineOptions;
 import com.amap.api.services.core.AMapException;
 import com.amap.api.services.core.LatLonPoint;
 import com.amap.api.services.route.BusRouteResult;
+import com.amap.api.services.route.DrivePath;
 import com.amap.api.services.route.DriveRouteResult;
+import com.amap.api.services.route.DriveStep;
 import com.amap.api.services.route.RideRouteResult;
 import com.amap.api.services.route.RouteSearch;
 import com.amap.api.services.route.WalkPath;
@@ -43,7 +45,7 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
 
         /**
          * 带道路折线的完成回调。默认转调三参数版本，兼容旧调用方。
-         * @param roadPolyline 沿道路的折线点；失败回退时可能是站点直连
+         * @param roadPolyline 沿道路的折线点；道路规划不完整时返回空列表，禁止站点直连
          */
         default void onPlanningFinished(@NonNull String summary,
                                         @NonNull ArrayList<String> instructions,
@@ -72,6 +74,7 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
     private int totalWalkDistance;
     private int totalWalkDuration;
     private boolean routeHasFailedSegment;
+    private boolean requestingDriveFallback;
 
     public LeaderWalkRoutePlanner(@NonNull Context context) {
         appContext = context.getApplicationContext();
@@ -161,8 +164,9 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
 
     private void startRoutePlanning() {
         if (routeSearch == null) {
-            drawDirectPolyline(routePoints);
-            notifyFinished(false);
+            if (callback != null) {
+                callback.onPlanningFailed("道路规划服务初始化失败");
+            }
             return;
         }
         plannedPolylinePoints.clear();
@@ -171,6 +175,7 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
         totalWalkDistance = 0;
         totalWalkDuration = 0;
         routeHasFailedSegment = false;
+        requestingDriveFallback = false;
         requestNextWalkSegment();
     }
 
@@ -192,16 +197,34 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
         }
         RouteSearch.FromAndTo fromAndTo = new RouteSearch.FromAndTo(toLatLonPoint(from), toLatLonPoint(to));
         RouteSearch.WalkRouteQuery query = new RouteSearch.WalkRouteQuery(fromAndTo, RouteSearch.WalkDefault);
+        requestingDriveFallback = false;
         routeSearch.calculateWalkRouteAsyn(query);
     }
 
+    /** 步行路线不可用时再请求一次真实驾车道路，仍失败则只展示站点，不画直线。 */
+    private void requestDriveFallback() {
+        if (routeSearch == null || currentSegmentIndex < 0
+                || currentSegmentIndex >= routePoints.size() - 1) {
+            skipFailedSegment();
+            return;
+        }
+        LatLng from = routePoints.get(currentSegmentIndex);
+        LatLng to = routePoints.get(currentSegmentIndex + 1);
+        RouteSearch.FromAndTo fromAndTo = new RouteSearch.FromAndTo(
+                toLatLonPoint(from), toLatLonPoint(to));
+        RouteSearch.DriveRouteQuery query = new RouteSearch.DriveRouteQuery(
+                fromAndTo,
+                RouteSearch.DRIVING_SINGLE_SHORTEST,
+                null,
+                null,
+                "");
+        requestingDriveFallback = true;
+        routeSearch.calculateDriveRouteAsyn(query);
+    }
+
     private void onPlanningFinished() {
-        if (aMap != null) {
-            if (plannedPolylinePoints.size() >= 2) {
-                drawPlannedPolyline();
-            } else if (routePoints.size() >= 2) {
-                drawDirectPolyline(routePoints);
-            }
+        if (aMap != null && !routeHasFailedSegment && plannedPolylinePoints.size() >= 2) {
+            drawPlannedPolyline();
         }
         notifyFinished(routeHasFailedSegment);
     }
@@ -210,13 +233,15 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
         if (callback == null) {
             return;
         }
-        String summary = formatWalkTime(totalWalkDuration) + "（" + formatWalkDistance(totalWalkDistance) + "）";
-        if (totalWalkDuration <= 0 && totalWalkDistance <= 0) {
-            summary = "已用直线连接各站点";
+        String summary;
+        if (hadFailures) {
+            summary = "部分路段未获取到真实道路，已隐藏不准确的路线连线";
+        } else {
+            summary = formatWalkTime(totalWalkDuration) + "（" + formatWalkDistance(totalWalkDistance) + "）";
         }
-        List<LatLng> roadPolyline = plannedPolylinePoints.size() >= 2
+        List<LatLng> roadPolyline = !hadFailures && plannedPolylinePoints.size() >= 2
                 ? new ArrayList<>(plannedPolylinePoints)
-                : new ArrayList<>(routePoints);
+                : new ArrayList<>();
         callback.onPlanningFinished(summary, new ArrayList<>(walkInstructions),
                 roadPolyline, hadFailures);
     }
@@ -227,16 +252,6 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
         }
         aMap.addPolyline(new PolylineOptions()
                 .addAll(plannedPolylinePoints)
-                .color(RouteMapDrawHelper.ROUTE_LINE_COLOR)
-                .width(RouteMapDrawHelper.ROUTE_LINE_WIDTH));
-    }
-
-    private void drawDirectPolyline(List<LatLng> points) {
-        if (aMap == null || points == null || points.size() < 2) {
-            return;
-        }
-        aMap.addPolyline(new PolylineOptions()
-                .addAll(points)
                 .color(RouteMapDrawHelper.ROUTE_LINE_COLOR)
                 .width(RouteMapDrawHelper.ROUTE_LINE_WIDTH));
     }
@@ -273,9 +288,21 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
                 }
             }
         }
-        if (segmentPoints.isEmpty()) {
-            segmentPoints.add(from);
-            segmentPoints.add(to);
+        return segmentPoints;
+    }
+
+    private List<LatLng> extractDrivePathPoints(@Nullable DrivePath path) {
+        List<LatLng> segmentPoints = new ArrayList<>();
+        if (path == null || path.getSteps() == null) {
+            return segmentPoints;
+        }
+        for (DriveStep step : path.getSteps()) {
+            if (step.getPolyline() == null) {
+                continue;
+            }
+            for (LatLonPoint point : step.getPolyline()) {
+                segmentPoints.add(new LatLng(point.getLatitude(), point.getLongitude()));
+            }
         }
         return segmentPoints;
     }
@@ -285,7 +312,7 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
         String toLabel = getRoutePointLabel(segmentIndex + 1);
         walkInstructions.add("第" + (segmentIndex + 1) + "段：" + fromLabel + " -> " + toLabel);
         if (fallback) {
-            walkInstructions.add("路径规划失败，已改用直线连接至下一站");
+            walkInstructions.add("步行路线不可用，已改用驾车道路参考");
             return;
         }
         if (path == null || path.getSteps() == null || path.getSteps().isEmpty()) {
@@ -302,6 +329,23 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
         }
         if (stepOrder == 1) {
             walkInstructions.add("请沿当前道路前往下一站");
+        }
+    }
+
+    private void appendDriveInstructions(@NonNull DrivePath path, int segmentIndex) {
+        String fromLabel = getRoutePointLabel(segmentIndex);
+        String toLabel = getRoutePointLabel(segmentIndex + 1);
+        walkInstructions.add("第" + (segmentIndex + 1) + "段：" + fromLabel + " -> " + toLabel);
+        walkInstructions.add("步行路线不可用，以下为驾车道路参考");
+        if (path.getSteps() == null) {
+            return;
+        }
+        int stepOrder = 1;
+        for (DriveStep step : path.getSteps()) {
+            if (!TextUtils.isEmpty(step.getInstruction())) {
+                walkInstructions.add(stepOrder + ". " + step.getInstruction());
+                stepOrder++;
+            }
         }
     }
 
@@ -322,15 +366,14 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
         return "第" + (index + 1) + "站";
     }
 
-    private void appendFallbackSegment() {
-        LatLng from = routePoints.get(currentSegmentIndex);
-        LatLng to = routePoints.get(currentSegmentIndex + 1);
-        List<LatLng> fallback = new ArrayList<>();
-        fallback.add(from);
-        fallback.add(to);
-        appendWalkInstructions(null, currentSegmentIndex, true);
-        appendSegmentPoints(fallback);
+    private void skipFailedSegment() {
+        String fromLabel = getRoutePointLabel(currentSegmentIndex);
+        String toLabel = getRoutePointLabel(currentSegmentIndex + 1);
+        walkInstructions.add("第" + (currentSegmentIndex + 1) + "段："
+                + fromLabel + " -> " + toLabel);
+        walkInstructions.add("道路规划失败，该段仅显示站点，不绘制直线");
         routeHasFailedSegment = true;
+        requestingDriveFallback = false;
         currentSegmentIndex++;
         requestNextWalkSegment();
     }
@@ -379,6 +422,33 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
 
     @Override
     public void onDriveRouteSearched(DriveRouteResult result, int errorCode) {
+        if (callback == null || routeSearch == null || !requestingDriveFallback
+                || currentSegmentIndex < 0
+                || currentSegmentIndex >= routePoints.size() - 1) {
+            return;
+        }
+        requestingDriveFallback = false;
+        if (errorCode != AMapException.CODE_AMAP_SUCCESS
+                || result == null
+                || result.getPaths() == null
+                || result.getPaths().isEmpty()) {
+            Log.w(TAG, "Drive fallback failed segment=" + currentSegmentIndex
+                    + ", errorCode=" + errorCode);
+            skipFailedSegment();
+            return;
+        }
+        DrivePath bestPath = result.getPaths().get(0);
+        List<LatLng> segmentPoints = extractDrivePathPoints(bestPath);
+        if (segmentPoints.size() < 2) {
+            skipFailedSegment();
+            return;
+        }
+        totalWalkDistance += (int) bestPath.getDistance();
+        totalWalkDuration += (int) bestPath.getDuration();
+        appendDriveInstructions(bestPath, currentSegmentIndex);
+        appendSegmentPoints(segmentPoints);
+        currentSegmentIndex++;
+        requestNextWalkSegment();
     }
 
     @Override
@@ -396,14 +466,19 @@ public class LeaderWalkRoutePlanner implements RouteSearch.OnRouteSearchListener
                 || result.getPaths() == null
                 || result.getPaths().isEmpty()) {
             Log.w(TAG, "Walk route failed segment=" + currentSegmentIndex + ", errorCode=" + errorCode);
-            appendFallbackSegment();
+            requestDriveFallback();
             return;
         }
         WalkPath bestPath = result.getPaths().get(0);
+        List<LatLng> segmentPoints = extractWalkPathPoints(bestPath, from, to);
+        if (segmentPoints.size() < 2) {
+            requestDriveFallback();
+            return;
+        }
         totalWalkDistance += (int) bestPath.getDistance();
         totalWalkDuration += (int) bestPath.getDuration();
         appendWalkInstructions(bestPath, currentSegmentIndex, false);
-        appendSegmentPoints(extractWalkPathPoints(bestPath, from, to));
+        appendSegmentPoints(segmentPoints);
         currentSegmentIndex++;
         requestNextWalkSegment();
     }
