@@ -12,12 +12,18 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.amap.api.maps.AMap;
+<<<<<<< Updated upstream
 import com.amap.api.maps.MapView;
 import com.amap.api.maps.MapsInitializer;
+=======
+import com.amap.api.maps.MapsInitializer;
+import com.amap.api.maps.TextureMapView;
+>>>>>>> Stashed changes
 import com.amap.api.maps.model.LatLng;
 import com.example.Japp.R;
 import com.example.Japp.network.ApiClient;
@@ -61,7 +67,11 @@ public class orderDetailActivity extends AppCompatActivity {
     @Nullable
     private FrameLayout mapContainer;
     @Nullable
+<<<<<<< Updated upstream
     private MapView routeMapView;
+=======
+    private TextureMapView routeMapView;
+>>>>>>> Stashed changes
     @Nullable
     private TextView mapTapHint;
     @Nullable
@@ -73,6 +83,12 @@ public class orderDetailActivity extends AppCompatActivity {
     private LeaderWalkRoutePlanner walkRoutePlanner;
     private boolean routePlanningStarted;
     private boolean mapCreated;
+<<<<<<< Updated upstream
+=======
+    private boolean closing;
+    private final Runnable startRoutePlanningRunnable = this::startRoadRoutePlanning;
+    private final Runnable drawRouteRunnable = this::drawRouteOnMap;
+>>>>>>> Stashed changes
 
     // 用于在 onDestroy 时取消尚未返回的请求，避免回调访问已销毁的视图
     @Nullable
@@ -93,7 +109,13 @@ public class orderDetailActivity extends AppCompatActivity {
         service = ApiClient.getClient().create(UserService.class);
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
-        toolbar.setNavigationOnClickListener(v -> finish());
+        toolbar.setNavigationOnClickListener(v -> closeDetail());
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                closeDetail();
+            }
+        });
 
         txtTitle = findViewById(R.id.txtTitle);
         txtMeta = findViewById(R.id.txtMeta);
@@ -105,6 +127,7 @@ public class orderDetailActivity extends AppCompatActivity {
         routeMapView = findViewById(R.id.routeMapView);
         mapTapHint = findViewById(R.id.mapTapHint);
 
+<<<<<<< Updated upstream
         // 完全按用户端 TeamDetailActivity 的策略：未配置 AMap Key 时隐藏地图，避免原生层崩溃
         if (!hasConfiguredAmapKey()) {
             if (mapContainer != null) {
@@ -132,6 +155,8 @@ public class orderDetailActivity extends AppCompatActivity {
             }
         }
 
+=======
+>>>>>>> Stashed changes
         View.OnClickListener openFullscreen = v -> openFullscreenMap();
         if (mapContainer != null) {
             mapContainer.setOnClickListener(openFullscreen);
@@ -154,11 +179,35 @@ public class orderDetailActivity extends AppCompatActivity {
             return;
         }
 
+        initRouteMap(savedInstanceState);
         bindProjectHeader();
         loadOwnerName();
         loadRouteDetail();
         setupAcceptButton();
         refreshProjectDetail();
+    }
+
+    private void initRouteMap(@Nullable Bundle savedInstanceState) {
+        if (!hasConfiguredAmapKey() || routeMapView == null) {
+            hideMapSection();
+            return;
+        }
+
+        routeMapView.onCreate(savedInstanceState);
+        mapCreated = true;
+        aMap = routeMapView.getMap();
+        if (aMap != null) {
+            aMap.getUiSettings().setZoomControlsEnabled(false);
+            aMap.getUiSettings().setRotateGesturesEnabled(false);
+            aMap.getUiSettings().setTiltGesturesEnabled(false);
+            aMap.setOnMapLoadedListener(() -> {
+                if (closing || isFinishing() || isDestroyed()) return;
+                drawRouteOnMap();
+                startRoadRoutePlanning();
+            });
+            aMap.setOnMapClickListener(point -> openFullscreenMap());
+        }
+        walkRoutePlanner = new LeaderWalkRoutePlanner(this);
     }
 
     private void refreshProjectDetail() {
@@ -292,24 +341,46 @@ public class orderDetailActivity extends AppCompatActivity {
         plannedRoadPoints.clear();
         routePlanningStarted = false;
 
+<<<<<<< Updated upstream
         if (routePoints.size() < 2) {
             if (mapContainer != null) {
                 mapContainer.setVisibility(View.GONE);
             }
+=======
+        if (routePoints.size() < 2 || !mapCreated || routeMapView == null || aMap == null) {
+            hideMapSection();
+>>>>>>> Stashed changes
             return;
         }
 
         if (mapContainer != null) {
             mapContainer.setVisibility(View.VISIBLE);
         }
+<<<<<<< Updated upstream
         if (routeMapView != null) {
             routeMapView.post(this::startRoadRoutePlanning);
             routeMapView.postDelayed(this::startRoadRoutePlanning, 400);
+=======
+        routeMapView.removeCallbacks(drawRouteRunnable);
+        routeMapView.removeCallbacks(startRoutePlanningRunnable);
+        routeMapView.post(drawRouteRunnable);
+        routeMapView.post(startRoutePlanningRunnable);
+        routeMapView.postDelayed(startRoutePlanningRunnable, 400L);
+    }
+
+    private void hideMapSection() {
+        if (mapContainer != null) {
+            mapContainer.setVisibility(View.GONE);
+>>>>>>> Stashed changes
         }
     }
 
     private void drawRouteOnMap() {
+<<<<<<< Updated upstream
         if (aMap == null || routePoints.size() < 2) {
+=======
+        if (closing || aMap == null || routePoints.size() < 2) {
+>>>>>>> Stashed changes
             return;
         }
         List<LatLng> line = plannedRoadPoints.size() >= 2
@@ -317,13 +388,29 @@ public class orderDetailActivity extends AppCompatActivity {
         RouteMapDrawHelper.drawRoute(aMap, line, routePoints);
     }
 
+<<<<<<< Updated upstream
     private void startRoadRoutePlanning() {
         if (aMap == null || cachedRouteNodes.size() < 2
+=======
+    private void closeDetail() {
+        if (closing || isFinishing()) return;
+        closing = true;
+        cancelBackgroundWork();
+        finish();
+    }
+
+    private void startRoadRoutePlanning() {
+        if (closing || aMap == null || cachedRouteNodes.size() < 2
+>>>>>>> Stashed changes
                 || walkRoutePlanner == null || routePlanningStarted) {
             return;
         }
         routePlanningStarted = true;
+<<<<<<< Updated upstream
         walkRoutePlanner.plan(aMap, cachedRouteNodes, new LeaderWalkRoutePlanner.Callback() {
+=======
+        walkRoutePlanner.planSummary(cachedRouteNodes, new LeaderWalkRoutePlanner.Callback() {
+>>>>>>> Stashed changes
             @Override
             public void onPlanningStarted() {
                 // 保持地图可交互，规划完成后自动替换为道路折线。
@@ -369,9 +456,6 @@ public class orderDetailActivity extends AppCompatActivity {
 
     private boolean hasConfiguredAmapKey() {
         try {
-            if (getPackageManager() == null) {
-                return false;
-            }
             android.content.pm.ApplicationInfo appInfo = getPackageManager()
                     .getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
             if (appInfo.metaData == null) {
@@ -573,23 +657,33 @@ public class orderDetailActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         if (mapCreated && routeMapView != null) {
+<<<<<<< Updated upstream
             try {
                 routeMapView.onResume();
                 startRoadRoutePlanning();
             } catch (Throwable t) {
                 Log.w(TAG, "routeMapView.onResume failed", t);
             }
+=======
+            routeMapView.onResume();
+            routeMapView.post(drawRouteRunnable);
+            routeMapView.post(startRoutePlanningRunnable);
+>>>>>>> Stashed changes
         }
     }
 
     @Override
     protected void onPause() {
         if (mapCreated && routeMapView != null) {
+<<<<<<< Updated upstream
             try {
                 routeMapView.onPause();
             } catch (Throwable t) {
                 Log.w(TAG, "routeMapView.onPause failed", t);
             }
+=======
+            routeMapView.onPause();
+>>>>>>> Stashed changes
         }
         super.onPause();
     }
@@ -598,16 +692,59 @@ public class orderDetailActivity extends AppCompatActivity {
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         if (mapCreated && routeMapView != null) {
+<<<<<<< Updated upstream
             try {
                 routeMapView.onSaveInstanceState(outState);
             } catch (Throwable t) {
                 Log.w(TAG, "routeMapView.onSaveInstanceState failed", t);
             }
+=======
+            routeMapView.onSaveInstanceState(outState);
+        }
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (mapCreated && routeMapView != null) {
+            routeMapView.onLowMemory();
+>>>>>>> Stashed changes
         }
     }
 
     @Override
     protected void onDestroy() {
+<<<<<<< Updated upstream
+=======
+        closing = true;
+        cancelBackgroundWork();
+        destroyRouteMap();
+        super.onDestroy();
+    }
+
+    private void destroyRouteMap() {
+        if (routeMapView != null) {
+            routeMapView.removeCallbacks(drawRouteRunnable);
+            routeMapView.removeCallbacks(startRoutePlanningRunnable);
+        }
+        if (aMap != null) {
+            try {
+                aMap.setOnMapLoadedListener(null);
+                aMap.setOnMapClickListener(null);
+                aMap.stopAnimation();
+            } catch (Throwable ignored) {
+            }
+        }
+        aMap = null;
+        if (mapCreated && routeMapView != null) {
+            mapCreated = false;
+            routeMapView.onDestroy();
+        }
+        routeMapView = null;
+    }
+
+    private void cancelBackgroundWork() {
+>>>>>>> Stashed changes
         cancelCall(pendingProjectCall);
         cancelCall(pendingOwnerCall);
         cancelCall(pendingRouteCall);
@@ -619,6 +756,7 @@ public class orderDetailActivity extends AppCompatActivity {
             walkRoutePlanner.cancel();
             walkRoutePlanner = null;
         }
+<<<<<<< Updated upstream
         if (mapCreated && routeMapView != null) {
             try {
                 if (aMap != null) {
@@ -647,6 +785,17 @@ public class orderDetailActivity extends AppCompatActivity {
         }
         aMap = null;
         super.onDestroy();
+=======
+    }
+
+    private void cancelCall(@Nullable Call<?> call) {
+        if (call != null && !call.isCanceled()) {
+            try {
+                call.cancel();
+            } catch (Throwable ignored) {
+            }
+        }
+>>>>>>> Stashed changes
     }
 
     @Override

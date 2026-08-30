@@ -43,11 +43,16 @@ import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.LeaderProfile;
+<<<<<<< Updated upstream
+=======
+import com.example.Japp.network.models.Region;
+>>>>>>> Stashed changes
 import com.example.Japp.network.models.Result;
 
 import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.List;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
@@ -161,11 +166,108 @@ public class profile extends Fragment {
         }
 
         txtName.setText(username);
-        String regionName = regionCodeToName(regionCode);
+        String regionName = resolveRegionDisplay(prefs, regionCode);
         txtStats.setText(regionName);
         if ("所在地区".equals(regionName)) {
             fetchRegionFromServer();
+        } else if (shouldResolveRegionNames(prefs, regionCode)) {
+            resolveRegionNamesFromServer(regionCode);
         }
+    }
+
+    private String resolveRegionDisplay(SharedPreferences prefs, String regionCode) {
+        String province = prefs.getString("region_province", "").trim();
+        String city = prefs.getString("region_city", "").trim();
+        if (!province.isEmpty() && !city.isEmpty()) {
+            return province.equals(city) ? city : province + " " + city;
+        }
+        if (!city.isEmpty()) return city;
+        if (!province.isEmpty()) return province;
+        return regionCodeToName(regionCode);
+    }
+
+    private boolean shouldResolveRegionNames(SharedPreferences prefs, String regionCode) {
+        if (TextUtils.isEmpty(regionCode) || !regionCode.trim().matches("\\d{6,}")) {
+            return false;
+        }
+        return TextUtils.isEmpty(prefs.getString("region_province", ""))
+                || TextUtils.isEmpty(prefs.getString("region_city", ""));
+    }
+
+    private void resolveRegionNamesFromServer(String regionCode) {
+        if (!isAdded() || TextUtils.isEmpty(regionCode)) return;
+        String normalizedCode = regionCode.trim();
+        if (normalizedCode.length() < 6 || !normalizedCode.matches("\\d+")) return;
+        normalizedCode = normalizedCode.substring(0, 6);
+
+        final String targetCode = normalizedCode;
+        UserService service = ApiClient.getClient().create(UserService.class);
+        service.getProvinces().enqueue(new Callback<Result<List<Region>>>() {
+            @Override
+            public void onResponse(@NonNull Call<Result<List<Region>>> call,
+                                   @NonNull Response<Result<List<Region>>> response) {
+                if (!isAdded() || response.body() == null || response.body().getCode() != 1) return;
+                Region province = findRegionByPrefix(response.body().getData(), targetCode, 2);
+                if (province == null) return;
+                if (targetCode.endsWith("0000")) {
+                    cacheResolvedRegion(targetCode, province.getName(), province.getName());
+                    return;
+                }
+                resolveCityName(service, province, targetCode);
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Result<List<Region>>> call, @NonNull Throwable t) {
+                // 保留行政区代码的本地回退显示。
+            }
+        });
+    }
+
+    private void resolveCityName(UserService service, Region province, String targetCode) {
+        service.getRegionChildren(province.getAdcode())
+                .enqueue(new Callback<Result<List<Region>>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<Result<List<Region>>> call,
+                                           @NonNull Response<Result<List<Region>>> response) {
+                        if (!isAdded() || response.body() == null || response.body().getCode() != 1) return;
+                        Region city = findRegionByPrefix(response.body().getData(), targetCode, 4);
+                        if (city != null) {
+                            cacheResolvedRegion(targetCode, province.getName(), city.getName());
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<Result<List<Region>>> call, @NonNull Throwable t) {
+                        // 保留行政区代码的本地回退显示。
+                    }
+                });
+    }
+
+    private Region findRegionByPrefix(List<Region> regions, String targetCode, int prefixLength) {
+        if (regions == null || targetCode.length() < prefixLength) return null;
+        String targetPrefix = targetCode.substring(0, prefixLength);
+        for (Region region : regions) {
+            if (region == null || TextUtils.isEmpty(region.getAdcode())) continue;
+            String adcode = region.getAdcode().trim();
+            if (adcode.length() >= prefixLength
+                    && targetPrefix.equals(adcode.substring(0, prefixLength))) {
+                return region;
+            }
+        }
+        return null;
+    }
+
+    private void cacheResolvedRegion(String expectedCode, String provinceName, String cityName) {
+        if (!isAdded()) return;
+        SharedPreferences prefs = requireContext().getSharedPreferences("user_pref", MODE_PRIVATE);
+        String currentCode = prefs.getString("region_code", "");
+        if (!expectedCode.equals(currentCode)) return;
+        prefs.edit()
+                .putString("region_province", provinceName)
+                .putString("region_city", cityName)
+                .apply();
+        txtStats.setText(provinceName.equals(cityName)
+                ? cityName : provinceName + " " + cityName);
     }
 
     private String regionCodeToName(String code) {
@@ -280,8 +382,17 @@ public class profile extends Fragment {
 
                         String regionCode = account.getRegionCode();
                         if (regionCode != null && !regionCode.trim().isEmpty()) {
-                            prefs.edit().putString("region_code", regionCode).apply();
-                            txtStats.setText(regionCodeToName(regionCode));
+                            String localRegionCode = prefs.getString("region_code", "");
+                            SharedPreferences.Editor editor = prefs.edit()
+                                    .putString("region_code", regionCode);
+                            if (!regionCode.equals(localRegionCode)) {
+                                editor.remove("region_province").remove("region_city");
+                            }
+                            editor.apply();
+                            txtStats.setText(resolveRegionDisplay(prefs, regionCode));
+                            if (shouldResolveRegionNames(prefs, regionCode)) {
+                                resolveRegionNamesFromServer(regionCode);
+                            }
                             if (TextUtils.isEmpty(prefs.getString("avatar_url", ""))) {
                                 loadImageFromLocal();
                             }

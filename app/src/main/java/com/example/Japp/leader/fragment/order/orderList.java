@@ -22,8 +22,6 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -133,13 +131,6 @@ public class orderList extends Fragment {
     private List<Region> provinces = new ArrayList<>();
     private List<Region> cities = new ArrayList<>();
 
-    private final ActivityResultLauncher<Intent> detailLauncher =
-            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
-                if (result.getResultCode() == android.app.Activity.RESULT_OK) {
-                    loadOrders();
-                }
-            });
-
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -171,7 +162,7 @@ public class orderList extends Fragment {
         TeamListAdapter.OnTeamClickListener clickListener = item -> {
             Intent intent = new Intent(requireContext(), orderDetailActivity.class);
             intent.putExtra(orderDetailActivity.EXTRA_PROJECT_JSON, new Gson().toJson(item.getProject()));
-            detailLauncher.launch(intent);
+            startActivity(intent);
         };
         adapter.setOnTeamClickListener(clickListener);
         myPendingAdapter.setOnTeamClickListener(clickListener);

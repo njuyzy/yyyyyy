@@ -286,17 +286,11 @@ public class PersonalInfoActivity extends AppCompatActivity {
             return;
         }
 
-        SharedPreferences prefs = getSharedPreferences("user_pref", MODE_PRIVATE);
-        prefs.edit()
-                .putString(PREF_GENDER, selectedGender)
-                .putString(PREF_BIRTHDAY, selectedBirthday)
-                .putString(PREF_SIGNATURE, signature)
-                .apply();
-
         btnSave.setEnabled(false);
         btnSave.setText("保存中...");
 
         if (accountId <= 0) {
+            persistLocalPersonalFields(signature);
             updateLocalUsername(name);
             finishSaving(true);
             return;
@@ -342,17 +336,33 @@ public class PersonalInfoActivity extends AppCompatActivity {
                         && response.body() != null
                         && response.body().getCode() == 1;
                 if (!introSuccess) {
-                    Toast.makeText(PersonalInfoActivity.this, "姓名已保存，个性签名同步失败", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(PersonalInfoActivity.this,
+                            "基本信息已保存，个性签名同步失败，请重试",
+                            Toast.LENGTH_SHORT).show();
+                    finishSaving(false);
+                    return;
                 }
+                persistLocalPersonalFields(signature);
                 finishSaving(true);
             }
 
             @Override
             public void onFailure(@NonNull Call<Result> call, @NonNull Throwable t) {
-                Toast.makeText(PersonalInfoActivity.this, "姓名已保存，个性签名同步失败", Toast.LENGTH_SHORT).show();
-                finishSaving(true);
+                Toast.makeText(PersonalInfoActivity.this,
+                        "基本信息已保存，个性签名同步失败，请重试",
+                        Toast.LENGTH_SHORT).show();
+                finishSaving(false);
             }
         });
+    }
+
+    private void persistLocalPersonalFields(String signature) {
+        getSharedPreferences("user_pref", MODE_PRIVATE)
+                .edit()
+                .putString(PREF_GENDER, selectedGender)
+                .putString(PREF_BIRTHDAY, selectedBirthday)
+                .putString(PREF_SIGNATURE, signature)
+                .apply();
     }
 
     private boolean isLeaderProfileMode() {
