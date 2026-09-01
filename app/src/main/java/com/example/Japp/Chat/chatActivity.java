@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -34,7 +35,6 @@ import com.example.Japp.user.util.SessionHelper;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.TeamDetailActivity;
 import com.example.Japp.leader.orderDetailActivity;
-import com.example.Japp.util.DisplayCutoutAdapter;
 import com.google.android.material.button.MaterialButton;
 import com.google.gson.Gson;
 
@@ -80,7 +80,6 @@ public class chatActivity extends AppCompatActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
-        DisplayCutoutAdapter.apply(this);
 
         conversation = (Conversation) getIntent().getSerializableExtra("conversation_info");
         if (conversation == null || conversation.getBackendSessionId() == 0) {
@@ -116,6 +115,7 @@ public class chatActivity extends AppCompatActivity {
         }
         applyReadOnlyState();
         btnSend.setOnClickListener(v -> sendMessage());
+        setupInputBehavior();
     }
 
     private void initViews() {
@@ -127,6 +127,18 @@ public class chatActivity extends AppCompatActivity {
         txtMemberPanelTitle = findViewById(R.id.txtMemberPanelTitle);
         btnViewTrip = findViewById(R.id.btnViewTrip);
         txtReadOnlyNotice = findViewById(R.id.txtReadOnlyNotice);
+    }
+
+    private void setupInputBehavior() {
+        edtInput.setOnEditorActionListener((view, actionId, event) -> {
+            if (actionId != EditorInfo.IME_ACTION_SEND) {
+                return false;
+            }
+            if (btnSend.isEnabled()) {
+                sendMessage();
+            }
+            return true;
+        });
     }
 
     private void setupRecyclerView() {

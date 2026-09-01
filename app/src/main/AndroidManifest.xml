@@ -69,7 +69,8 @@
             android:windowSoftInputMode="adjustPan" />
         <activity
             android:name=".Chat.chatActivity"
-            android:exported="false"/>
+            android:exported="false"
+            android:windowSoftInputMode="adjustPan" />
         <activity
             android:name=".SettingsActivity"
             android:exported="false" />

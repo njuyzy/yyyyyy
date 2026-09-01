@@ -37,6 +37,7 @@ import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.Project;
+import com.example.Japp.network.models.ProjectPage;
 import com.example.Japp.network.models.Region;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
@@ -69,8 +70,6 @@ public class orderList extends Fragment {
     private static final String TAG = "LeaderOrderListApi";
     private static final int AVAILABLE_PAGE_SIZE = 15;
     private static final int MY_SERVING_PAGE_SIZE = 3;
-    // 防止客户端过滤导致整页 0 命中而无限递归拉取下一页。
-    private static final int MAX_AVAILABLE_PAGES = 10;
     private static final int MAX_MY_SERVING_PAGES = 5;
     private static final int MAX_CONSECUTIVE_EMPTY_PAGES = 3;
 
@@ -104,6 +103,10 @@ public class orderList extends Fragment {
     private int loadGeneration;
     private boolean loadingAvailable;
     private boolean loadingMyPending;
+    @Nullable
+    private Call<?> pendingAvailableCall;
+    @Nullable
+    private Call<?> pendingMyPendingCall;
     private boolean hasMoreAvailable = true;
     private boolean hasMoreMyPending = true;
     private int myPendingSectionHeight;
@@ -159,6 +162,8 @@ public class orderList extends Fragment {
         service = ApiClient.getClient().create(UserService.class);
         adapter = new TeamListAdapter();
         myPendingAdapter = new TeamListAdapter();
+        adapter.setFavoriteEnabled(true);
+        myPendingAdapter.setFavoriteEnabled(true);
         TeamListAdapter.OnTeamClickListener clickListener = item -> {
             Intent intent = new Intent(requireContext(), orderDetailActivity.class);
             intent.putExtra(orderDetailActivity.EXTRA_PROJECT_JSON, new Gson().toJson(item.getProject()));
@@ -286,6 +291,17 @@ public class orderList extends Fragment {
     public void onResume() {
         super.onResume();
         loadOrders();
+    }
+
+    @Override
+    public void onDestroyView() {
+        loadGeneration++;
+        cancelPendingCalls();
+        if (tagGridAnimator != null) {
+            tagGridAnimator.cancel();
+            tagGridAnimator = null;
+        }
+        super.onDestroyView();
     }
 
     private void showInlineSearch() {
@@ -1025,6 +1041,7 @@ public class orderList extends Fragment {
             return;
         }
 
+        cancelPendingCalls();
         int generation = ++loadGeneration;
         availablePage = 0;
         myPendingPage = 0;
@@ -1051,42 +1068,119 @@ public class orderList extends Fragment {
         loadAvailablePage(false, generation);
     }
 
+    private void cancelPendingCalls() {
+        if (pendingAvailableCall != null) {
+            pendingAvailableCall.cancel();
+            pendingAvailableCall = null;
+        }
+        if (pendingMyPendingCall != null) {
+            pendingMyPendingCall.cancel();
+            pendingMyPendingCall = null;
+        }
+        loadingAvailable = false;
+        loadingMyPending = false;
+    }
+
     private void loadAvailablePage(boolean append, int generation) {
         if (loadingAvailable || (append && !hasMoreAvailable) || generation != loadGeneration) {
             return;
         }
-        int accountId = SessionHelper.getAccountId(requireContext());
         int requestedPage = append ? availablePage + 1 : 1;
-        // 防止客户端过滤掉整页导致死循环。
-        if (append && requestedPage > MAX_AVAILABLE_PAGES) {
-            hasMoreAvailable = false;
-            stopRefreshing();
-            updateAvailableEmptyState();
-            return;
-        }
         loadingAvailable = true;
 
-        // 领队"可接订单"列表：仅显示尚未指派领队的路线且当前可加入。
-        service.filterProjects(
-                        accountId,
-                        requestedPage,
-                        AVAILABLE_PAGE_SIZE,
-                        filterKeyword,
-                        backendRegionCode(),
-                        selectedFilterTag(),
-                        filterStatus,
-                        filterDateFrom,
-                        filterDateTo,
-                        null,
-                        null,
-                        filterHasLeader,
-                        true)
-                .enqueue(new Callback<Result<List<Project>>>() {
+        if (hasActiveFilters()) {
+            loadFilteredAvailablePage(append, requestedPage, generation);
+        } else {
+            loadDedicatedAvailablePage(append, requestedPage, generation);
+        }
+    }
+
+    /** README: GET /projects/available?pageNum=&pageSize=，由后端保证项目当前可接。 */
+    private void loadDedicatedAvailablePage(boolean append, int requestedPage, int generation) {
+        Call<Result<ProjectPage>> request = service.getAvailableProjects(
+                requestedPage, AVAILABLE_PAGE_SIZE);
+        pendingAvailableCall = request;
+        request.enqueue(new Callback<Result<ProjectPage>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<Result<ProjectPage>> call,
+                                           @NonNull Response<Result<ProjectPage>> response) {
+                        if (!isAdded() || generation != loadGeneration) {
+                            return;
+                        }
+                        if (pendingAvailableCall == call) {
+                            pendingAvailableCall = null;
+                        }
+                        loadingAvailable = false;
+                        if (response.code() == 401) {
+                            stopRefreshing();
+                            verifySessionAfterLeaderUnauthorized();
+                            return;
+                        }
+                        if (!response.isSuccessful() || response.body() == null
+                                || response.body().getCode() != 1
+                                || response.body().getData() == null) {
+                            handleAvailableLoadFailure(append, "加载失败，下拉刷新重试");
+                            return;
+                        }
+
+                        ProjectPage page = response.body().getData();
+                        List<Project> projects = page.getItems();
+                        if (projects == null) {
+                            projects = new ArrayList<>();
+                        }
+                        availablePage = page.getPageNum() > 0 ? page.getPageNum() : requestedPage;
+                        hasMoreAvailable = page.getPages() > 0
+                                ? availablePage < page.getPages()
+                                : projects.size() >= AVAILABLE_PAGE_SIZE;
+                        appendProjects(projects, teamItems, teamProjectIds, adapter);
+                        consecutiveEmptyAvailablePages = 0;
+                        stopRefreshing();
+                        updateAvailableEmptyState();
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<Result<ProjectPage>> call,
+                                          @NonNull Throwable t) {
+                        if (!isAdded() || generation != loadGeneration || call.isCanceled()) {
+                            return;
+                        }
+                        if (pendingAvailableCall == call) {
+                            pendingAvailableCall = null;
+                        }
+                        loadingAvailable = false;
+                        Log.e(TAG, "available projects request failed", t);
+                        handleAvailableLoadFailure(append, "网络错误，下拉刷新重试");
+                    }
+                });
+    }
+
+    /** 有搜索/地区/标签等条件时保留通用复合筛选接口，并继续按页加载。 */
+    private void loadFilteredAvailablePage(boolean append, int requestedPage, int generation) {
+        int accountId = SessionHelper.getAccountId(requireContext());
+        Call<Result<List<Project>>> request = service.filterProjects(
+                accountId,
+                requestedPage,
+                AVAILABLE_PAGE_SIZE,
+                filterKeyword,
+                backendRegionCode(),
+                selectedFilterTag(),
+                filterStatus,
+                filterDateFrom,
+                filterDateTo,
+                null,
+                null,
+                false,
+                true);
+        pendingAvailableCall = request;
+        request.enqueue(new Callback<Result<List<Project>>>() {
                     @Override
                     public void onResponse(@NonNull Call<Result<List<Project>>> call,
                                            @NonNull Response<Result<List<Project>>> response) {
                         if (!isAdded() || generation != loadGeneration) {
                             return;
+                        }
+                        if (pendingAvailableCall == call) {
+                            pendingAvailableCall = null;
                         }
                         loadingAvailable = false;
                         if (response.code() == 401) {
@@ -1108,8 +1202,7 @@ public class orderList extends Fragment {
                             projects = new ArrayList<>();
                         }
                         availablePage = requestedPage;
-                        hasMoreAvailable = projects.size() >= AVAILABLE_PAGE_SIZE
-                                && requestedPage < MAX_AVAILABLE_PAGES;
+                        hasMoreAvailable = projects.size() >= AVAILABLE_PAGE_SIZE;
                         List<Project> filtered = filterProvinceLocallyIfNeeded(projects);
                         // 过滤掉不可接单的路线（例如已有人接）。
                         List<Project> acceptList = new ArrayList<>();
@@ -1142,13 +1235,18 @@ public class orderList extends Fragment {
                         // 当前页可能全部都不命中过滤条件，继续取下一页。
                         if (added == 0) {
                             loadAvailablePage(true, generation);
+                        } else {
+                            stopRefreshing();
                         }
                     }
 
                     @Override
                     public void onFailure(@NonNull Call<Result<List<Project>>> call, @NonNull Throwable t) {
-                        if (!isAdded() || generation != loadGeneration) {
+                        if (!isAdded() || generation != loadGeneration || call.isCanceled()) {
                             return;
+                        }
+                        if (pendingAvailableCall == call) {
+                            pendingAvailableCall = null;
                         }
                         loadingAvailable = false;
                         stopRefreshing();
@@ -1160,6 +1258,15 @@ public class orderList extends Fragment {
                         }
                     }
                 });
+    }
+
+    private void handleAvailableLoadFailure(boolean append, @NonNull String emptyMessage) {
+        stopRefreshing();
+        if (append && !teamItems.isEmpty()) {
+            Toast.makeText(requireContext(), "加载下一页失败，请稍后重试", Toast.LENGTH_SHORT).show();
+        } else {
+            showEmpty(emptyMessage);
+        }
     }
 
     private void loadMyServingPage(boolean append, int generation) {
@@ -1177,26 +1284,30 @@ public class orderList extends Fragment {
         btnMoreMine.setEnabled(false);
 
         // 领队"我正在服务的路线"：leaderAccountId 为当前账号的订单。
-        service.filterProjects(
-                        accountId,
-                        requestedPage,
-                        MY_SERVING_PAGE_SIZE,
-                        filterKeyword,
-                        backendRegionCode(),
-                        selectedFilterTag(),
-                        filterStatus,
-                        filterDateFrom,
-                        filterDateTo,
-                        null,
-                        accountId,
-                        null,
-                        null)
-                .enqueue(new Callback<Result<List<Project>>>() {
+        Call<Result<List<Project>>> request = service.filterProjects(
+                accountId,
+                requestedPage,
+                MY_SERVING_PAGE_SIZE,
+                filterKeyword,
+                backendRegionCode(),
+                selectedFilterTag(),
+                filterStatus,
+                filterDateFrom,
+                filterDateTo,
+                null,
+                accountId,
+                null,
+                null);
+        pendingMyPendingCall = request;
+        request.enqueue(new Callback<Result<List<Project>>>() {
                     @Override
                     public void onResponse(@NonNull Call<Result<List<Project>>> call,
                                            @NonNull Response<Result<List<Project>>> response) {
                         if (!isAdded() || generation != loadGeneration) {
                             return;
+                        }
+                        if (pendingMyPendingCall == call) {
+                            pendingMyPendingCall = null;
                         }
                         loadingMyPending = false;
                         btnMoreMine.setEnabled(true);
@@ -1248,8 +1359,11 @@ public class orderList extends Fragment {
                     @Override
                     public void onFailure(@NonNull Call<Result<List<Project>>> call,
                                           @NonNull Throwable t) {
-                        if (!isAdded() || generation != loadGeneration) {
+                        if (!isAdded() || generation != loadGeneration || call.isCanceled()) {
                             return;
+                        }
+                        if (pendingMyPendingCall == call) {
+                            pendingMyPendingCall = null;
                         }
                         loadingMyPending = false;
                         btnMoreMine.setEnabled(true);

@@ -112,17 +112,11 @@
                     android:id="@+id/mapContainer"
                     android:layout_width="match_parent"
                     android:layout_height="220dp"
-<<<<<<< Updated upstream
-                    android:visibility="gone">
-
-                    <com.amap.api.maps.MapView
-=======
                     android:background="#F2F6FF"
                     android:foreground="?selectableItemBackground"
                     android:visibility="gone">
 
-                    <com.amap.api.maps.TextureMapView
->>>>>>> Stashed changes
+                    <com.amap.api.maps.MapView
                         android:id="@+id/routeMapView"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent" />
@@ -130,16 +124,6 @@
                     <TextView
                         android:id="@+id/mapTapHint"
                         android:layout_width="match_parent"
-<<<<<<< Updated upstream
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="bottom|center_horizontal"
-                        android:background="#99000000"
-                        android:gravity="center"
-                        android:padding="8dp"
-                        android:text="@string/route_map_tap_fullscreen"
-                        android:textColor="#FFFFFF"
-                        android:textSize="12sp" />
-=======
                         android:layout_height="40dp"
                         android:layout_gravity="bottom"
                         android:background="#CCFFFFFF"
@@ -149,7 +133,6 @@
                         android:textColor="@color/accent"
                         android:textSize="14sp"
                         android:textStyle="bold" />
->>>>>>> Stashed changes
                 </FrameLayout>
             </com.google.android.material.card.MaterialCardView>
 

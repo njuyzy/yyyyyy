@@ -29,6 +29,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
+import com.example.Japp.FavoriteOrdersActivity;
 import com.example.Japp.R;
 import com.example.Japp.PersonalInfoActivity;
 import com.example.Japp.RoleSelectionActivity;
@@ -43,10 +44,7 @@ import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.LeaderProfile;
-<<<<<<< Updated upstream
-=======
 import com.example.Japp.network.models.Region;
->>>>>>> Stashed changes
 import com.example.Japp.network.models.Result;
 
 import java.io.File;
@@ -66,7 +64,7 @@ public class profile extends Fragment {
     private static final int REQUEST_PERSONAL_INFO = 1003;
 
     private View switchMode;
-    private View btnPersonalInfo, btnHistoryRoute, btnShareApp, btnAboutUs;
+    private View btnPersonalInfo, btnHistoryRoute, btnFavoriteOrders, btnShareApp, btnAboutUs;
     private View btnLogout, btnSettings;
     private View btnPendingOrders, btnCompletedOrders, btnRating;
     private ImageView ivAvatar;
@@ -86,6 +84,7 @@ public class profile extends Fragment {
         switchMode = view.findViewById(R.id.btnSwitchRole);
         btnPersonalInfo = view.findViewById(R.id.btnPersonalInfo);
         btnHistoryRoute = view.findViewById(R.id.btnHistoryRoute);
+        btnFavoriteOrders = view.findViewById(R.id.btnFavoriteOrders);
         btnShareApp = view.findViewById(R.id.btnShareApp);
         btnAboutUs = view.findViewById(R.id.btnAboutUs);
         btnLogout = view.findViewById(R.id.btnLogout);
@@ -116,6 +115,9 @@ public class profile extends Fragment {
 
         btnHistoryRoute.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), LeaderHistoryRouteActivity.class)));
+
+        btnFavoriteOrders.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), FavoriteOrdersActivity.class)));
 
         btnSettings.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), SettingsActivity.class)));
