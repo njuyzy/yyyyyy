@@ -279,9 +279,8 @@ public class MainActivity extends AppCompatActivity {
                                     .apply();
 
                             // 保存 token
-                            if (loginData.getToken() != null) {
-                                ApiClient.saveToken(loginData.getToken());
-                            }
+                            ApiClient.saveTokens(loginData.getToken(),
+                                    loginData.getRefreshToken());
 
                             loginSuccess(user);
                         }

@@ -182,7 +182,7 @@
                         app:iconGravity="textStart"
                         style="@style/Widget.MaterialComponents.Button"
                         android:textColor="#F6FFF9"
-                        app:backgroundTint="#4ED7A1"/>
+                        app:backgroundTint="@color/accent_dark"/>
 
                     <!-- 选择身份区域 -->
                     <LinearLayout

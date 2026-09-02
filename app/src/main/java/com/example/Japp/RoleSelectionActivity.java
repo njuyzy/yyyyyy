@@ -210,9 +210,8 @@ public class RoleSelectionActivity extends AppCompatActivity {
                                 .putBoolean("autoLogin", autoLoginEnabled)
                                 .apply();
 
-                        if (loginData.getToken() != null) {
-                            ApiClient.saveToken(loginData.getToken());
-                        }
+                        ApiClient.saveTokens(loginData.getToken(),
+                                loginData.getRefreshToken());
 
                         updateTagPrefs(account.getId(), mode);
                         return;

@@ -35,6 +35,9 @@ public class LeaderProfile {
     @SerializedName("tagNames")
     private List<String> tagNames;
 
+    @SerializedName("recentReviews")
+    private List<LeaderReview> recentReviews;
+
     public int getAccountId() { return accountId; }
     public String getUsername() { return username; }
     public String getAvatarUrl() { return avatarUrl; }
@@ -45,4 +48,5 @@ public class LeaderProfile {
     public int getAcceptedProjectCount() { return acceptedProjectCount; }
     public int getCompletedProjectCount() { return completedProjectCount; }
     public List<String> getTagNames() { return tagNames; }
+    public List<LeaderReview> getRecentReviews() { return recentReviews; }
 }

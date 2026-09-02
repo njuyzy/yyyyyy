@@ -1,5 +1,6 @@
 package com.example.Japp.user;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -29,6 +30,7 @@ import java.util.Map;
 public class UserMainActivity extends AppCompatActivity
         implements ConversationList.UnreadCountHost {
 
+    public static final String EXTRA_OPEN_ROUTE_TAB = "open_route_tab";
     private static final String STATE_POSITION = "user_main_position";
     private static final String TAG_ROUTE = "user_route";
     private static final String TAG_TEAM = "user_team";
@@ -83,8 +85,19 @@ public class UserMainActivity extends AppCompatActivity
             }
         });
 
-        position = savedInstanceState != null ? savedInstanceState.getInt(STATE_POSITION, 0) : 0;
+        position = getIntent().getBooleanExtra(EXTRA_OPEN_ROUTE_TAB, false)
+                ? 0
+                : savedInstanceState != null ? savedInstanceState.getInt(STATE_POSITION, 0) : 0;
         selectedFragment(position);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent.getBooleanExtra(EXTRA_OPEN_ROUTE_TAB, false)) {
+            switchToRouteTab();
+        }
     }
 
     private void refreshChatUnread() {

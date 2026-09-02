@@ -43,6 +43,7 @@ import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.user.util.SessionHelper;
+import com.example.Japp.user.UserHistoryRouteActivity;
 
 import java.io.File;
 import java.io.InputStream;
@@ -202,11 +203,7 @@ public class profile extends Fragment {
     }
 
     private void openHistory() {
-        requireActivity().getSupportFragmentManager().beginTransaction()
-                .hide(this)
-                .add(R.id.container, new historyRoute())
-                .addToBackStack("history")
-                .commit();
+        startActivity(new Intent(requireContext(), UserHistoryRouteActivity.class));
     }
 
     private void switchToLeaderMode() {

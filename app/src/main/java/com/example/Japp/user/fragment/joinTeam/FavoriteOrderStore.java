@@ -37,18 +37,32 @@ public final class FavoriteOrderStore {
     /** @return 切换后的收藏状态。 */
     public static synchronized boolean toggle(@NonNull Context context,
                                               @NonNull TeamCardItem item) {
+        boolean favorite = item.getProject() != null
+                && isFavorite(context, item.getProject().getId());
+        setFavorite(context, item, !favorite);
+        return !favorite;
+    }
+
+    /** 按后端已确认的状态更新本地订单快照。 */
+    public static synchronized void setFavorite(@NonNull Context context,
+                                                @NonNull TeamCardItem item,
+                                                boolean favorite) {
         Project project = item.getProject();
-        if (project == null || project.getId() <= 0) return false;
+        if (project == null || project.getId() <= 0) return;
         List<Record> records = read(context);
         for (int i = 0; i < records.size(); i++) {
             Record record = records.get(i);
             if (record != null && record.project != null
                     && record.project.getId() == project.getId()) {
-                records.remove(i);
-                write(context, records);
-                return false;
+                if (!favorite) {
+                    records.remove(i);
+                    write(context, records);
+                }
+                return;
             }
         }
+
+        if (!favorite) return;
 
         Record record = new Record();
         record.savedAt = System.currentTimeMillis();
@@ -62,7 +76,6 @@ public final class FavoriteOrderStore {
             records = new ArrayList<>(records.subList(0, MAX_FAVORITES));
         }
         write(context, records);
-        return true;
     }
 
     @NonNull

@@ -321,9 +321,8 @@ public class CodeLoginActivity extends AppCompatActivity {
                                     .putBoolean("is_logged_in", true)
                                     .apply();
 
-                            if (loginData.getToken() != null) {
-                                ApiClient.saveToken(loginData.getToken());
-                            }
+                            ApiClient.saveTokens(loginData.getToken(),
+                                    loginData.getRefreshToken());
 
                             loginSuccess(user);
                         }

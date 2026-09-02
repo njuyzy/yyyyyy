@@ -11,17 +11,22 @@ import com.example.Japp.network.models.ServerChatMessage;
 import com.example.Japp.network.models.LoginResponse;
 import com.example.Japp.network.models.Project;
 import com.example.Japp.network.models.ProjectPage;
+import com.example.Japp.network.models.ProjectMember;
 import com.example.Japp.network.models.Region;
 import com.example.Japp.network.models.Result;
+import com.example.Japp.network.models.Review;
 import com.example.Japp.network.models.RouteNode;
+import com.example.Japp.network.models.RouteSummary;
 import com.google.gson.JsonElement;
 import com.example.Japp.network.models.requests.CreateProjectRequest;
-import com.example.Japp.network.models.requests.CreateSessionRequest;
+import com.example.Japp.network.models.requests.CreateChatGroupRequest;
 import com.example.Japp.network.models.requests.IntroRequest;
 import com.example.Japp.network.models.requests.JoinProjectRequest;
 import com.example.Japp.network.models.requests.UpdateUsernameRequest;
 import com.example.Japp.network.models.requests.LoginRequest;
 import com.example.Japp.network.models.requests.RegisterRequest;
+import com.example.Japp.network.models.requests.ReviewRequest;
+import com.example.Japp.network.models.requests.PublishRouteRequest;
 import com.example.Japp.network.models.requests.SendChatMessageRequest;
 import com.example.Japp.network.models.requests.UpdateAccountProfileRequest;
 import com.example.Japp.network.models.requests.UpdateAccountRoleRequest;
@@ -31,6 +36,7 @@ import java.util.List;
 
 import retrofit2.Call;
 import retrofit2.http.Body;
+import retrofit2.http.DELETE;
 import retrofit2.http.GET;
 import retrofit2.http.Multipart;
 import retrofit2.http.POST;
@@ -40,11 +46,18 @@ import retrofit2.http.Query;
 import retrofit2.http.PUT;
 import retrofit2.http.Url;
 import okhttp3.MultipartBody;
+import okhttp3.ResponseBody;
 
 public interface UserService {
 
     @POST("login")
     Call<Result<LoginResponse>> login(@Body LoginRequest request);
+
+    @POST("login/refresh")
+    Call<Result<LoginResponse>> refreshLogin(@Query("refreshToken") String refreshToken);
+
+    @GET("login/ping")
+    Call<ResponseBody> ping();
 
     @POST("register")
     Call<Result> register(@Body RegisterRequest request);
@@ -107,6 +120,14 @@ public interface UserService {
                                             @Query("pageNum") int pageNum,
                                             @Query("pageSize") int pageSize);
 
+    @GET("projects")
+    Call<Result<List<Project>>> getProjectsWithOptions(
+            @Query("accountId") int accountId,
+            @Query("pageNum") int pageNum,
+            @Query("pageSize") int pageSize,
+            @Query("keyword") String keyword,
+            @Query("withExplanation") Boolean withExplanation);
+
     @GET("projects/{id}")
     Call<Result<Project>> getProject(@Path("id") int projectId);
 
@@ -147,7 +168,7 @@ public interface UserService {
 
     @POST("routes/{id}/publish")
     Call<Result<JsonElement>> publishRoute(@Path("id") int routeId,
-                                           @Body CreateProjectRequest request);
+                                           @Body PublishRouteRequest request);
 
     // 统一 AI 路线接口：不传请求体时生成路线，传入已有地点时优化路线。
     // 两种方式成功时 data 均为路线 ID（数字）。
@@ -165,6 +186,48 @@ public interface UserService {
     @POST("routes/manual")
     Call<Result<JsonElement>> createManualRoute(@Body List<RouteNode> routeNodes);
 
+    @GET("routes")
+    Call<Result<List<RouteSummary>>> getRoutes(@Query("accountId") int accountId,
+                                               @Query("pageNum") int pageNum,
+                                               @Query("pageSize") int pageSize);
+
+    @POST("routes/{id}/favorite")
+    Call<Result> favoriteRoute(@Path("id") int routeId);
+
+    @DELETE("routes/{id}/favorite")
+    Call<Result> unfavoriteRoute(@Path("id") int routeId);
+
+    @POST("reviews")
+    Call<Result<Integer>> createReview(@Body ReviewRequest request);
+
+    @DELETE("reviews/{id}")
+    Call<Result> deleteReview(@Path("id") int reviewId);
+
+    @PUT("reviews/{id}")
+    Call<Result> updateReview(@Path("id") int reviewId,
+                              @Body ReviewRequest request);
+
+    @GET("reviews/{id}")
+    Call<Result<Review>> getReview(@Path("id") int reviewId);
+
+    @GET("reviews")
+    Call<Result<List<Review>>> getReviews();
+
+    @GET("reviews/project/{projectId}")
+    Call<Result<List<Review>>> getProjectReviews(@Path("projectId") int projectId);
+
+    @GET("reviews/route/{routeId}")
+    Call<Result<List<Review>>> getRouteReviews(@Path("routeId") int routeId);
+
+    @GET("reviews/leader/{accountId}")
+    Call<Result<List<Review>>> getReviewsForLeader(@Path("accountId") int accountId);
+
+    @GET("reviews/user/{accountId}")
+    Call<Result<List<Review>>> getReviewsByUser(@Path("accountId") int accountId);
+
+    @GET("reviews/average-score/{accountId}")
+    Call<Result<Double>> getAverageReviewScore(@Path("accountId") int accountId);
+
     @POST("attractions/sync/{poiId}")
     Call<Result<JsonElement>> syncAttraction(@Path("poiId") String poiId);
 
@@ -173,6 +236,14 @@ public interface UserService {
 
     @GET("routes/{id}")
     Call<Result<JsonElement>> getRouteNodesRaw(@Path("id") int routeId);
+
+    @GET("projects/{id}/members")
+    Call<Result<List<ProjectMember>>> getProjectMembers(@Path("id") int projectId);
+
+    @GET("attractions")
+    Call<Result<List<RouteNode>>> getAttractions(@Query("regionCode") String regionCode,
+                                                 @Query("pageNum") int pageNum,
+                                                 @Query("pageSize") int pageSize);
 
     @POST("projects/{id}/leader")
     Call<Result> assignLeader(@Path("id") int projectId,
@@ -194,17 +265,29 @@ public interface UserService {
     Call<Result> updateProjectStatus(@Path("id") int projectId,
                                      @Query("status") String status);
 
-    @POST("chat/sessions")
-    Call<Result<ChatSession>> createChatSession(@Body CreateSessionRequest request);
+    @POST("chat/groups")
+    Call<Result<ChatSession>> createChatGroup(@Body CreateChatGroupRequest request);
+
+    @POST("chat/groups/{sessionId}/join")
+    Call<Result> joinChatGroup(@Path("sessionId") long sessionId);
+
+    @DELETE("chat/groups/{sessionId}/members/me")
+    Call<Result> leaveChatGroup(@Path("sessionId") long sessionId);
+
+    @DELETE("chat/groups/{sessionId}")
+    Call<Result> deleteChatGroup(@Path("sessionId") long sessionId);
 
     @GET("chat/sessions")
     Call<Result<List<ChatSession>>> getChatSessions();
 
+    @GET("chat/groups")
+    Call<Result<List<ChatSession>>> getChatGroups();
+
     @GET("chat/sessions/{sessionId}/messages")
     Call<Result<List<ServerChatMessage>>> getChatMessagesPage(
             @Path("sessionId") long sessionId,
-            @Query("beforeId") Long beforeId,
-            @Query("limit") int limit);
+            @Query("pageNum") int pageNum,
+            @Query("pageSize") int pageSize);
 
     @GET("chat/sessions/{sessionId}/members")
     Call<Result<List<ChatGroupMember>>> getChatMembers(@Path("sessionId") long sessionId);

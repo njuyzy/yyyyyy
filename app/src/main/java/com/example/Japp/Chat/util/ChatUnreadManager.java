@@ -163,7 +163,7 @@ public final class ChatUnreadManager {
                     total, failed, callback);
             return;
         }
-        service.getChatMessagesPage(sessionId, null, ChatMessagePaging.PAGE_SIZE)
+        service.getChatMessagesPage(sessionId, 1, ChatMessagePaging.PAGE_SIZE)
                 .enqueue(new Callback<Result<List<ServerChatMessage>>>() {
                     @Override
                     public void onResponse(Call<Result<List<ServerChatMessage>>> call,

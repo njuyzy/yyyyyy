@@ -583,9 +583,8 @@ private int countdown = 60;
                                     .apply();
 
                             // 保存 token
-                            if (loginData.getToken() != null) {
-                                ApiClient.saveToken(loginData.getToken());
-                            }
+                            ApiClient.saveTokens(loginData.getToken(),
+                                    loginData.getRefreshToken());
 
                             // 添加注册成功动画
                             Animation slideUp = AnimationUtils.loadAnimation(signup.this, R.anim.slide_up);

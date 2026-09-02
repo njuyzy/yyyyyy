@@ -337,7 +337,7 @@ public class ConversationList extends Fragment {
                     }
                 });
 
-        service.getChatMessagesPage(conversation.getBackendSessionId(), null,
+        service.getChatMessagesPage(conversation.getBackendSessionId(), 1,
                         ChatMessagePaging.PAGE_SIZE)
                 .enqueue(new Callback<Result<List<ServerChatMessage>>>() {
                     @Override

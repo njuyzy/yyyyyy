@@ -32,10 +32,27 @@ public class ApiClient {
         prefs.edit().putString("token", token).apply();
     }
 
+    public static void saveTokens(String token, String refreshToken) {
+        if (appContext == null) return;
+        SharedPreferences.Editor editor = appContext
+                .getSharedPreferences("user_pref", Context.MODE_PRIVATE).edit();
+        if (token == null) editor.remove("token");
+        else editor.putString("token", token);
+        if (refreshToken == null) editor.remove("refresh_token");
+        else editor.putString("refresh_token", refreshToken);
+        editor.apply();
+    }
+
+    public static String getRefreshToken() {
+        if (appContext == null) return null;
+        return appContext.getSharedPreferences("user_pref", Context.MODE_PRIVATE)
+                .getString("refresh_token", null);
+    }
+
     public static void clearToken() {
         if (appContext == null) return;
         SharedPreferences prefs = appContext.getSharedPreferences("user_pref", Context.MODE_PRIVATE);
-        prefs.edit().remove("token").apply();
+        prefs.edit().remove("token").remove("refresh_token").apply();
     }
 
     public static Retrofit getClient() {

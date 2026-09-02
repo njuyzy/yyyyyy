@@ -11,7 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 聊天消息的前端游标分页规则。 */
+/** 聊天消息分页与本地缓存合并规则。 */
 public final class ChatMessagePaging {
 
     public static final int PAGE_SIZE = 30;
@@ -20,8 +20,8 @@ public final class ChatMessagePaging {
     private ChatMessagePaging() {}
 
     /**
-     * 兼容分页接口和旧版全量接口：筛出 beforeId 之前、最接近游标的 30 条，
-     * 并统一为时间正序。
+     * 后端使用 pageNum/pageSize；本地缓存仍按消息 ID 取 beforeId 之前的 30 条，
+     * 用于断网回退，并统一为时间正序。
      */
     @NonNull
     public static List<ServerChatMessage> pageBefore(

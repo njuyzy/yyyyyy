@@ -20,7 +20,7 @@ import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
-import com.example.Japp.network.models.requests.CreateProjectRequest;
+import com.example.Japp.network.models.requests.PublishRouteRequest;
 import com.example.Japp.user.fragment.route.RouteMapDrawHelper;
 import com.example.Japp.user.util.RoutePlanHelper;
 import com.example.Japp.user.util.SessionHelper;
@@ -229,7 +229,7 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
             editRepresentativeCount.setError("人数至少为 1");
             return;
         }
-        if (maxMembers < representativeCount) {
+        if (maxMembers > 0 && maxMembers < representativeCount) {
             editMaxMembers.setError("总人数不能小于本组人数");
             return;
         }
@@ -291,19 +291,16 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
         if (TextUtils.isEmpty(startPoint)) {
             startPoint = hasCurrentLocation() ? "当前位置" : null;
         }
-        CreateProjectRequest request = new CreateProjectRequest(
-                savedRouteId,
+        PublishRouteRequest request = new PublishRouteRequest(
                 form.title,
+                form.representativeCount,
                 form.departureDate,
-                form.maxMembers,
-                form.representativeCount,
-                "OPEN",
-                form.representativeCount,
                 form.departureTime,
-                startPoint,
                 "MANUAL",
+                startPoint,
                 form.leaderRequirements,
-                form.memberRequirements);
+                form.memberRequirements,
+                form.maxMembers);
 
         service.publishRoute(savedRouteId, request).enqueue(new Callback<Result<JsonElement>>() {
             @Override
@@ -358,7 +355,7 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
         }
     }
 
-    private void saveLocalPublishDetails(CreateProjectRequest request) {
+    private void saveLocalPublishDetails(PublishRouteRequest request) {
         String prefix = "route_" + routeId + "_";
         getSharedPreferences("project_publish_details", MODE_PRIVATE).edit()
                 .putInt(prefix + "representative_count", request.getRepresentedCount())

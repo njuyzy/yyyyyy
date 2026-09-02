@@ -131,7 +131,7 @@
                 android:id="@+id/txtTagHint"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="共 15 项，请选择 1～3 项"
+                android:text="共 15 项，请至少选择 1 项"
                 android:textColor="#666666"
                 android:textSize="13sp"
                 android:layout_marginBottom="12dp" />

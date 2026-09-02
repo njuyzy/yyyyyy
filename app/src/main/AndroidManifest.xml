@@ -81,6 +81,10 @@
             android:name=".user.UserMainActivity"
             android:exported="false" />
         <activity
+            android:name=".user.UserHistoryRouteActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".user.TeamDetailActivity"
             android:exported="false"
             android:screenOrientation="portrait" />

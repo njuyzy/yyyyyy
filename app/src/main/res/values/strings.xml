@@ -36,7 +36,7 @@
     <string name="settings_account_security">个人资料</string>
     <string name="settings_account_security_summary">头像、姓名、地区与简介</string>
     <string name="settings_interest_preferences">兴趣偏好</string>
-    <string name="settings_interest_preferences_summary">用于路线与拼单推荐，最多选择 3 项</string>
+    <string name="settings_interest_preferences_summary">用于路线与拼单推荐，可多选</string>
     <string name="settings_account_role">账号身份</string>
     <string name="settings_account_role_summary">普通用户、领队或双身份</string>
     <string name="settings_change_password">修改密码</string>
@@ -49,7 +49,7 @@
     <string name="settings_password_changed">密码修改成功</string>
     <string name="settings_preferences_loading">正在加载兴趣偏好…</string>
     <string name="settings_preferences_saved">兴趣偏好已更新</string>
-    <string name="settings_preferences_required">请至少选择 1 项，最多选择 3 项</string>
+    <string name="settings_preferences_required">请至少选择 1 项</string>
     <string name="settings_role_changed">账号身份已更新</string>
     <string name="settings_request_failed">操作失败，请稍后重试</string>
     <string name="settings_notification">消息通知</string>

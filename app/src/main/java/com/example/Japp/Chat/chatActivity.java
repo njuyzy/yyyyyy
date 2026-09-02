@@ -74,6 +74,7 @@ public class chatActivity extends AppCompatActivity {
     private boolean chatReadOnly;
     private boolean loadingOlderMessages;
     private boolean hasMoreOlderMessages = true;
+    private int nextMessagePage = 2;
     private boolean systemConversation;
 
     @Override
@@ -369,7 +370,7 @@ public class chatActivity extends AppCompatActivity {
     }
 
     private void loadMessages(int generation) {
-        service.getChatMessagesPage(conversation.getBackendSessionId(), null,
+        service.getChatMessagesPage(conversation.getBackendSessionId(), 1,
                         ChatMessagePaging.PAGE_SIZE)
                 .enqueue(new Callback<Result<List<ServerChatMessage>>>() {
                     @Override
@@ -398,6 +399,7 @@ public class chatActivity extends AppCompatActivity {
                         List<ServerChatMessage> serverMessages = response.body().getData();
                         List<ServerChatMessage> latestPage =
                                 ChatMessagePaging.pageBefore(serverMessages, null);
+                        nextMessagePage = 2;
                         bindLatestPage(latestPage);
                         hasMoreOlderMessages = ChatMessagePaging.mayHaveOlder(
                                 serverMessages, latestPage);
@@ -431,7 +433,8 @@ public class chatActivity extends AppCompatActivity {
 
         loadingOlderMessages = true;
         int generation = loadGeneration;
-        service.getChatMessagesPage(conversation.getBackendSessionId(), beforeId,
+        int requestedPage = nextMessagePage;
+        service.getChatMessagesPage(conversation.getBackendSessionId(), requestedPage,
                         ChatMessagePaging.PAGE_SIZE)
                 .enqueue(new Callback<Result<List<ServerChatMessage>>>() {
                     @Override
@@ -451,13 +454,17 @@ public class chatActivity extends AppCompatActivity {
 
                         List<ServerChatMessage> serverMessages = response.body().getData();
                         List<ServerChatMessage> olderPage =
-                                ChatMessagePaging.pageBefore(serverMessages, beforeId);
+                                ChatMessagePaging.pageBefore(serverMessages, null);
+                        if (serverMessages != null && !serverMessages.isEmpty()) {
+                            nextMessagePage = requestedPage + 1;
+                        }
                         if (olderPage.isEmpty()) {
                             olderPage = cachedPageBefore(beforeId);
                         }
                         int inserted = prependOlderPage(olderPage);
                         hasMoreOlderMessages = inserted > 0
-                                && (ChatMessagePaging.mayHaveOlder(serverMessages, olderPage)
+                                && (serverMessages != null
+                                && serverMessages.size() >= ChatMessagePaging.PAGE_SIZE
                                 || hasCachedMessagesBefore(olderPage.get(0).getId()));
                         ChatHistoryStore.saveMessages(chatActivity.this, currentAccountId,
                                 conversation.getBackendSessionId(), serverMessages);
@@ -520,6 +527,10 @@ public class chatActivity extends AppCompatActivity {
 
     private void loadOlderMessagesFromCache(long beforeId) {
         List<ServerChatMessage> cached = cachedPageBefore(beforeId);
+        if (cached.isEmpty()) {
+            hasMoreOlderMessages = false;
+            return;
+        }
         int inserted = prependOlderPage(cached);
         hasMoreOlderMessages = inserted > 0
                 && hasCachedMessagesBefore(cached.get(0).getId());
@@ -779,6 +790,7 @@ public class chatActivity extends AppCompatActivity {
         List<ServerChatMessage> latestPage =
                 ChatMessagePaging.pageBefore(cachedMessages, null);
         bindLatestPage(latestPage);
+        nextMessagePage = 2;
         hasMoreOlderMessages = cachedMessages.size() > latestPage.size();
     }
 

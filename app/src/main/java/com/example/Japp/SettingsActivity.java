@@ -431,7 +431,7 @@ public class SettingsActivity extends AppCompatActivity {
                             count++;
                         }
                     }
-                    if (count < 1 || count > 3) {
+                    if (count < 1) {
                         Toast.makeText(this, R.string.settings_preferences_required,
                                 Toast.LENGTH_SHORT).show();
                         return;

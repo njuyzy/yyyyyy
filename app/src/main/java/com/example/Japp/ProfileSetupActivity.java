@@ -49,7 +49,6 @@ public class ProfileSetupActivity extends AppCompatActivity {
     private final Map<String, String[]> cityMap = buildCityMap();
     private final Map<Integer, Integer> chipIdToTagId = new LinkedHashMap<>();
     private static final int ROUTE_TAG_COUNT = 15;
-    private static final int MAX_ROUTE_TAG_SELECTION = 3;
     private final Map<String, String> regionCodeMap = buildRegionCodeMap();
     private final Map<String, String> provinceCodeMap = buildProvinceCodeMap();
 
@@ -144,15 +143,6 @@ public class ProfileSetupActivity extends AppCompatActivity {
             chip.setChipBackgroundColor(
                     ColorStateList.valueOf(ContextCompat.getColor(this, R.color.route_tag_chip_bg)));
             chip.setId(View.generateViewId());
-            chip.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                if (!isChecked) {
-                    return;
-                }
-                if (chipGroup.getCheckedChipIds().size() > MAX_ROUTE_TAG_SELECTION) {
-                    chip.setChecked(false);
-                    Toast.makeText(this, "最多选择 3 个偏好", Toast.LENGTH_SHORT).show();
-                }
-            });
             chipGroup.addView(chip);
             chipIdToTagId.put(chip.getId(), tagId);
         }
@@ -198,10 +188,6 @@ public class ProfileSetupActivity extends AppCompatActivity {
 
             if (selectedTagIds.isEmpty()) {
                 Toast.makeText(this, "请选择至少一个路线偏好", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            if (selectedTagIds.size() > MAX_ROUTE_TAG_SELECTION) {
-                Toast.makeText(this, "最多选择 3 个偏好", Toast.LENGTH_SHORT).show();
                 return;
             }
 

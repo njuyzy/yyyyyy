@@ -49,7 +49,7 @@ public class Project {
     private int representedCount;
 
     @SerializedName("maxMembers")
-    private int maxMembers;
+    private Integer maxMembers;
 
     @SerializedName("currentMembers")
     private int currentMembers;
@@ -80,6 +80,9 @@ public class Project {
 
     @SerializedName("canJoin")
     private boolean canJoin;
+
+    @SerializedName("canManageGroup")
+    private boolean canManageGroup;
 
     @SerializedName("groupId")
     private Long groupId;
@@ -120,8 +123,10 @@ public class Project {
     public String getParticipantRequirements() { return participantRequirements; }
     public int getRepresentedCount() { return representedCount; }
 
-    public int getMaxMembers() { return maxMembers; }
-    public void setMaxMembers(int maxMembers) { this.maxMembers = maxMembers; }
+    /** 0 表示后端未设置人数上限。 */
+    public int getMaxMembers() { return maxMembers == null ? 0 : maxMembers; }
+    public Integer getMaxMembersNullable() { return maxMembers; }
+    public void setMaxMembers(Integer maxMembers) { this.maxMembers = maxMembers; }
 
     public int getCurrentMembers() { return currentMembers; }
     public void setCurrentMembers(int currentMembers) { this.currentMembers = currentMembers; }
@@ -142,5 +147,6 @@ public class Project {
     public void setViewerRole(String viewerRole) { this.viewerRole = viewerRole; }
     public boolean isCanAccept() { return canAccept; }
     public boolean isCanJoin() { return canJoin; }
+    public boolean isCanManageGroup() { return canManageGroup; }
     public Long getGroupId() { return groupId; }
 }

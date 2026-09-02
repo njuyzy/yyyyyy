@@ -30,6 +30,7 @@ import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
 import com.example.Japp.util.InsetDividerDecoration;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.chip.ChipGroup;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
@@ -45,8 +46,10 @@ public class historyRoute extends Fragment {
     private TeamListAdapter adapter;
     private SavedRouteAdapter savedRouteAdapter;
     private TextView txtEmpty;
+    private RecyclerView recycler;
     private UserService service;
     private final List<TeamCardItem> items = new ArrayList<>();
+    private String selectedStatus = "";
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -54,11 +57,12 @@ public class historyRoute extends Fragment {
         View view = inflater.inflate(R.layout.user_fragment_history_route, container, false);
 
         MaterialToolbar toolbar = view.findViewById(R.id.toolbar);
-        toolbar.setNavigationOnClickListener(v -> requireActivity().getSupportFragmentManager().popBackStack());
+        toolbar.setNavigationOnClickListener(v -> requireActivity().finish());
 
-        RecyclerView recycler = view.findViewById(R.id.recycler);
+        recycler = view.findViewById(R.id.recycler);
         txtEmpty = view.findViewById(R.id.txtEmpty);
         service = ApiClient.getClient().create(UserService.class);
+        bindStatusFilter(view);
 
         adapter = new TeamListAdapter();
         adapter.setFavoriteEnabled(true);
@@ -79,16 +83,46 @@ public class historyRoute extends Fragment {
 
     private void loadSavedRoutes() {
         if (!isAdded() || savedRouteAdapter == null) return;
-        savedRouteAdapter.setRoutes(SavedRouteStore.getAll(requireContext()));
+        savedRouteAdapter.setRoutes(selectedStatus.isEmpty()
+                ? SavedRouteStore.getAll(requireContext())
+                : new ArrayList<>());
         updateEmptyState(null);
+    }
+
+    private void bindStatusFilter(View view) {
+        ChipGroup group = view.findViewById(R.id.statusFilterGroup);
+        group.setOnCheckedChangeListener((chipGroup, checkedId) -> {
+            if (checkedId == R.id.chipStatusOpen) {
+                selectedStatus = ProjectUiHelper.STATUS_OPEN;
+            } else if (checkedId == R.id.chipStatusMatching) {
+                selectedStatus = ProjectUiHelper.STATUS_MATCHING;
+            } else if (checkedId == R.id.chipStatusConfirmed) {
+                selectedStatus = ProjectUiHelper.STATUS_CONFIRMED;
+            } else if (checkedId == R.id.chipStatusInProgress) {
+                selectedStatus = ProjectUiHelper.STATUS_IN_PROGRESS;
+            } else if (checkedId == R.id.chipStatusDone) {
+                selectedStatus = ProjectUiHelper.STATUS_DONE;
+            } else if (checkedId == R.id.chipStatusCancelled) {
+                selectedStatus = ProjectUiHelper.STATUS_CANCELLED;
+            } else {
+                selectedStatus = "";
+            }
+            loadSavedRoutes();
+            applyStatusFilter(true);
+        });
     }
 
     private void openSavedRoute(SavedRouteStore.SavedRoute route) {
         SavedRouteStore.requestOpen(requireContext(), route.getId());
-        requireActivity().getSupportFragmentManager().popBackStackImmediate();
         if (requireActivity() instanceof UserMainActivity) {
             ((UserMainActivity) requireActivity()).switchToRouteTab();
+            return;
         }
+        Intent intent = new Intent(requireContext(), UserMainActivity.class);
+        intent.putExtra(UserMainActivity.EXTRA_OPEN_ROUTE_TAB, true);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+        requireActivity().finish();
     }
 
     private void loadHistory() {
@@ -155,8 +189,7 @@ public class historyRoute extends Fragment {
             temp.add(item);
             items.add(item);
         }
-        adapter.setItems(temp);
-        txtEmpty.setVisibility(View.GONE);
+        applyStatusFilter(false);
 
         AtomicInteger done = new AtomicInteger(0);
         int total = projects.size();
@@ -204,11 +237,31 @@ public class historyRoute extends Fragment {
 
     private void checkDone(AtomicInteger done, int total) {
         if (done.incrementAndGet() == total && isAdded()) {
-            requireActivity().runOnUiThread(() -> adapter.setItems(new ArrayList<>(items)));
+            requireActivity().runOnUiThread(() -> applyStatusFilter(false));
+        }
+    }
+
+    private void applyStatusFilter(boolean animate) {
+        if (adapter == null) return;
+        List<TeamCardItem> filtered = new ArrayList<>();
+        for (TeamCardItem item : items) {
+            Project project = item == null ? null : item.getProject();
+            if (project != null && (selectedStatus.isEmpty()
+                    || selectedStatus.equals(ProjectUiHelper.normalizeStatus(project.getStatus())))) {
+                filtered.add(item);
+            }
+        }
+        adapter.setItems(filtered);
+        updateEmptyState(selectedStatus.isEmpty() ? null : "暂无该状态的历史路线");
+        if (animate && recycler != null) {
+            recycler.animate().cancel();
+            recycler.setAlpha(0.72f);
+            recycler.animate().alpha(1f).setDuration(160L).start();
         }
     }
 
     private void showEmpty(String message) {
+        items.clear();
         adapter.setItems(new ArrayList<>());
         updateEmptyState(message);
     }

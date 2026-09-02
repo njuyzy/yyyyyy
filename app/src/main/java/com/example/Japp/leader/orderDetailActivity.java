@@ -203,7 +203,8 @@ public class orderDetailActivity extends AppCompatActivity {
         txtMeta.setText((city.isEmpty() ? "未知城市" : city)
                 + " · 出发 " + date
                 + "\n已有人数 " + Math.max(0, project.getCurrentMembers())
-                + " / 人数上限 " + Math.max(0, project.getMaxMembers()));
+                + " / 人数上限 " + (project.getMaxMembers() > 0
+                ? String.valueOf(project.getMaxMembers()) : "不限"));
 
         txtStatus.setText(ProjectUiHelper.statusLabel(project.getStatus()));
     }

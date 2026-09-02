@@ -7,6 +7,9 @@ public class CreateProjectRequest {
     @SerializedName("routeId")
     private final int routeId;
 
+    @SerializedName("leaderAccountId")
+    private final Integer leaderAccountId;
+
     @SerializedName("title")
     private final String title;
 
@@ -14,10 +17,7 @@ public class CreateProjectRequest {
     private final String departureDate;
 
     @SerializedName("maxMembers")
-    private final int maxMembers;
-
-    @SerializedName("currentMembers")
-    private final int currentMembers;
+    private final Integer maxMembers;
 
     @SerializedName("status")
     private final String status;
@@ -41,43 +41,37 @@ public class CreateProjectRequest {
     private final String participantRequirements;
 
     public CreateProjectRequest(int routeId,
+                                Integer leaderAccountId,
                                 String title,
                                 String departureDate,
-                                int maxMembers,
-                                int currentMembers,
-                                String status) {
-        this(routeId, title, departureDate, maxMembers, currentMembers, status,
-                currentMembers, null, null, "MANUAL", null, null);
-    }
-
-    public CreateProjectRequest(int routeId,
-                                String title,
-                                String departureDate,
-                                int maxMembers,
-                                int currentMembers,
-                                String status,
-                                int representedCount,
                                 String departureTime,
-                                String startPoint,
                                 String startPointType,
+                                String startPoint,
                                 String leaderRequirements,
-                                String participantRequirements) {
+                                String participantRequirements,
+                                int representedCount,
+                                Integer maxMembers,
+                                String status) {
         this.routeId = routeId;
+        this.leaderAccountId = leaderAccountId;
         this.title = title;
         this.departureDate = departureDate;
-        this.maxMembers = maxMembers;
-        this.currentMembers = currentMembers;
-        this.status = status;
-        this.representedCount = representedCount;
         this.departureTime = departureTime;
-        this.startPoint = startPoint;
         this.startPointType = startPointType;
+        this.startPoint = startPoint;
         this.leaderRequirements = leaderRequirements;
         this.participantRequirements = participantRequirements;
+        this.representedCount = representedCount;
+        this.maxMembers = maxMembers != null && maxMembers > 0 ? maxMembers : null;
+        this.status = status;
     }
 
     public int getRouteId() {
         return routeId;
+    }
+
+    public Integer getLeaderAccountId() {
+        return leaderAccountId;
     }
 
     public String getTitle() {
@@ -88,12 +82,8 @@ public class CreateProjectRequest {
         return departureDate;
     }
 
-    public int getMaxMembers() {
+    public Integer getMaxMembers() {
         return maxMembers;
-    }
-
-    public int getCurrentMembers() {
-        return currentMembers;
     }
 
     public String getStatus() {

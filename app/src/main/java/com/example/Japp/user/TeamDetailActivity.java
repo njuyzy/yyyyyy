@@ -157,7 +157,8 @@ public class TeamDetailActivity extends AppCompatActivity {
         txtMeta.setText((city.isEmpty() ? "未知城市" : city)
                 + " · 出发 " + date
                 + "\n已有人数 " + Math.max(0, project.getCurrentMembers())
-                + " / 人数上限 " + Math.max(0, project.getMaxMembers()));
+                + " / 人数上限 " + (project.getMaxMembers() > 0
+                ? String.valueOf(project.getMaxMembers()) : "不限"));
 
         txtStatus.setText(ProjectUiHelper.statusLabel(project.getStatus()));
     }
@@ -350,7 +351,8 @@ public class TeamDetailActivity extends AppCompatActivity {
         }
         stylePrimaryAction();
         btnJoin.setText("加入拼单");
-        if (project.getCurrentMembers() >= project.getMaxMembers()) {
+        if (project.getMaxMembers() > 0
+                && project.getCurrentMembers() >= project.getMaxMembers()) {
             btnJoin.setEnabled(false);
             btnJoin.setText("已满员");
             return;
@@ -574,8 +576,10 @@ public class TeamDetailActivity extends AppCompatActivity {
                         input.setError("人数至少为 1");
                         return;
                     }
-                    int remaining = project.getMaxMembers() - project.getCurrentMembers();
-                    if (remaining > 0 && partySize > remaining) {
+                    int remaining = project.getMaxMembers() > 0
+                            ? project.getMaxMembers() - project.getCurrentMembers()
+                            : Integer.MAX_VALUE;
+                    if (remaining != Integer.MAX_VALUE && partySize > remaining) {
                         input.setError("当前最多还可加入 " + remaining + " 人");
                         return;
                     }

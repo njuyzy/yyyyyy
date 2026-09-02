@@ -168,7 +168,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="5dp"
                             android:layout_weight="1"
-                            android:hint="总人数上限">
+                            android:hint="总人数上限（可选）">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/editMaxMembers"

@@ -34,6 +34,15 @@ public class ChatSession {
     @SerializedName("latestMessageAt")
     private String latestMessageAt;
 
+    @SerializedName("latestMessageSenderAccountId")
+    private Integer latestMessageSenderAccountId;
+
+    @SerializedName("disabledAt")
+    private String disabledAt;
+
+    @SerializedName("createdAt")
+    private String createdAt;
+
     public int getId() {
         return id;
     }
@@ -72,4 +81,7 @@ public class ChatSession {
     public int getMemberCount() { return memberCount; }
     public String getLatestMessage() { return latestMessage; }
     public String getLatestMessageAt() { return latestMessageAt; }
+    public Integer getLatestMessageSenderAccountId() { return latestMessageSenderAccountId; }
+    public String getDisabledAt() { return disabledAt; }
+    public String getCreatedAt() { return createdAt; }
 }
