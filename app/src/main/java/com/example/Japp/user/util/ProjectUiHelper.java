@@ -124,6 +124,11 @@ public final class ProjectUiHelper {
         return leaderAccountId != null && leaderAccountId > 0;
     }
 
+    public static boolean canLeaderAbandon(String status) {
+        String normalized = normalizeStatus(status);
+        return !STATUS_DONE.equals(normalized) && !STATUS_CANCELLED.equals(normalized);
+    }
+
     public static boolean isLeaderAcceptableStatus(String status) {
         String normalized = normalizeStatus(status);
         return STATUS_OPEN.equals(normalized) || STATUS_MATCHING.equals(normalized);

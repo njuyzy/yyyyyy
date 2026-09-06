@@ -439,19 +439,9 @@ public class orderDetailActivity extends AppCompatActivity {
 
     private void setupLeaderAction() {
         String status = ProjectUiHelper.normalizeStatus(project.getStatus());
-        if (ProjectUiHelper.STATUS_DONE.equals(status)) {
+        if (!ProjectUiHelper.canLeaderAbandon(status)) {
             btnJoin.setEnabled(false);
-            btnJoin.setText("已完成");
-            return;
-        }
-        if (ProjectUiHelper.STATUS_CANCELLED.equals(status)) {
-            btnJoin.setEnabled(false);
-            btnJoin.setText("已取消");
-            return;
-        }
-        if (ProjectUiHelper.STATUS_IN_PROGRESS.equals(status)) {
-            btnJoin.setEnabled(false);
-            btnJoin.setText("进行中");
+            btnJoin.setText(ProjectUiHelper.STATUS_DONE.equals(status) ? "已完成" : "已取消");
             return;
         }
 

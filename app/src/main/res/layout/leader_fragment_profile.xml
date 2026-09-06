@@ -18,6 +18,20 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <ImageButton
+        android:id="@+id/btnSettings"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="16dp"
+        android:background="?selectableItemBackgroundBorderless"
+        android:contentDescription="设置"
+        android:padding="8dp"
+        android:src="@drawable/baseline_settings_24"
+        app:layout_constraintBottom_toBottomOf="@id/txtTitle"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/txtTitle"
+        app:tint="#666666" />
+
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollView"
         android:layout_width="0dp"
@@ -112,15 +126,30 @@
                             android:textSize="14sp" />
                     </LinearLayout>
 
-                    <ImageButton
-                        android:id="@+id/btnSettings"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="?selectableItemBackgroundBorderless"
-                        android:contentDescription="设置"
-                        android:padding="8dp"
-                        android:src="@drawable/baseline_settings_24"
-                        app:tint="#666666" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSwitchRole"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:contentDescription="切换到用户身份"
+                        android:elevation="0dp"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="11dp"
+                        android:paddingEnd="12dp"
+                        android:text="用户模式"
+                        android:textAllCaps="false"
+                        android:textColor="#1E72FF"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        app:backgroundTint="#EAF2FF"
+                        app:cornerRadius="18dp"
+                        app:icon="@drawable/baseline_account_circle_24"
+                        app:iconPadding="4dp"
+                        app:iconSize="16dp"
+                        app:iconTint="#1E72FF"
+                        app:strokeColor="#B8D1FF"
+                        app:strokeWidth="1dp" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -345,45 +374,6 @@
                                 android:textSize="18sp" />
                         </LinearLayout>
 
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/btnSwitchRole"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?selectableItemBackground"
-                    app:cardBackgroundColor="#FFFFFF"
-                    app:cardCornerRadius="14dp"
-                    app:cardElevation="0dp"
-                    app:strokeColor="#EEF0F4"
-                    app:strokeWidth="1dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingStart="18dp"
-                        android:paddingEnd="18dp">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="切换身份"
-                            android:textColor="#121212"
-                            android:textSize="16sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text=">"
-                            android:textColor="#999999"
-                            android:textSize="18sp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 

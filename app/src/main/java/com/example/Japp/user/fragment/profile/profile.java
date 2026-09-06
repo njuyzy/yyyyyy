@@ -78,7 +78,7 @@ public class profile extends Fragment {
         View view = inflater.inflate(R.layout.user_fragment_profile, container, false);
 
         ivAvatar = view.findViewById(R.id.ivAvatar);
-        switchMode = view.findViewById(R.id.btnViewReviews);
+        switchMode = view.findViewById(R.id.btnSwitchRole);
         btnPersonalInfo = view.findViewById(R.id.btnPersonalInfo);
         btnHistoryRoute = view.findViewById(R.id.btnHistoryRoute);
         btnFavoriteOrders = view.findViewById(R.id.btnFavoriteOrders);

@@ -6,7 +6,6 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.activity.EdgeToEdge;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -23,8 +22,10 @@ import com.example.Japp.user.fragment.joinTeam.TeamCardItem;
 import com.example.Japp.user.fragment.joinTeam.TeamListAdapter;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
+import com.example.Japp.util.DisplayCutoutAdapter;
 import com.example.Japp.util.InsetDividerDecoration;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.chip.ChipGroup;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
@@ -42,18 +43,20 @@ public class LeaderHistoryRouteActivity extends AppCompatActivity {
     private TeamListAdapter adapter;
     private final List<TeamCardItem> teamItems = new ArrayList<>();
     private UserService service;
+    private String selectedStatus = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
-        setContentView(R.layout.activity_leader_history_route);
+        setContentView(R.layout.user_fragment_history_route);
+        DisplayCutoutAdapter.apply(this);
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         toolbar.setNavigationOnClickListener(v -> finish());
 
         recycler = findViewById(R.id.recycler);
         txtEmpty = findViewById(R.id.txtEmpty);
+        bindStatusFilter();
 
         adapter = new TeamListAdapter();
         adapter.setOnTeamClickListener(item -> {
@@ -68,6 +71,27 @@ public class LeaderHistoryRouteActivity extends AppCompatActivity {
 
         service = ApiClient.getClient().create(UserService.class);
         loadHistoryRoutes();
+    }
+
+    private void bindStatusFilter() {
+        findViewById(R.id.chipStatusMatching).setVisibility(View.GONE);
+        findViewById(R.id.chipStatusConfirmed).setVisibility(View.GONE);
+        findViewById(R.id.chipStatusCancelled).setVisibility(View.GONE);
+
+        ChipGroup group = findViewById(R.id.statusFilterGroup);
+        group.check(R.id.chipStatusAll);
+        group.setOnCheckedChangeListener((chipGroup, checkedId) -> {
+            if (checkedId == R.id.chipStatusOpen) {
+                selectedStatus = ProjectUiHelper.STATUS_OPEN;
+            } else if (checkedId == R.id.chipStatusInProgress) {
+                selectedStatus = ProjectUiHelper.STATUS_IN_PROGRESS;
+            } else if (checkedId == R.id.chipStatusDone) {
+                selectedStatus = ProjectUiHelper.STATUS_DONE;
+            } else {
+                selectedStatus = "";
+            }
+            applyStatusFilter(true);
+        });
     }
 
     private void loadHistoryRoutes() {
@@ -104,8 +128,12 @@ public class LeaderHistoryRouteActivity extends AppCompatActivity {
 
                 List<Project> history = new ArrayList<>();
                 for (Project project : projects) {
+                    if (project == null) {
+                        continue;
+                    }
                     Integer leaderId = project.getLeaderAccountId();
-                    if (leaderId != null && leaderId == accountId && !"OPEN".equals(project.getStatus())) {
+                    String status = ProjectUiHelper.normalizeStatus(project.getStatus());
+                    if (leaderId != null && leaderId == accountId && isVisibleStatus(status)) {
                         history.add(project);
                     }
                 }
@@ -136,9 +164,7 @@ public class LeaderHistoryRouteActivity extends AppCompatActivity {
             temp.add(item);
             teamItems.add(item);
         }
-        adapter.setItems(temp);
-        txtEmpty.setVisibility(View.GONE);
-        recycler.setVisibility(View.VISIBLE);
+        applyStatusFilter(false);
 
         AtomicInteger done = new AtomicInteger(0);
         int total = projects.size();
@@ -192,15 +218,49 @@ public class LeaderHistoryRouteActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 teamItems.sort((left, right) -> ProjectUiHelper.compareProjectsByStatus(
                         left.getProject(), right.getProject()));
-                adapter.setItems(new ArrayList<>(teamItems));
+                applyStatusFilter(false);
             });
+        }
+    }
+
+    private static boolean isVisibleStatus(String status) {
+        return ProjectUiHelper.STATUS_OPEN.equals(status)
+                || ProjectUiHelper.STATUS_IN_PROGRESS.equals(status)
+                || ProjectUiHelper.STATUS_DONE.equals(status);
+    }
+
+    private void applyStatusFilter(boolean animate) {
+        if (adapter == null) {
+            return;
+        }
+        List<TeamCardItem> filtered = new ArrayList<>();
+        for (TeamCardItem item : teamItems) {
+            Project project = item == null ? null : item.getProject();
+            if (project != null && (selectedStatus.isEmpty() || selectedStatus.equals(
+                    ProjectUiHelper.normalizeStatus(project.getStatus())))) {
+                filtered.add(item);
+            }
+        }
+        adapter.setItems(filtered);
+        txtEmpty.setText(selectedStatus.isEmpty()
+                ? "暂无历史路线"
+                : "暂无" + ProjectUiHelper.statusLabel(selectedStatus) + "的历史路线");
+        txtEmpty.setVisibility(filtered.isEmpty() ? View.VISIBLE : View.GONE);
+        recycler.setVisibility(View.VISIBLE);
+        if (animate) {
+            recycler.animate().cancel();
+            recycler.setAlpha(0.72f);
+            recycler.animate().alpha(1f).setDuration(160L).start();
         }
     }
 
     private void showEmpty() {
         teamItems.clear();
         adapter.setItems(new ArrayList<>());
-        recycler.setVisibility(View.GONE);
+        recycler.setVisibility(View.VISIBLE);
         txtEmpty.setVisibility(View.VISIBLE);
+        txtEmpty.setText(selectedStatus.isEmpty()
+                ? "暂无历史路线"
+                : "暂无" + ProjectUiHelper.statusLabel(selectedStatus) + "的历史路线");
     }
 }
