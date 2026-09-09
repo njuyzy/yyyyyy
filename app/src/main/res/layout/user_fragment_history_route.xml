@@ -70,6 +70,15 @@
                 app:chipStrokeColor="@color/history_filter_chip_stroke"
                 app:chipStrokeWidth="1dp" />
 
+            <!-- 兼容复用该布局的旧页面；用户端状态已合并，不直接展示。 -->
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipStatusMatching"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="匹配中"
+                android:visibility="gone" />
+
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipStatusConfirmed"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
@@ -80,6 +89,15 @@
                 app:chipBackgroundColor="@color/history_filter_chip_background"
                 app:chipStrokeColor="@color/history_filter_chip_stroke"
                 app:chipStrokeWidth="1dp" />
+
+            <!-- 兼容复用该布局的旧页面；用户端归入“已确认”。 -->
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipStatusInProgress"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="进行中"
+                android:visibility="gone" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipStatusDone"
