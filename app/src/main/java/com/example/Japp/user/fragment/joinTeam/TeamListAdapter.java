@@ -5,6 +5,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.util.LruCache;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -15,14 +17,20 @@ import com.example.Japp.R;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Project;
+import com.example.Japp.network.models.Account;
+import com.example.Japp.Chat.util.ChatAvatarLoader;
+import com.example.Japp.user.PublisherProfileSheet;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.user.util.ProjectUiHelper;
+import com.example.Japp.user.util.UserOrderPresentation;
 import com.example.Japp.user.util.SessionHelper;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -46,6 +54,11 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
         final TextView txtMeta;
         final TextView txtStatus;
         final ImageButton btnFavorite;
+        final View clickTarget;
+        final View publisher;
+        final ImageView publisherAvatar;
+        final TextView publisherInitial;
+        final TextView publisherName;
 
         Holder(@NonNull View itemView) {
             super(itemView);
@@ -56,6 +69,12 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
             txtMeta = itemView.findViewById(R.id.txtMeta);
             txtStatus = itemView.findViewById(R.id.txtStatus);
             btnFavorite = itemView.findViewById(R.id.btnFavorite);
+            View cardContent = itemView.findViewById(R.id.userOrderCardContent);
+            clickTarget = cardContent == null ? itemView : cardContent;
+            publisher = itemView.findViewById(R.id.userOrderPublisher);
+            publisherAvatar = itemView.findViewById(R.id.userPublisherAvatar);
+            publisherInitial = itemView.findViewById(R.id.userPublisherInitial);
+            publisherName = itemView.findViewById(R.id.userPublisherName);
         }
     }
 
@@ -63,7 +82,26 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
     private OnTeamClickListener listener;
     private OnFavoriteChangedListener favoriteChangedListener;
     private boolean favoriteEnabled;
+    private boolean userPresentation;
+
+    public TeamListAdapter() {}
+
+    public TeamListAdapter(boolean userPresentation) {
+        this.userPresentation = userPresentation;
+    }
     private final Set<Integer> pendingFavoriteProjectIds = new HashSet<>();
+    private final LruCache<Integer, PublisherAvatar> publishers = new LruCache<>(64);
+    private final LruCache<Integer, Long> publisherRetryAfter = new LruCache<>(64);
+    private final Map<Integer, Call<Result<Account>>> publisherRequests = new HashMap<>();
+
+    private static final class PublisherAvatar {
+        final String name;
+        final String url;
+        PublisherAvatar(Account account) {
+            name = UserOrderPresentation.clean(account.getUsername());
+            url = account.getAvatarUrl();
+        }
+    }
 
     public void setItems(List<TeamCardItem> data) {
         items.clear();
@@ -89,8 +127,11 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
     @NonNull
     @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        // Favorites is a user-only entry; shared leader lists keep the default presentation.
+        boolean userStyle = userPresentation
+                || parent.getContext() instanceof com.example.Japp.FavoriteOrdersActivity;
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_team_card, parent, false);
+                .inflate(userStyle ? R.layout.item_user_order_card : R.layout.item_team_card, parent, false);
         return new Holder(view);
     }
 
@@ -126,13 +167,89 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
 
         holder.txtStatus.setText(ProjectUiHelper.statusLabel(project.getStatus()));
 
-        bindFavorite(holder, item);
+        if (userPresentation || holder.itemView.getContext() instanceof com.example.Japp.FavoriteOrdersActivity) {
+            String publicCity = UserOrderPresentation.city(city);
+            holder.txtCity.setText(publicCity);
+            holder.txtCity.setVisibility(publicCity.isEmpty() ? View.GONE : View.VISIBLE);
+            holder.txtRoute.setText(item.getRouteSummary().isEmpty()
+                    ? "打开行程，查看沿途安排" : item.getRouteSummary().replaceFirst("^途经[：:]", ""));
+            holder.txtMeta.setText(UserOrderPresentation.departure(project)
+                    + "\n参团 " + UserOrderPresentation.capacity(project)
+                    + (item.getDuration().isEmpty() || "暂无".equals(item.getDuration())
+                    ? "" : " · 游览约 " + item.getDuration()));
+            String label = UserOrderPresentation.statusLabel(project.getStatus());
+            holder.txtStatus.setText(label);
+            holder.txtStatus.setVisibility(label.isEmpty() ? View.GONE : View.VISIBLE);
+            String phase = UserOrderPresentation.phase(project.getStatus());
+            holder.txtStatus.setTextColor("CANCELLED".equals(phase) ? 0xFFB45353
+                    : "DONE".equals(phase) ? 0xFF637086 : 0xFF2563EB);
+        }
 
-        holder.itemView.setOnClickListener(v -> {
+        bindFavorite(holder, item);
+        bindPublisher(holder, item);
+
+        holder.clickTarget.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onTeamClick(item);
             }
         });
+    }
+
+    private void bindPublisher(Holder holder, TeamCardItem item) {
+        if (holder.publisher == null) return; // Leader layouts do not contain this user-only entry.
+        int ownerId = item.getProject().getOwnerAccountId();
+        PublisherAvatar profile = publishers.get(ownerId);
+        String displayName = profile == null ? "" : profile.name;
+        if (displayName.isEmpty()) displayName = UserOrderPresentation.clean(item.getProject().getPublisherName());
+        if (displayName.isEmpty()) displayName = UserOrderPresentation.clean(item.getOwnerName());
+        if (displayName.isEmpty()) displayName = "发布者";
+        String avatarUrl = profile == null ? null : profile.url;
+        holder.publisherName.setText(displayName);
+        holder.publisher.setContentDescription("查看发布者“" + displayName + "”的资料");
+        holder.publisher.setEnabled(ownerId > 0);
+        ChatAvatarLoader.bind(holder.publisherAvatar, holder.publisherInitial, avatarUrl, displayName);
+        final String visibleName = displayName;
+        holder.publisher.setOnClickListener(v -> PublisherProfileSheet.open(
+                v.getContext(), ownerId, visibleName, avatarUrl));
+        Long retryAfter = publisherRetryAfter.get(ownerId);
+        if (ownerId <= 0 || profile != null || publisherRequests.containsKey(ownerId)
+                || (retryAfter != null && android.os.SystemClock.elapsedRealtime() < retryAfter)) return;
+
+        Call<Result<Account>> request = ApiClient.getClient().create(UserService.class).getAccount(ownerId);
+        publisherRequests.put(ownerId, request);
+        request.enqueue(new Callback<Result<Account>>() {
+            @Override public void onResponse(@NonNull Call<Result<Account>> call,
+                                             @NonNull Response<Result<Account>> response) {
+                if (publisherRequests.get(ownerId) != call) return;
+                publisherRequests.remove(ownerId);
+                Account account = response.isSuccessful() && response.body() != null
+                        && response.body().getCode() == 1 ? response.body().getData() : null;
+                if (account != null) {
+                    publishers.put(ownerId, new PublisherAvatar(account));
+                    for (int i = 0; i < items.size(); i++) {
+                        if (items.get(i).getProject().getOwnerAccountId() == ownerId) notifyItemChanged(i);
+                    }
+                } else publisherRetryAfter.put(ownerId, android.os.SystemClock.elapsedRealtime() + 30_000L);
+            }
+            @Override public void onFailure(@NonNull Call<Result<Account>> call, @NonNull Throwable error) {
+                if (publisherRequests.get(ownerId) != call) return;
+                publisherRequests.remove(ownerId);
+                if (!call.isCanceled()) publisherRetryAfter.put(ownerId, android.os.SystemClock.elapsedRealtime() + 30_000L);
+            }
+        });
+    }
+
+    @Override
+    public void onViewRecycled(@NonNull Holder holder) {
+        if (holder.publisherAvatar != null) holder.publisherAvatar.setTag(null);
+        super.onViewRecycled(holder);
+    }
+
+    @Override
+    public void onDetachedFromRecyclerView(@NonNull RecyclerView recyclerView) {
+        for (Call<Result<Account>> call : publisherRequests.values()) call.cancel();
+        publisherRequests.clear();
+        super.onDetachedFromRecyclerView(recyclerView);
     }
 
     private void bindFavorite(Holder holder, TeamCardItem item) {
@@ -178,8 +295,10 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
                     Result body = response.body();
                     if (!response.isSuccessful() || body == null || body.getCode() != 1) {
                         notifyProjectChanged(projectId);
-                        Toast.makeText(v.getContext(), body != null && body.getMsg() != null
-                                        ? body.getMsg() : "收藏操作失败",
+                        boolean userStyle = userPresentation
+                                || v.getContext() instanceof com.example.Japp.FavoriteOrdersActivity;
+                        Toast.makeText(v.getContext(), userStyle ? "暂时无法更新收藏，请稍后重试"
+                                        : body != null && body.getMsg() != null ? body.getMsg() : "收藏操作失败",
                                 Toast.LENGTH_SHORT).show();
                         return;
                     }

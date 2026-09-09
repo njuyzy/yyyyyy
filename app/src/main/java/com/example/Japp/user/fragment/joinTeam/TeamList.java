@@ -157,8 +157,8 @@ public class TeamList extends Fragment {
         txtCurrentCity = view.findViewById(R.id.txtCurrentCity);
 
         service = ApiClient.getClient().create(UserService.class);
-        adapter = new TeamListAdapter();
-        myPendingAdapter = new TeamListAdapter();
+        adapter = new TeamListAdapter(true);
+        myPendingAdapter = new TeamListAdapter(true);
         adapter.setFavoriteEnabled(true);
         myPendingAdapter.setFavoriteEnabled(true);
         TeamListAdapter.OnTeamClickListener clickListener = item -> {
@@ -730,8 +730,8 @@ public class TeamList extends Fragment {
             }
         }
 
-        String[] statusLabels = getResources().getStringArray(R.array.order_filter_status_labels);
-        String[] statusValues = getResources().getStringArray(R.array.order_filter_status_values);
+        String[] statusLabels = {"全部状态", "招募中", "已确认"};
+        String[] statusValues = {"", "OPEN", "CONFIRMED"};
         ArrayAdapter<String> statusAdapter = new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_item, statusLabels);
         statusAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -1064,7 +1064,7 @@ public class TeamList extends Fragment {
                         filterKeyword,
                         backendRegionCode(),
                         selectedFilterTag(),
-                        filterStatus,
+                        null, // A public phase may include multiple backend states; filter each paged result below.
                         filterDateFrom,
                         filterDateTo,
                         null,
@@ -1113,7 +1113,8 @@ public class TeamList extends Fragment {
                                                     project.getLeaderAccountId())
                                             && ProjectUiHelper.isLeaderAcceptableStatus(
                                                     project.getStatus());
-                            if (ProjectUiHelper.hasRemainingCapacity(project)
+                            if (!com.example.Japp.user.util.UserOrderPresentation.isCancelled(project)
+                                    && ProjectUiHelper.hasRemainingCapacity(project)
                                     && !shownInMyPendingSection) {
                                 joinable.add(project);
                             }
@@ -1160,7 +1161,7 @@ public class TeamList extends Fragment {
                         filterKeyword,
                         backendRegionCode(),
                         selectedFilterTag(),
-                        filterStatus,
+                        null,
                         filterDateFrom,
                         filterDateTo,
                         accountId,
@@ -1236,16 +1237,15 @@ public class TeamList extends Fragment {
     }
 
     private List<Project> filterProvinceLocallyIfNeeded(List<Project> projects) {
-        if (!isProvinceRegionCode(filterRegionCode)) {
-            return projects;
-        }
         List<Project> matched = new ArrayList<>();
-        String prefix = filterRegionCode.substring(0, 2);
         for (Project project : projects) {
-            if (project != null && !TextUtils.isEmpty(project.getRegionAdcode())
-                    && project.getRegionAdcode().startsWith(prefix)) {
-                matched.add(project);
-            }
+            if (project == null) continue;
+            if (!TextUtils.isEmpty(filterStatus) && !filterStatus.equals(
+                    com.example.Japp.user.util.UserOrderPresentation.phase(project.getStatus()))) continue;
+            if (isProvinceRegionCode(filterRegionCode)
+                    && (TextUtils.isEmpty(project.getRegionAdcode())
+                    || !project.getRegionAdcode().startsWith(filterRegionCode.substring(0, 2)))) continue;
+            matched.add(project);
         }
         return matched;
     }

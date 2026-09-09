@@ -64,7 +64,7 @@ public class historyRoute extends Fragment {
         service = ApiClient.getClient().create(UserService.class);
         bindStatusFilter(view);
 
-        adapter = new TeamListAdapter();
+        adapter = new TeamListAdapter(true);
         adapter.setFavoriteEnabled(true);
         savedRouteAdapter = new SavedRouteAdapter(this::openSavedRoute);
         adapter.setOnTeamClickListener(item -> {
@@ -94,12 +94,8 @@ public class historyRoute extends Fragment {
         group.setOnCheckedChangeListener((chipGroup, checkedId) -> {
             if (checkedId == R.id.chipStatusOpen) {
                 selectedStatus = ProjectUiHelper.STATUS_OPEN;
-            } else if (checkedId == R.id.chipStatusMatching) {
-                selectedStatus = ProjectUiHelper.STATUS_MATCHING;
             } else if (checkedId == R.id.chipStatusConfirmed) {
                 selectedStatus = ProjectUiHelper.STATUS_CONFIRMED;
-            } else if (checkedId == R.id.chipStatusInProgress) {
-                selectedStatus = ProjectUiHelper.STATUS_IN_PROGRESS;
             } else if (checkedId == R.id.chipStatusDone) {
                 selectedStatus = ProjectUiHelper.STATUS_DONE;
             } else if (checkedId == R.id.chipStatusCancelled) {
@@ -247,7 +243,7 @@ public class historyRoute extends Fragment {
         for (TeamCardItem item : items) {
             Project project = item == null ? null : item.getProject();
             if (project != null && (selectedStatus.isEmpty()
-                    || selectedStatus.equals(ProjectUiHelper.normalizeStatus(project.getStatus())))) {
+                    || selectedStatus.equals(com.example.Japp.user.util.UserOrderPresentation.phase(project.getStatus())))) {
                 filtered.add(item);
             }
         }

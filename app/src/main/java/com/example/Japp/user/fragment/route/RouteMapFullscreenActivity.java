@@ -19,6 +19,7 @@ import com.amap.api.maps.model.LatLng;
 import com.example.Japp.R;
 import com.example.Japp.network.models.RouteNode;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,6 +33,7 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
     private static final String EXTRA_WAYPOINT_LATS = "waypoint_lats";
     private static final String EXTRA_WAYPOINT_LNGS = "waypoint_lngs";
     private static final String EXTRA_TITLE = "route_title";
+    private static final String EXTRA_ROUTE_NODES = "route_nodes";
 
     private MapView mapView;
     @Nullable
@@ -41,6 +43,7 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
     @Nullable
     private List<LatLng> waypointPoints;
     private boolean mapCreated;
+    private List<RouteNode> routeNodes = Collections.emptyList();
 
     public static void start(@NonNull Context context, @Nullable List<LatLng> points) {
         start(context, points, null);
@@ -49,14 +52,35 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
     public static void startWithNodes(@NonNull Context context,
                                       @Nullable List<RouteNode> nodes,
                                       @Nullable String title) {
-        start(context, Collections.emptyList(),
-                RouteMapDrawHelper.extractPointsFromNodes(nodes), title);
+        startWithNodes(context, Collections.emptyList(), nodes, title);
+    }
+
+    public static void startWithNodes(@NonNull Context context,
+                                      @Nullable List<LatLng> roadPoints,
+                                      @Nullable List<RouteNode> nodes,
+                                      @Nullable String title) {
+        List<RouteNode> safeNodes = new ArrayList<>();
+        if (nodes != null) {
+            for (RouteNode node : nodes) {
+                if (node != null) safeNodes.add(node);
+            }
+        }
+        launch(context, roadPoints, RouteMapDrawHelper.extractPointsFromNodes(safeNodes),
+                safeNodes, title);
     }
 
     public static void start(@NonNull Context context,
                              @Nullable List<LatLng> roadPoints,
                              @Nullable List<LatLng> waypoints,
                              @Nullable String title) {
+        launch(context, roadPoints, waypoints, null, title);
+    }
+
+    private static void launch(@NonNull Context context,
+                               @Nullable List<LatLng> roadPoints,
+                               @Nullable List<LatLng> waypoints,
+                               @Nullable List<RouteNode> nodes,
+                               @Nullable String title) {
         List<LatLng> safePoints = roadPoints != null ? roadPoints : Collections.emptyList();
         double[] lats = new double[safePoints.size()];
         double[] lngs = new double[safePoints.size()];
@@ -67,6 +91,9 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
         Intent intent = new Intent(context, RouteMapFullscreenActivity.class);
         intent.putExtra(EXTRA_LATS, lats);
         intent.putExtra(EXTRA_LNGS, lngs);
+        if (nodes != null && !nodes.isEmpty()) {
+            intent.putExtra(EXTRA_ROUTE_NODES, new Gson().toJson(nodes));
+        }
         if (waypoints != null && !waypoints.isEmpty()) {
             double[] wLats = new double[waypoints.size()];
             double[] wLngs = new double[waypoints.size()];
@@ -124,6 +151,7 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
 
         routePoints = readPointsFromIntent();
         waypointPoints = readWaypointsFromIntent();
+        routeNodes = readNodesFromIntent();
         mapView = findViewById(R.id.mapView);
         if (mapView == null) {
             Toast.makeText(this, "地图加载失败", Toast.LENGTH_SHORT).show();
@@ -155,7 +183,12 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
             return;
         }
         try {
-            RouteMapDrawHelper.drawRoute(aMap, routePoints, waypointPoints);
+            if (!routeNodes.isEmpty()) {
+                RouteMapDrawHelper.drawRouteWithNodes(aMap, routePoints, routeNodes);
+            } else {
+                // Coordinate-only callers retain their existing marker presentation.
+                RouteMapDrawHelper.drawRoute(aMap, routePoints, waypointPoints);
+            }
         } catch (Exception ignored) {
             // 地图尚未就绪时忽略，等待 onMapLoaded 再次绘制
         }
@@ -169,6 +202,23 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
     private List<LatLng> readWaypointsFromIntent() {
         List<LatLng> points = readLatLngExtra(EXTRA_WAYPOINT_LATS, EXTRA_WAYPOINT_LNGS);
         return points.isEmpty() ? null : points;
+    }
+
+    private List<RouteNode> readNodesFromIntent() {
+        List<RouteNode> nodes = new ArrayList<>();
+        String json = getIntent().getStringExtra(EXTRA_ROUTE_NODES);
+        if (TextUtils.isEmpty(json)) return nodes;
+        try {
+            RouteNode[] decoded = new Gson().fromJson(json, RouteNode[].class);
+            if (decoded != null) {
+                for (RouteNode node : decoded) {
+                    if (node != null) nodes.add(node);
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // Older or incomplete launch data can still use the coordinate fallback.
+        }
+        return nodes;
     }
 
     @NonNull

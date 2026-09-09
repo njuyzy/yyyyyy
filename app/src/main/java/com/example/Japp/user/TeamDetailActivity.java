@@ -27,12 +27,18 @@ import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.Project;
+import com.example.Japp.network.models.ProjectMember;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.example.Japp.network.models.requests.JoinProjectRequest;
 import com.example.Japp.user.fragment.route.RouteMapDrawHelper;
 import com.example.Japp.user.fragment.route.RouteMapFullscreenActivity;
 import com.example.Japp.user.util.ProjectUiHelper;
+import com.example.Japp.user.util.UserOrderPresentation;
+import com.example.Japp.user.util.UserOrderDetailContent;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+import androidx.core.widget.NestedScrollView;
+import com.amap.api.maps.CameraUpdateFactory;
 import com.example.Japp.user.util.SessionHelper;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -77,6 +83,12 @@ public class TeamDetailActivity extends AppCompatActivity {
     private LeaderWalkRoutePlanner walkRoutePlanner;
     private boolean routePlanningStarted;
     private boolean mapCreated;
+    private UserOrderDetailContent detailContent;
+    private SwipeRefreshLayout refreshLayout;
+    private boolean projectFresh;
+    private boolean actionInFlight;
+    private final List<Call<?>> detailCalls = new ArrayList<>();
+    private int detailGeneration;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -101,6 +113,10 @@ public class TeamDetailActivity extends AppCompatActivity {
         mapContainer = findViewById(R.id.mapContainer);
         routeMapView = findViewById(R.id.routeMapView);
         mapTapHint = findViewById(R.id.mapTapHint);
+        detailContent = new UserOrderDetailContent(this);
+        refreshLayout = findViewById(R.id.userOrderRefresh);
+        refreshLayout.setColorSchemeColors(0xFF2563EB);
+        refreshLayout.setOnRefreshListener(this::refreshProject);
 
         if (!hasConfiguredAmapKey()) {
             if (mapContainer != null) {
@@ -114,6 +130,9 @@ public class TeamDetailActivity extends AppCompatActivity {
                 aMap.getUiSettings().setZoomControlsEnabled(false);
                 aMap.getUiSettings().setRotateGesturesEnabled(false);
                 aMap.getUiSettings().setTiltGesturesEnabled(false);
+                aMap.getUiSettings().setScrollGesturesEnabled(false);
+                aMap.getUiSettings().setZoomGesturesEnabled(false);
+                aMap.setOnMapClickListener(point -> openFullscreenMap());
                 aMap.setOnMapLoadedListener(this::startRoadRoutePlanning);
             }
             walkRoutePlanner = new LeaderWalkRoutePlanner(this);
@@ -134,7 +153,11 @@ public class TeamDetailActivity extends AppCompatActivity {
             return;
         }
 
-        project = new Gson().fromJson(projectJson, Project.class);
+        try {
+            project = new Gson().fromJson(projectJson, Project.class);
+        } catch (RuntimeException invalidData) {
+            project = null;
+        }
         if (project == null) {
             Toast.makeText(this, "项目数据无效", Toast.LENGTH_SHORT).show();
             finish();
@@ -143,87 +166,205 @@ public class TeamDetailActivity extends AppCompatActivity {
 
         bindProjectHeader();
         restoreMyPartySize();
-        loadOwnerName();
-        loadRouteDetail();
         setupJoinButton();
+        refreshProject();
+    }
+
+    private void refreshProject() {
+        if (actionInFlight) {
+            refreshLayout.setRefreshing(false);
+            return;
+        }
+        final int generation = ++detailGeneration;
+        if (walkRoutePlanner != null) walkRoutePlanner.cancel();
+        for (Call<?> call : detailCalls) call.cancel();
+        detailCalls.clear();
+        projectFresh = false;
+        setupJoinButton();
+        refreshLayout.setRefreshing(true);
+        Call<Result<Project>> request = service.getProject(project.getId());
+        detailCalls.add(request);
+        request.enqueue(new Callback<Result<Project>>() {
+            @Override public void onResponse(Call<Result<Project>> call, Response<Result<Project>> response) {
+                if (!isCurrent(generation)) return;
+                refreshLayout.setRefreshing(false);
+                if (response.code() == 401) {
+                    SessionHelper.handleUnauthorized(TeamDetailActivity.this);
+                    return;
+                }
+                if (response.isSuccessful() && response.body() != null
+                        && response.body().getCode() == 1 && response.body().getData() != null) {
+                    project = response.body().getData();
+                    projectFresh = true;
+                    cachedRouteNodes.clear();
+                    routePoints.clear();
+                    plannedRoadPoints.clear();
+                    routePlanningStarted = false;
+                    ((android.widget.LinearLayout) findViewById(R.id.userOrderStops)).removeAllViews();
+                    hideMapSection();
+                    bindProjectHeader();
+                    restoreMyPartySize();
+                    loadMyPartySize();
+                    findViewById(R.id.userOrderNotice).setVisibility(View.GONE);
+                    setResult(RESULT_OK);
+                } else showRefreshFailure();
+                setupJoinButton();
+                loadOwnerName();
+                loadRouteDetail();
+            }
+            @Override public void onFailure(Call<Result<Project>> call, Throwable t) {
+                if (!isCurrent(generation) || call.isCanceled()) return;
+                refreshLayout.setRefreshing(false);
+                showRefreshFailure();
+                setupJoinButton();
+                loadRouteDetail();
+            }
+        });
+    }
+
+    private boolean isCurrent(int generation) {
+        return !isFinishing() && !isDestroyed() && generation == detailGeneration;
+    }
+
+    private void showRefreshFailure() {
+        TextView notice = findViewById(R.id.userOrderNotice);
+        notice.setText("暂时无法更新行程，当前展示上次的信息。点此重试或下拉刷新。");
+        notice.setVisibility(View.VISIBLE);
+        notice.setOnClickListener(v -> refreshProject());
     }
 
     private void bindProjectHeader() {
         String title = project.getTitle();
         txtTitle.setText(title == null || title.isEmpty() ? "研学拼单" : title);
 
-        String city = ProjectUiHelper.regionAdcodeToCity(project.getRegionAdcode());
-        String date = project.getDepartureDate() != null ? project.getDepartureDate() : "待定";
-        txtMeta.setText((city.isEmpty() ? "未知城市" : city)
-                + " · 出发 " + date
-                + "\n已有人数 " + Math.max(0, project.getCurrentMembers())
-                + " / 人数上限 " + (project.getMaxMembers() > 0
-                ? String.valueOf(project.getMaxMembers()) : "不限"));
-
-        txtStatus.setText(ProjectUiHelper.statusLabel(project.getStatus()));
+        String city = UserOrderPresentation.city(ProjectUiHelper.regionAdcodeToCity(project.getRegionAdcode()));
+        String tag = UserOrderPresentation.clean(project.getTag());
+        txtMeta.setText(city.isEmpty() ? tag : city + (tag.isEmpty() ? "" : " · " + tag));
+        txtMeta.setVisibility(txtMeta.length() == 0 ? View.GONE : View.VISIBLE);
+        detailContent.bind(project);
+        if (!cachedRouteNodes.isEmpty()) detailContent.bindStops(cachedRouteNodes, this::focusRouteNode);
     }
 
     private void loadOwnerName() {
-        service.getAccount(project.getOwnerAccountId()).enqueue(new Callback<Result<Account>>() {
+        loadPersonName(project.getOwnerAccountId(), txtOwner, "发布者");
+        if (ProjectUiHelper.hasAssignedLeader(project.getLeaderAccountId())) {
+            loadPersonName(project.getLeaderAccountId(), findViewById(R.id.userOrderLeader), "领队");
+        }
+    }
+
+    private void loadPersonName(int accountId, TextView view, String role) {
+        final int generation = detailGeneration;
+        Call<Result<Account>> request = service.getAccount(accountId);
+        detailCalls.add(request);
+        request.enqueue(new Callback<Result<Account>>() {
             @Override
             public void onResponse(Call<Result<Account>> call, Response<Result<Account>> response) {
+                if (!isCurrent(generation)) return;
                 if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
                     Account account = response.body().getData();
-                    if (account != null) {
-                        txtOwner.setText("发起人：" + account.getUsername());
+                    if (account != null && !UserOrderPresentation.clean(account.getUsername()).isEmpty()) {
+                        view.setText(role + "  ·  " + account.getUsername());
                     }
                 }
             }
 
             @Override
             public void onFailure(Call<Result<Account>> call, Throwable t) {
-                txtOwner.setText("发起人：未知");
+                // Keep the supplied display name when a separate profile cannot be loaded.
+            }
+        });
+    }
+
+    private void loadMyPartySize() {
+        if (!"PARTICIPANT".equalsIgnoreCase(project.getViewerRole())) return;
+        final int generation = detailGeneration;
+        final int accountId = SessionHelper.getAccountId(this);
+        Call<Result<List<ProjectMember>>> request = service.getProjectMembers(project.getId());
+        detailCalls.add(request);
+        request.enqueue(new Callback<Result<List<ProjectMember>>>() {
+            @Override public void onResponse(Call<Result<List<ProjectMember>>> call,
+                                             Response<Result<List<ProjectMember>>> response) {
+                if (!isCurrent(generation) || !response.isSuccessful() || response.body() == null
+                        || response.body().getCode() != 1 || response.body().getData() == null) return;
+                for (ProjectMember member : response.body().getData()) {
+                    if (member != null && member.getAccountId() == accountId && member.getRepresentedCount() > 0) {
+                        saveMyPartySize(member.getRepresentedCount());
+                        showMyPartySize(member.getRepresentedCount());
+                        return;
+                    }
+                }
+            }
+            @Override public void onFailure(Call<Result<List<ProjectMember>>> call, Throwable t) {
+                // Keep the last confirmed party size while the supplementary request is unavailable.
             }
         });
     }
 
     private void loadRouteDetail() {
-        service.getRouteNodes(project.getRouteId()).enqueue(new Callback<Result<List<RouteNode>>>() {
+        final int generation = detailGeneration;
+        txtRouteDetail.setText("正在加载路线…");
+        txtRouteDetail.setTextColor(0xFF637086);
+        txtRouteDetail.setOnClickListener(null);
+        Call<Result<List<RouteNode>>> request = service.getRouteNodes(project.getRouteId());
+        detailCalls.add(request);
+        request.enqueue(new Callback<Result<List<RouteNode>>>() {
             @Override
             public void onResponse(Call<Result<List<RouteNode>>> call, Response<Result<List<RouteNode>>> response) {
+                if (!isCurrent(generation)) return;
                 if (!response.isSuccessful() || response.body() == null || response.body().getCode() != 1) {
-                    txtRouteDetail.setText("暂无路线详情");
-                    hideMapSection();
+                    showRouteFailure();
                     return;
                 }
-                List<RouteNode> nodes = response.body().getData();
-                if (nodes == null || nodes.isEmpty()) {
-                    txtRouteDetail.setText("暂无路线详情");
-                    hideMapSection();
+                List<RouteNode> nodes = response.body().getData() == null
+                        ? new ArrayList<>() : new ArrayList<>(response.body().getData());
+                nodes.removeAll(Collections.singleton(null));
+                if (nodes.isEmpty()) {
+                    showRouteFailure();
                     return;
                 }
                 Collections.sort(nodes, Comparator.comparingInt(RouteNode::getVisitOrder));
-                txtRouteDetail.setText(buildRouteText(nodes));
+                int duration = ProjectUiHelper.sumDurationMinutes(nodes);
+                txtRouteDetail.setText(nodes.size() + " 处地点"
+                        + (duration > 0 ? " · 建议游览 " + ProjectUiHelper.formatDuration(duration) : "")
+                        + "\n点击站点展开地址、营业时间与游览提示");
+                detailContent.bindStops(nodes, TeamDetailActivity.this::focusRouteNode);
+                String routeCity = UserOrderPresentation.city(nodes.get(0).getCityname());
+                if (!routeCity.isEmpty()) {
+                    String tag = UserOrderPresentation.clean(project.getTag());
+                    txtMeta.setText(routeCity + (tag.isEmpty() ? "" : " · " + tag));
+                    txtMeta.setVisibility(View.VISIBLE);
+                }
                 bindRouteMap(nodes);
             }
 
             @Override
             public void onFailure(Call<Result<List<RouteNode>>> call, Throwable t) {
-                txtRouteDetail.setText("路线加载失败");
-                hideMapSection();
+                if (!isCurrent(generation) || call.isCanceled()) return;
+                showRouteFailure();
             }
         });
     }
 
-    private String buildRouteText(List<RouteNode> nodes) {
-        StringBuilder sb = new StringBuilder();
-        for (RouteNode node : nodes) {
-            sb.append(node.getVisitOrder()).append(". ")
-                    .append(node.getName() != null ? node.getName() : "未知景点");
-            if (node.getRecommendedDuration() > 0) {
-                sb.append("（约").append(node.getRecommendedDuration()).append("分钟）");
-            }
-            if (node.getNotes() != null && !node.getNotes().isEmpty()) {
-                sb.append("\n   ").append(node.getNotes());
-            }
-            sb.append("\n\n");
+    private void showRouteFailure() {
+        txtRouteDetail.setText("暂未获取到路线详情，点击重新加载");
+        txtRouteDetail.setTextColor(0xFF2563EB);
+        txtRouteDetail.setOnClickListener(v -> loadRouteDetail());
+        detailContent.routeUnavailable();
+        hideMapSection();
+    }
+
+    private void focusRouteNode(RouteNode node) {
+        List<LatLng> points = RouteMapDrawHelper.extractPointsFromNodes(Collections.singletonList(node));
+        if (aMap == null || points.isEmpty()) {
+            Toast.makeText(this, "该地点暂时无法在地图中展示，可复制地址查询", Toast.LENGTH_SHORT).show();
+            return;
         }
-        return sb.toString().trim();
+        aMap.animateCamera(CameraUpdateFactory.newLatLngZoom(points.get(0), 16f));
+        NestedScrollView scroll = findViewById(R.id.userOrderScroll);
+        android.graphics.Rect bounds = new android.graphics.Rect();
+        mapContainer.getDrawingRect(bounds);
+        scroll.offsetDescendantRectToMyCoords(mapContainer, bounds);
+        scroll.smoothScrollTo(0, Math.max(0, bounds.top - 12));
     }
 
     private void bindRouteMap(List<RouteNode> nodes) {
@@ -234,7 +375,7 @@ public class TeamDetailActivity extends AppCompatActivity {
         plannedRoadPoints.clear();
         routePlanningStarted = false;
 
-        if (routePoints.size() < 2) {
+        if (routePoints.isEmpty() || aMap == null) {
             hideMapSection();
             return;
         }
@@ -256,7 +397,7 @@ public class TeamDetailActivity extends AppCompatActivity {
     }
 
     private void drawRouteOnMap() {
-        if (aMap == null || routePoints.size() < 2) {
+        if (aMap == null || routePoints.isEmpty()) {
             return;
         }
         RouteMapDrawHelper.drawRouteWithNodes(
@@ -269,9 +410,11 @@ public class TeamDetailActivity extends AppCompatActivity {
             return;
         }
         routePlanningStarted = true;
+        final int generation = detailGeneration;
         walkRoutePlanner.plan(aMap, cachedRouteNodes, new LeaderWalkRoutePlanner.Callback() {
             @Override
             public void onPlanningStarted() {
+                if (!isCurrent(generation)) return;
                 // 规划完成前只显示站点，避免短暂出现两点直连线。
                 drawRouteOnMap();
             }
@@ -288,6 +431,7 @@ public class TeamDetailActivity extends AppCompatActivity {
                                            @NonNull ArrayList<String> instructions,
                                            @NonNull List<LatLng> roadPolyline,
                                            boolean hadFailures) {
+                if (!isCurrent(generation)) return;
                 plannedRoadPoints.clear();
                 plannedRoadPoints.addAll(roadPolyline);
                 drawRouteOnMap();
@@ -295,6 +439,7 @@ public class TeamDetailActivity extends AppCompatActivity {
 
             @Override
             public void onPlanningFailed(@NonNull String message) {
+                if (!isCurrent(generation)) return;
                 routePlanningStarted = false;
                 drawRouteOnMap();
             }
@@ -302,13 +447,13 @@ public class TeamDetailActivity extends AppCompatActivity {
     }
 
     private void openFullscreenMap() {
-        if (routePoints.size() < 2) {
+        if (routePoints.isEmpty()) {
             Toast.makeText(this, R.string.route_map_no_coords, Toast.LENGTH_SHORT).show();
             return;
         }
-        RouteMapFullscreenActivity.start(this,
+        RouteMapFullscreenActivity.startWithNodes(this,
                 new ArrayList<>(plannedRoadPoints),
-                new ArrayList<>(routePoints),
+                new ArrayList<>(cachedRouteNodes),
                 txtTitle.getText().toString());
     }
 
@@ -335,6 +480,20 @@ public class TeamDetailActivity extends AppCompatActivity {
         btnJoin.setEnabled(true);
         btnJoin.setOnClickListener(null);
 
+        stylePrimaryAction();
+        if (!projectFresh) {
+            btnJoin.setEnabled(false);
+            btnJoin.setText("等待更新行程");
+            return;
+        }
+        String phase = UserOrderPresentation.phase(project.getStatus());
+        if (phase.isEmpty() || "DONE".equals(phase) || "CANCELLED".equals(phase)) {
+            btnJoin.setEnabled(false);
+            btnJoin.setText("DONE".equals(phase) ? "行程已完成"
+                    : "CANCELLED".equals(phase) ? "行程已取消" : "暂不可操作");
+            return;
+        }
+
         if (project.getOwnerAccountId() == accountId) {
             setupPublisherAction();
             return;
@@ -357,7 +516,7 @@ public class TeamDetailActivity extends AppCompatActivity {
             btnJoin.setText("已满员");
             return;
         }
-        if (!"OPEN".equals(project.getStatus()) && !"MATCHING".equals(project.getStatus())) {
+        if (!project.isCanJoin() && !"OPEN".equals(phase)) {
             btnJoin.setEnabled(false);
             btnJoin.setText("暂不可加入");
             return;
@@ -367,6 +526,7 @@ public class TeamDetailActivity extends AppCompatActivity {
     }
 
     private void setupPublisherAction() {
+        actionInFlight = false;
         String status = ProjectUiHelper.normalizeStatus(project.getStatus());
         btnJoin.setEnabled(true);
         styleDangerAction();
@@ -390,6 +550,7 @@ public class TeamDetailActivity extends AppCompatActivity {
     }
 
     private void setupParticipantAction() {
+        actionInFlight = false;
         btnJoin.setEnabled(true);
         styleDangerAction();
         btnJoin.setText("退出行程");
@@ -402,6 +563,7 @@ public class TeamDetailActivity extends AppCompatActivity {
     }
 
     private void setupLeaderAction() {
+        actionInFlight = false;
         btnJoin.setEnabled(true);
         styleDangerAction();
         btnJoin.setText("放弃带队");
@@ -414,6 +576,7 @@ public class TeamDetailActivity extends AppCompatActivity {
     }
 
     private void quitTrip() {
+        actionInFlight = true;
         btnJoin.setEnabled(false);
         btnJoin.setText("正在退出…");
         service.quitProject(project.getId()).enqueue(new Callback<Result>() {
@@ -426,8 +589,7 @@ public class TeamDetailActivity extends AppCompatActivity {
                 if (!response.isSuccessful() || response.body() == null
                         || response.body().getCode() != 1) {
                     setupParticipantAction();
-                    String message = response.body() == null
-                            ? "退出行程失败" : response.body().getMsg();
+                    String message = "暂时无法退出，请刷新确认行程状态后重试";
                     Toast.makeText(TeamDetailActivity.this,
                             message, Toast.LENGTH_SHORT).show();
                     return;
@@ -451,6 +613,7 @@ public class TeamDetailActivity extends AppCompatActivity {
     }
 
     private void abandonTrip() {
+        actionInFlight = true;
         btnJoin.setEnabled(false);
         btnJoin.setText("正在放弃…");
         service.abandonProject(project.getId()).enqueue(new Callback<Result>() {
@@ -463,8 +626,7 @@ public class TeamDetailActivity extends AppCompatActivity {
                 if (!response.isSuccessful() || response.body() == null
                         || response.body().getCode() != 1) {
                     setupLeaderAction();
-                    String message = response.body() == null
-                            ? "放弃带队失败" : response.body().getMsg();
+                    String message = "暂时无法放弃带队，请刷新确认行程状态后重试";
                     Toast.makeText(TeamDetailActivity.this,
                             message, Toast.LENGTH_SHORT).show();
                     return;
@@ -497,6 +659,7 @@ public class TeamDetailActivity extends AppCompatActivity {
     }
 
     private void cancelTrip() {
+        actionInFlight = true;
         btnJoin.setEnabled(false);
         btnJoin.setText("正在取消…");
         service.updateProjectStatus(project.getId(), ProjectUiHelper.STATUS_CANCELLED)
@@ -510,8 +673,7 @@ public class TeamDetailActivity extends AppCompatActivity {
                         if (!response.isSuccessful() || response.body() == null
                                 || response.body().getCode() != 1) {
                             setupPublisherAction();
-                            String message = response.body() == null
-                                    ? "取消行程失败" : response.body().getMsg();
+                            String message = "暂时无法取消，请刷新确认行程状态后重试";
                             Toast.makeText(TeamDetailActivity.this,
                                     message, Toast.LENGTH_SHORT).show();
                             return;
@@ -537,9 +699,12 @@ public class TeamDetailActivity extends AppCompatActivity {
     }
 
     private void stylePrimaryAction() {
-        btnJoin.setBackgroundTintList(ColorStateList.valueOf(
-                ContextCompat.getColor(this, R.color.accent)));
-        btnJoin.setTextColor(ContextCompat.getColor(this, R.color.white));
+        btnJoin.setBackgroundTintList(new ColorStateList(
+                new int[][]{new int[]{-android.R.attr.state_enabled}, new int[]{}},
+                new int[]{0xFFE3E9F2, 0xFF2563EB}));
+        btnJoin.setTextColor(new ColorStateList(
+                new int[][]{new int[]{-android.R.attr.state_enabled}, new int[]{}},
+                new int[]{0xFF78859A, 0xFFFFFFFF}));
         btnJoin.setStrokeWidth(0);
     }
 
@@ -596,11 +761,14 @@ public class TeamDetailActivity extends AppCompatActivity {
             return;
         }
 
+        actionInFlight = true;
         btnJoin.setEnabled(false);
+        btnJoin.setText("正在加入…");
         service.joinProject(project.getId(), new JoinProjectRequest(partySize))
                 .enqueue(new Callback<Result>() {
             @Override
             public void onResponse(Call<Result> call, Response<Result> response) {
+                actionInFlight = false;
                 if (response.code() == 401) {
                     Toast.makeText(TeamDetailActivity.this, "登录已失效，请重新登录", Toast.LENGTH_SHORT).show();
                     SessionHelper.handleUnauthorized(TeamDetailActivity.this);
@@ -618,16 +786,17 @@ public class TeamDetailActivity extends AppCompatActivity {
                     bindProjectHeader();
                     setupJoinButton();
                     setResult(RESULT_OK);
+                    refreshProject();
                 } else {
-                    btnJoin.setEnabled(true);
-                    String msg = response.body() != null ? response.body().getMsg() : "加入失败";
-                    Toast.makeText(TeamDetailActivity.this, msg, Toast.LENGTH_SHORT).show();
+                    setupJoinButton();
+                    Toast.makeText(TeamDetailActivity.this, "暂时无法加入，请刷新行程确认剩余名额", Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onFailure(Call<Result> call, Throwable t) {
-                btnJoin.setEnabled(true);
+                actionInFlight = false;
+                setupJoinButton();
                 Toast.makeText(TeamDetailActivity.this, "网络错误，加入失败", Toast.LENGTH_SHORT).show();
             }
         });
@@ -645,10 +814,12 @@ public class TeamDetailActivity extends AppCompatActivity {
     private void restoreMyPartySize() {
         int partySize = getSharedPreferences("project_party_sizes", MODE_PRIVATE)
                 .getInt(partySizePreferenceKey(), 0);
-        if (partySize > 0) {
-            if (project.getOwnerAccountId() != SessionHelper.getAccountId(this)) {
-                project.setViewerRole("PARTICIPANT");
-            }
+        txtMyPartySize.setVisibility(View.GONE);
+        if (project.getOwnerAccountId() == SessionHelper.getAccountId(this)) {
+            partySize = project.getRepresentedCount();
+        }
+        if (partySize > 0 && ("PARTICIPANT".equalsIgnoreCase(project.getViewerRole())
+                || project.getOwnerAccountId() == SessionHelper.getAccountId(this))) {
             showMyPartySize(partySize);
         }
     }
@@ -687,6 +858,9 @@ public class TeamDetailActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        ++detailGeneration;
+        for (Call<?> call : detailCalls) call.cancel();
+        detailCalls.clear();
         if (walkRoutePlanner != null) {
             walkRoutePlanner.cancel();
             walkRoutePlanner = null;
