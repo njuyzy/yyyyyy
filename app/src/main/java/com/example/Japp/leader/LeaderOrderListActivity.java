@@ -44,7 +44,7 @@ import retrofit2.Response;
 public class LeaderOrderListActivity extends AppCompatActivity {
 
     public static final String EXTRA_TYPE = "extra_type";
-    public static final int TYPE_PENDING = 0;
+    public static final int TYPE_ACCEPTED = 0;
     public static final int TYPE_COMPLETED = 1;
 
     private static final String TAG = "LeaderOrderList";
@@ -64,16 +64,18 @@ public class LeaderOrderListActivity extends AppCompatActivity {
     private int currentPage = 1;
     private int totalPages = 1;
     private boolean loading = false;
+    private boolean hasResumedOnce = false;
+    private boolean refreshAfterCurrentLoad = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_leader_order_list);
 
-        type = getIntent().getIntExtra(EXTRA_TYPE, TYPE_PENDING);
+        type = getIntent().getIntExtra(EXTRA_TYPE, TYPE_ACCEPTED);
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
-        toolbar.setTitle(type == TYPE_COMPLETED ? "已完成订单" : "待完成订单");
+        toolbar.setTitle(type == TYPE_COMPLETED ? "已完成订单" : "已接单订单");
         toolbar.setNavigationOnClickListener(v -> finish());
 
         recycler = findViewById(R.id.recycler);
@@ -117,6 +119,19 @@ public class LeaderOrderListActivity extends AppCompatActivity {
         loadPage(1);
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (hasResumedOnce) {
+            if (loading) {
+                refreshAfterCurrentLoad = true;
+            } else {
+                refresh();
+            }
+        }
+        hasResumedOnce = true;
+    }
+
     private void loadPage(int page) {
         if (loading) return;
         if (!SessionHelper.isLoggedIn(this)) {
@@ -134,9 +149,7 @@ public class LeaderOrderListActivity extends AppCompatActivity {
 
         loading = true;
         String status = type == TYPE_COMPLETED ? "DONE" : null;
-        // 待完成订单 = 领队已接但还未结束，包含 CONFIRMED / IN_PROGRESS，
-        // 后端只支持单值过滤，这里先按 IN_PROGRESS 拉一页后再补 CONFIRMED。
-        // 为简化实现，统一走 "relation=LEADING"，客户端再按状态过滤。
+        // 已接单包含后端 MATCHING / CONFIRMED / IN_PROGRESS，统一在客户端归并展示。
         service.getMyProjects("LEADING", status, page, PAGE_SIZE)
                 .enqueue(new Callback<Result<ProjectPage>>() {
                     @Override
@@ -144,6 +157,11 @@ public class LeaderOrderListActivity extends AppCompatActivity {
                                            @NonNull Response<Result<ProjectPage>> response) {
                         loading = false;
                         swipeRefresh.setRefreshing(false);
+                        if (refreshAfterCurrentLoad) {
+                            refreshAfterCurrentLoad = false;
+                            refresh();
+                            return;
+                        }
                         if (response.code() == 401) {
                             SessionHelper.handleUnauthorized(LeaderOrderListActivity.this);
                             return;
@@ -162,14 +180,22 @@ public class LeaderOrderListActivity extends AppCompatActivity {
                         }
                         currentPage = pageData.getPageNum();
                         totalPages = Math.max(1, pageData.getPages());
-                        appendProjects(pageData.getItems());
+                        int added = appendProjects(pageData.getItems());
                         updateEmptyState();
+                        if (type == TYPE_ACCEPTED && added == 0 && currentPage < totalPages) {
+                            loadPage(currentPage + 1);
+                        }
                     }
 
                     @Override
                     public void onFailure(@NonNull Call<Result<ProjectPage>> call, @NonNull Throwable t) {
                         loading = false;
                         swipeRefresh.setRefreshing(false);
+                        if (refreshAfterCurrentLoad) {
+                            refreshAfterCurrentLoad = false;
+                            refresh();
+                            return;
+                        }
                         Log.e(TAG, "load orders failed", t);
                         Toast.makeText(LeaderOrderListActivity.this,
                                 "网络错误，请检查网络后重试", Toast.LENGTH_SHORT).show();
@@ -178,16 +204,19 @@ public class LeaderOrderListActivity extends AppCompatActivity {
                 });
     }
 
-    private void appendProjects(List<Project> projects) {
-        if (projects == null) return;
+    private int appendProjects(List<Project> projects) {
+        if (projects == null) return 0;
+        int added = 0;
         List<TeamCardItem> fresh = new ArrayList<>();
         for (Project project : projects) {
-            if (project == null || !projectIds.add(project.getId())) continue;
+            if (project == null) continue;
             if (!matchesType(project)) continue;
+            if (!projectIds.add(project.getId())) continue;
             TeamCardItem item = new TeamCardItem(project);
             item.setCity(ProjectUiHelper.regionAdcodeToCity(project.getRegionAdcode()));
             items.add(item);
             fresh.add(item);
+            added++;
         }
         items.sort((a, b) -> ProjectUiHelper.compareProjectsByStatus(
                 a.getProject(), b.getProject()));
@@ -195,6 +224,7 @@ public class LeaderOrderListActivity extends AppCompatActivity {
         for (TeamCardItem item : fresh) {
             enrichRoute(item);
         }
+        return added;
     }
 
     private boolean matchesType(Project project) {
@@ -203,8 +233,7 @@ public class LeaderOrderListActivity extends AppCompatActivity {
         if (type == TYPE_COMPLETED) {
             return "DONE".equals(status);
         }
-        // 待完成订单：已接单但未结束，包含 CONFIRMED / IN_PROGRESS
-        return "CONFIRMED".equals(status) || "IN_PROGRESS".equals(status);
+        return ProjectUiHelper.isLeaderAcceptedStatus(status);
     }
 
     private void enrichRoute(TeamCardItem item) {
@@ -243,7 +272,7 @@ public class LeaderOrderListActivity extends AppCompatActivity {
     private void updateEmptyState() {
         if (items.isEmpty()) {
             txtEmpty.setVisibility(View.VISIBLE);
-            txtEmpty.setText(type == TYPE_COMPLETED ? "暂无已完成订单" : "暂无待完成订单");
+            txtEmpty.setText(type == TYPE_COMPLETED ? "暂无已完成订单" : "暂无已接单订单");
             recycler.setVisibility(View.GONE);
         } else {
             txtEmpty.setVisibility(View.GONE);

@@ -129,7 +129,7 @@ public class profile extends Fragment {
                 Toast.makeText(requireContext(), "研学导览 · 领队端", Toast.LENGTH_SHORT).show());
 
         btnPendingOrders.setOnClickListener(v -> openOrderList(
-                LeaderOrderListActivity.TYPE_PENDING));
+                LeaderOrderListActivity.TYPE_ACCEPTED));
 
         btnCompletedOrders.setOnClickListener(v -> openOrderList(
                 LeaderOrderListActivity.TYPE_COMPLETED));

@@ -106,12 +106,13 @@ public final class ProjectUiHelper {
 
     public static String statusLabel(String status) {
         switch (normalizeStatus(status)) {
-            case STATUS_OPEN: return "招募中";
-            case STATUS_MATCHING: return "匹配中";
-            case STATUS_CONFIRMED: return "已确认";
-            case STATUS_IN_PROGRESS: return "进行中";
+            case STATUS_OPEN: return "待接单";
+            case STATUS_MATCHING:
+            case STATUS_CONFIRMED:
+            case STATUS_IN_PROGRESS:
+                return "已接单";
             case STATUS_DONE: return "已完成";
-            case STATUS_CANCELLED: return "已取消";
+            case STATUS_CANCELLED: return "";
             default: return status == null || status.isEmpty() ? "未知" : status;
         }
     }
@@ -129,9 +130,19 @@ public final class ProjectUiHelper {
         return !STATUS_DONE.equals(normalized) && !STATUS_CANCELLED.equals(normalized);
     }
 
-    public static boolean isLeaderAcceptableStatus(String status) {
+    public static boolean isLeaderAvailableStatus(String status) {
+        return STATUS_OPEN.equals(normalizeStatus(status));
+    }
+
+    public static boolean isLeaderAcceptedStatus(String status) {
         String normalized = normalizeStatus(status);
-        return STATUS_OPEN.equals(normalized) || STATUS_MATCHING.equals(normalized);
+        return STATUS_MATCHING.equals(normalized)
+                || STATUS_CONFIRMED.equals(normalized)
+                || STATUS_IN_PROGRESS.equals(normalized);
+    }
+
+    public static boolean isLeaderAcceptableStatus(String status) {
+        return isLeaderAvailableStatus(status);
     }
 
     public static void bindStatusBadge(TextView view, String status) {

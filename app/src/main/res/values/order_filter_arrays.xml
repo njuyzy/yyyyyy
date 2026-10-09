@@ -2,22 +2,12 @@
 <resources>
     <string-array name="order_filter_status_labels">
         <item>全部状态</item>
-        <item>招募中</item>
-        <item>匹配中</item>
-        <item>已确认</item>
-        <item>进行中</item>
-        <item>已完成</item>
-        <item>已取消</item>
+        <item>待接单</item>
     </string-array>
 
     <string-array name="order_filter_status_values">
         <item></item>
         <item>OPEN</item>
-        <item>MATCHING</item>
-        <item>CONFIRMED</item>
-        <item>IN_PROGRESS</item>
-        <item>DONE</item>
-        <item>CANCELLED</item>
     </string-array>
 
     <string-array name="order_filter_has_leader_labels">

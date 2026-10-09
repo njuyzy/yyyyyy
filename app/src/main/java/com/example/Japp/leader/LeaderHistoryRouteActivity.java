@@ -38,6 +38,8 @@ import retrofit2.Response;
 
 public class LeaderHistoryRouteActivity extends AppCompatActivity {
 
+    private static final String FILTER_ACCEPTED = "ACCEPTED";
+
     private RecyclerView recycler;
     private TextView txtEmpty;
     private TeamListAdapter adapter;
@@ -74,17 +76,19 @@ public class LeaderHistoryRouteActivity extends AppCompatActivity {
     }
 
     private void bindStatusFilter() {
+        findViewById(R.id.chipStatusOpen).setVisibility(View.GONE);
         findViewById(R.id.chipStatusMatching).setVisibility(View.GONE);
-        findViewById(R.id.chipStatusConfirmed).setVisibility(View.GONE);
+        TextView acceptedChip = findViewById(R.id.chipStatusConfirmed);
+        acceptedChip.setVisibility(View.VISIBLE);
+        acceptedChip.setText("已接单");
+        findViewById(R.id.chipStatusInProgress).setVisibility(View.GONE);
         findViewById(R.id.chipStatusCancelled).setVisibility(View.GONE);
 
         ChipGroup group = findViewById(R.id.statusFilterGroup);
         group.check(R.id.chipStatusAll);
         group.setOnCheckedChangeListener((chipGroup, checkedId) -> {
-            if (checkedId == R.id.chipStatusOpen) {
-                selectedStatus = ProjectUiHelper.STATUS_OPEN;
-            } else if (checkedId == R.id.chipStatusInProgress) {
-                selectedStatus = ProjectUiHelper.STATUS_IN_PROGRESS;
+            if (checkedId == R.id.chipStatusConfirmed) {
+                selectedStatus = FILTER_ACCEPTED;
             } else if (checkedId == R.id.chipStatusDone) {
                 selectedStatus = ProjectUiHelper.STATUS_DONE;
             } else {
@@ -224,9 +228,28 @@ public class LeaderHistoryRouteActivity extends AppCompatActivity {
     }
 
     private static boolean isVisibleStatus(String status) {
-        return ProjectUiHelper.STATUS_OPEN.equals(status)
+        return ProjectUiHelper.STATUS_MATCHING.equals(status)
+                || ProjectUiHelper.STATUS_CONFIRMED.equals(status)
                 || ProjectUiHelper.STATUS_IN_PROGRESS.equals(status)
                 || ProjectUiHelper.STATUS_DONE.equals(status);
+    }
+
+    private boolean matchesSelectedStatus(Project project) {
+        if (selectedStatus.isEmpty()) {
+            return true;
+        }
+        String status = ProjectUiHelper.normalizeStatus(project.getStatus());
+        if (FILTER_ACCEPTED.equals(selectedStatus)) {
+            return ProjectUiHelper.STATUS_MATCHING.equals(status)
+                    || ProjectUiHelper.STATUS_CONFIRMED.equals(status)
+                    || ProjectUiHelper.STATUS_IN_PROGRESS.equals(status);
+        }
+        return selectedStatus.equals(status);
+    }
+
+    private String selectedStatusLabel() {
+        return FILTER_ACCEPTED.equals(selectedStatus)
+                ? "已接单" : ProjectUiHelper.statusLabel(selectedStatus);
     }
 
     private void applyStatusFilter(boolean animate) {
@@ -236,15 +259,14 @@ public class LeaderHistoryRouteActivity extends AppCompatActivity {
         List<TeamCardItem> filtered = new ArrayList<>();
         for (TeamCardItem item : teamItems) {
             Project project = item == null ? null : item.getProject();
-            if (project != null && (selectedStatus.isEmpty() || selectedStatus.equals(
-                    ProjectUiHelper.normalizeStatus(project.getStatus())))) {
+            if (project != null && matchesSelectedStatus(project)) {
                 filtered.add(item);
             }
         }
         adapter.setItems(filtered);
         txtEmpty.setText(selectedStatus.isEmpty()
                 ? "暂无历史路线"
-                : "暂无" + ProjectUiHelper.statusLabel(selectedStatus) + "的历史路线");
+                : "暂无" + selectedStatusLabel() + "的历史路线");
         txtEmpty.setVisibility(filtered.isEmpty() ? View.VISIBLE : View.GONE);
         recycler.setVisibility(View.VISIBLE);
         if (animate) {
@@ -261,6 +283,6 @@ public class LeaderHistoryRouteActivity extends AppCompatActivity {
         txtEmpty.setVisibility(View.VISIBLE);
         txtEmpty.setText(selectedStatus.isEmpty()
                 ? "暂无历史路线"
-                : "暂无" + ProjectUiHelper.statusLabel(selectedStatus) + "的历史路线");
+                : "暂无" + selectedStatusLabel() + "的历史路线");
     }
 }

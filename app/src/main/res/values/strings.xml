@@ -127,9 +127,9 @@
 
     <!-- Leader order list -->
     <string name="leader_order_toolbar_title">可选路线</string>
-    <string name="leader_order_my_serving_title">我正在服务的路线</string>
-    <string name="leader_order_my_serving_expand">展开我正在服务的路线</string>
-    <string name="leader_order_my_serving_collapse">收起我正在服务的路线</string>
+    <string name="leader_order_my_serving_title">我已接单的路线</string>
+    <string name="leader_order_my_serving_expand">展开我已接单的路线</string>
+    <string name="leader_order_my_serving_collapse">收起我已接单的路线</string>
     <string name="leader_order_available_title">可接的订单</string>
 
     <!-- Order filter -->

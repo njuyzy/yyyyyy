@@ -1132,7 +1132,15 @@ public class orderList extends Fragment {
                         hasMoreAvailable = page.getPages() > 0
                                 ? availablePage < page.getPages()
                                 : projects.size() >= AVAILABLE_PAGE_SIZE;
-                        appendProjects(projects, teamItems, teamProjectIds, adapter);
+                        List<Project> availableProjects = new ArrayList<>();
+                        for (Project project : projects) {
+                            if (project != null
+                                    && ProjectUiHelper.isLeaderAvailableStatus(project.getStatus())
+                                    && !ProjectUiHelper.hasAssignedLeader(project.getLeaderAccountId())) {
+                                availableProjects.add(project);
+                            }
+                        }
+                        appendProjects(availableProjects, teamItems, teamProjectIds, adapter);
                         consecutiveEmptyAvailablePages = 0;
                         stopRefreshing();
                         updateAvailableEmptyState();
@@ -1207,7 +1215,8 @@ public class orderList extends Fragment {
                         // 过滤掉不可接单的路线（例如已有人接）。
                         List<Project> acceptList = new ArrayList<>();
                         for (Project project : filtered) {
-                            if (ProjectUiHelper.isJoinable(project)
+                            if (ProjectUiHelper.isLeaderAvailableStatus(project.getStatus())
+                                    && ProjectUiHelper.isJoinable(project)
                                     && !ProjectUiHelper.hasAssignedLeader(project.getLeaderAccountId())) {
                                 acceptList.add(project);
                             }
@@ -1283,7 +1292,7 @@ public class orderList extends Fragment {
         loadingMyPending = true;
         btnMoreMine.setEnabled(false);
 
-        // 领队"我正在服务的路线"：leaderAccountId 为当前账号的订单。
+        // 领队“我已接单的路线”：leaderAccountId 为当前账号的订单。
         Call<Result<List<Project>>> request = service.filterProjects(
                 accountId,
                 requestedPage,
@@ -1320,7 +1329,7 @@ public class orderList extends Fragment {
                         if (!response.isSuccessful() || response.body() == null
                                 || response.body().getCode() != 1) {
                             if (append) {
-                                Toast.makeText(requireContext(), "加载我正在服务的路线失败",
+                                Toast.makeText(requireContext(), "加载我已接单的路线失败",
                                         Toast.LENGTH_SHORT).show();
                             }
                             updateMyPendingSection();
@@ -1334,7 +1343,14 @@ public class orderList extends Fragment {
                         hasMoreMyPending = projects.size() >= MY_SERVING_PAGE_SIZE
                                 && requestedPage < MAX_MY_SERVING_PAGES;
                         projects = filterProvinceLocallyIfNeeded(projects);
-                        int added = appendProjects(projects, myPendingItems,
+                        List<Project> acceptedProjects = new ArrayList<>();
+                        for (Project project : projects) {
+                            if (project != null
+                                    && ProjectUiHelper.isLeaderAcceptedStatus(project.getStatus())) {
+                                acceptedProjects.add(project);
+                            }
+                        }
+                        int added = appendProjects(acceptedProjects, myPendingItems,
                                 myPendingProjectIds, myPendingAdapter);
                         updateMyPendingSection();
                         if (added > 0) {
@@ -1368,7 +1384,7 @@ public class orderList extends Fragment {
                         loadingMyPending = false;
                         btnMoreMine.setEnabled(true);
                         if (append) {
-                            Toast.makeText(requireContext(), "加载我正在服务的路线失败",
+                            Toast.makeText(requireContext(), "加载我已接单的路线失败",
                                     Toast.LENGTH_SHORT).show();
                         }
                         updateMyPendingSection();
@@ -1414,7 +1430,9 @@ public class orderList extends Fragment {
         int added = 0;
         List<TeamCardItem> newItems = new ArrayList<>();
         for (Project project : projects) {
-            if (project == null || !targetIds.add(project.getId())) {
+            if (project == null
+                    || TextUtils.isEmpty(ProjectUiHelper.statusLabel(project.getStatus()))
+                    || !targetIds.add(project.getId())) {
                 continue;
             }
             TeamCardItem item = new TeamCardItem(project);

@@ -165,7 +165,9 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
                 + " / 人数上限 " + (project.getMaxMembers() > 0
                 ? String.valueOf(project.getMaxMembers()) : "不限"));
 
-        holder.txtStatus.setText(ProjectUiHelper.statusLabel(project.getStatus()));
+        String leaderStatusLabel = ProjectUiHelper.statusLabel(project.getStatus());
+        holder.txtStatus.setText(leaderStatusLabel);
+        holder.txtStatus.setVisibility(leaderStatusLabel.isEmpty() ? View.GONE : View.VISIBLE);
 
         if (userPresentation || holder.itemView.getContext() instanceof com.example.Japp.FavoriteOrdersActivity) {
             String publicCity = UserOrderPresentation.city(city);

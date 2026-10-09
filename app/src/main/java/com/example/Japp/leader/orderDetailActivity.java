@@ -155,6 +155,9 @@ public class orderDetailActivity extends AppCompatActivity {
             finish();
             return;
         }
+        if (hideIfCancelled()) {
+            return;
+        }
 
         bindProjectHeader();
         loadOwnerName();
@@ -180,6 +183,9 @@ public class orderDetailActivity extends AppCompatActivity {
                     Project latest = response.body().getData();
                     if (latest != null) {
                         project = latest;
+                        if (hideIfCancelled()) {
+                            return;
+                        }
                         bindProjectHeader();
                     }
                 }
@@ -207,6 +213,16 @@ public class orderDetailActivity extends AppCompatActivity {
                 ? String.valueOf(project.getMaxMembers()) : "不限"));
 
         txtStatus.setText(ProjectUiHelper.statusLabel(project.getStatus()));
+    }
+
+    private boolean hideIfCancelled() {
+        if (!ProjectUiHelper.STATUS_CANCELLED.equals(
+                ProjectUiHelper.normalizeStatus(project.getStatus()))) {
+            return false;
+        }
+        Toast.makeText(this, "该订单已不可用", Toast.LENGTH_SHORT).show();
+        finish();
+        return true;
     }
 
     private void loadOwnerName() {
@@ -402,30 +418,20 @@ public class orderDetailActivity extends AppCompatActivity {
                 setupLeaderAction();
             } else {
                 btnJoin.setEnabled(false);
-                btnJoin.setText("已有领队");
+                btnJoin.setText("已接单");
             }
             return;
         }
 
         String status = ProjectUiHelper.normalizeStatus(project.getStatus());
-        if (ProjectUiHelper.STATUS_CONFIRMED.equals(status)) {
+        if (ProjectUiHelper.isLeaderAcceptedStatus(status)) {
             btnJoin.setEnabled(false);
-            btnJoin.setText("已确认");
-            return;
-        }
-        if (ProjectUiHelper.STATUS_IN_PROGRESS.equals(status)) {
-            btnJoin.setEnabled(false);
-            btnJoin.setText("进行中");
+            btnJoin.setText("已接单");
             return;
         }
         if (ProjectUiHelper.STATUS_DONE.equals(status)) {
             btnJoin.setEnabled(false);
             btnJoin.setText("已完成");
-            return;
-        }
-        if (ProjectUiHelper.STATUS_CANCELLED.equals(status)) {
-            btnJoin.setEnabled(false);
-            btnJoin.setText("已取消");
             return;
         }
         if (!ProjectUiHelper.isLeaderAcceptableStatus(project.getStatus())) {
@@ -441,7 +447,7 @@ public class orderDetailActivity extends AppCompatActivity {
         String status = ProjectUiHelper.normalizeStatus(project.getStatus());
         if (!ProjectUiHelper.canLeaderAbandon(status)) {
             btnJoin.setEnabled(false);
-            btnJoin.setText(ProjectUiHelper.STATUS_DONE.equals(status) ? "已完成" : "已取消");
+            btnJoin.setText(ProjectUiHelper.statusLabel(status));
             return;
         }
 
