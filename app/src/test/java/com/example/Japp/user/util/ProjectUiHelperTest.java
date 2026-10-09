@@ -50,4 +50,16 @@ public class ProjectUiHelperTest {
         assertFalse(ProjectUiHelper.canLeaderAbandon(ProjectUiHelper.STATUS_DONE));
         assertFalse(ProjectUiHelper.canLeaderAbandon(ProjectUiHelper.STATUS_CANCELLED));
     }
+
+    @Test
+    public void leaderRatingIsHiddenUntilAtLeastOneReviewExists() {
+        assertEquals("--", ProjectUiHelper.leaderRatingLabel(null, null));
+        assertEquals("--", ProjectUiHelper.leaderRatingLabel(5.0, 0));
+        assertEquals("--", ProjectUiHelper.leaderRatingLabel(0.0, 3));
+    }
+
+    @Test
+    public void leaderRatingUsesOneDecimalForReviewedLeader() {
+        assertEquals("4.8", ProjectUiHelper.leaderRatingLabel(4.75, 12));
+    }
 }

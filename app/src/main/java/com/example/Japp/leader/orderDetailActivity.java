@@ -30,11 +30,12 @@ import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.example.Japp.user.fragment.route.RouteMapDrawHelper;
 import com.example.Japp.user.fragment.route.RouteMapFullscreenActivity;
+import com.example.Japp.user.util.AbandonDeadlineHelper;
+import com.example.Japp.user.util.AbandonReasonDialog;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
@@ -75,6 +76,10 @@ public class orderDetailActivity extends AppCompatActivity {
     private LeaderWalkRoutePlanner walkRoutePlanner;
     private boolean routePlanningStarted;
     private boolean mapCreated;
+
+    // 保留放弃原因草稿，联网失败后可修改重试。
+    @Nullable
+    private String abandonReasonDraft;
 
     // 用于在 onDestroy 时取消尚未返回的请求，避免回调访问已销毁的视图
     @Nullable
@@ -453,21 +458,36 @@ public class orderDetailActivity extends AppCompatActivity {
 
         styleDangerAction();
         btnJoin.setEnabled(true);
-        btnJoin.setText("放弃带队");
-        btnJoin.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
-                .setTitle("放弃带队")
-                .setMessage("放弃后订单将重新开放给其他领队；历史聊天仍会保留，但不能继续发消息。确定继续吗？")
-                .setNegativeButton("暂不放弃", null)
-                .setPositiveButton("确认放弃", (dialog, which) -> abandonOrder())
-                .show());
+        btnJoin.setText("放弃接单");
+        btnJoin.setOnClickListener(v -> promptAbandon());
     }
 
-    private void abandonOrder() {
+    private void promptAbandon() {
+        AbandonDeadlineHelper.Result result = AbandonDeadlineHelper.check(
+                project.getDepartureDate(), project.getDepartureTime());
+        if (result == AbandonDeadlineHelper.Result.TIME_INVALID) {
+            Toast.makeText(this, AbandonDeadlineHelper.ALERT_TIME_INVALID,
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (result == AbandonDeadlineHelper.Result.TOO_LATE) {
+            Toast.makeText(this, AbandonDeadlineHelper.ALERT_TOO_LATE,
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        AbandonReasonDialog.show(this, abandonReasonDraft, reason -> {
+            abandonReasonDraft = reason;
+            abandonOrder(reason);
+        });
+    }
+
+    private void abandonOrder(@NonNull String reason) {
         btnJoin.setEnabled(false);
         btnJoin.setText("正在放弃…");
-        service.abandonProject(project.getId()).enqueue(new Callback<Result>() {
+        service.abandonProject(project.getId(), reason).enqueue(new Callback<Result>() {
             @Override
-            public void onResponse(Call<Result> call, Response<Result> response) {
+            public void onResponse(@NonNull Call<Result> call,
+                                   @NonNull Response<Result> response) {
                 if (isFinishing() || isDestroyed()) return;
                 if (response.code() == 401) {
                     SessionHelper.handleUnauthorized(orderDetailActivity.this);
@@ -477,27 +497,39 @@ public class orderDetailActivity extends AppCompatActivity {
                         || response.body().getCode() != 1) {
                     setupLeaderAction();
                     String message = response.body() == null
-                            ? "放弃带队失败" : response.body().getMsg();
+                            ? "放弃接单失败" : response.body().getMsg();
                     Toast.makeText(orderDetailActivity.this,
                             message, Toast.LENGTH_SHORT).show();
+                    retryAbandon(reason);
                     return;
                 }
+                project.setLeaderAccountId(null);
+                project.setStatus(ProjectUiHelper.STATUS_OPEN);
                 ChatHistoryStore.markProjectReadOnly(orderDetailActivity.this,
                         SessionHelper.getAccountId(orderDetailActivity.this), project.getId(),
-                        "你已放弃带队，聊天记录仅供查看");
+                        "你已放弃接单，聊天记录仅供查看");
+                abandonReasonDraft = null;
                 setResult(RESULT_OK);
                 Toast.makeText(orderDetailActivity.this,
-                        "已放弃带队，订单已重新开放", Toast.LENGTH_SHORT).show();
+                        "已放弃接单，订单已恢复为待接单", Toast.LENGTH_SHORT).show();
                 finish();
             }
 
             @Override
-            public void onFailure(Call<Result> call, Throwable t) {
+            public void onFailure(@NonNull Call<Result> call, @NonNull Throwable t) {
                 if (isFinishing() || isDestroyed()) return;
                 setupLeaderAction();
                 Toast.makeText(orderDetailActivity.this,
                         "网络异常，操作失败", Toast.LENGTH_SHORT).show();
+                retryAbandon(reason);
             }
+        });
+    }
+
+    private void retryAbandon(@NonNull String reason) {
+        AbandonReasonDialog.show(this, reason, retried -> {
+            abandonReasonDraft = retried;
+            abandonOrder(retried);
         });
     }
 

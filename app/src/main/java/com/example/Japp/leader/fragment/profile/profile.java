@@ -39,6 +39,7 @@ import com.example.Japp.leader.LeaderHistoryRouteActivity;
 import com.example.Japp.leader.LeaderOrderListActivity;
 import com.example.Japp.leader.LeaderReviewListActivity;
 import com.example.Japp.user.UserMainActivity;
+import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.SessionHelper;
 import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
@@ -97,6 +98,7 @@ public class profile extends Fragment {
         txtPendingOrders = view.findViewById(R.id.txtPendingOrders);
         txtCompletedOrders = view.findViewById(R.id.txtCompletedOrders);
         txtRating = view.findViewById(R.id.txtRating);
+        txtRating.setText(ProjectUiHelper.leaderRatingLabel(null, null));
 
         loadImageFromLocal();
         bindProfileInfo();
@@ -429,10 +431,10 @@ public class profile extends Fragment {
 
     private void loadLeaderDashboard() {
         if (!isAdded()) return;
+        txtRating.setText(ProjectUiHelper.leaderRatingLabel(null, null));
         if (!SessionHelper.isLoggedIn(requireContext())) {
             txtPendingOrders.setText("0");
             txtCompletedOrders.setText("0");
-            txtRating.setText("5.0");
             return;
         }
         UserService service = ApiClient.getClient().create(UserService.class);
@@ -449,12 +451,8 @@ public class profile extends Fragment {
                 txtPendingOrders.setText(String.valueOf(profile.getAcceptedProjectCount()
                         - profile.getCompletedProjectCount()));
                 txtCompletedOrders.setText(String.valueOf(profile.getCompletedProjectCount()));
-                Double avg = profile.getAverageRating();
-                if (avg != null && avg > 0) {
-                    txtRating.setText(String.format(java.util.Locale.getDefault(), "%.1f", avg));
-                } else {
-                    txtRating.setText("5.0");
-                }
+                txtRating.setText(ProjectUiHelper.leaderRatingLabel(
+                        profile.getAverageRating(), profile.getRatingCount()));
             }
 
             @Override

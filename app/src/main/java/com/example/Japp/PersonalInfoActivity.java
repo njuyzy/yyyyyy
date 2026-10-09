@@ -1,7 +1,6 @@
 package com.example.Japp;
 
 import android.Manifest;
-import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -44,9 +43,7 @@ import com.google.android.material.textfield.TextInputEditText;
 import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.Calendar;
 import java.util.List;
-import java.util.Locale;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
@@ -58,22 +55,16 @@ import retrofit2.Response;
 public class PersonalInfoActivity extends AppCompatActivity {
 
     private static final int SELECT_FILE = 2001;
-    private static final String PREF_GENDER = "personal_gender";
-    private static final String PREF_BIRTHDAY = "personal_birthday";
     private static final String PREF_SIGNATURE = "personal_signature";
 
     private ImageView ivAvatar;
     private TextInputEditText etName;
-    private TextView txtGender;
     private TextView txtRegion;
-    private TextView txtBirthday;
     private TextView txtPhone;
     private TextInputEditText etSignature;
     private MaterialButton btnSave;
 
     private int accountId = -1;
-    private String selectedGender = "";
-    private String selectedBirthday = "";
     private String selectedRegionCode = "";
     private String selectedProvinceName = "";
     private String selectedCityName = "";
@@ -93,9 +84,7 @@ public class PersonalInfoActivity extends AppCompatActivity {
     private void bindViews() {
         ivAvatar = findViewById(R.id.ivAvatar);
         etName = findViewById(R.id.etName);
-        txtGender = findViewById(R.id.txtGender);
         txtRegion = findViewById(R.id.txtRegion);
-        txtBirthday = findViewById(R.id.txtBirthday);
         txtPhone = findViewById(R.id.txtPhone);
         etSignature = findViewById(R.id.etSignature);
         btnSave = findViewById(R.id.btnSave);
@@ -108,9 +97,7 @@ public class PersonalInfoActivity extends AppCompatActivity {
 
     private void setupListeners() {
         findViewById(R.id.rowAvatar).setOnClickListener(v -> requestImagePermissionAndPick());
-        findViewById(R.id.rowGender).setOnClickListener(v -> showGenderDialog());
         findViewById(R.id.rowRegion).setOnClickListener(v -> loadProvinceOptions());
-        findViewById(R.id.rowBirthday).setOnClickListener(v -> showBirthdayPicker());
         btnSave.setOnClickListener(v -> saveProfile());
     }
 
@@ -124,11 +111,6 @@ public class PersonalInfoActivity extends AppCompatActivity {
         etName.setText(parseUsername(prefs.getString("user_inf", "")));
         txtPhone.setText(parsePhone(prefs.getString("user_inf", "")));
         txtRegion.setText(resolveRegionDisplay(prefs));
-
-        selectedGender = prefs.getString(PREF_GENDER, "");
-        selectedBirthday = prefs.getString(PREF_BIRTHDAY, "");
-        updateGenderText();
-        updateBirthdayText();
 
         String signature = prefs.getString(PREF_SIGNATURE, "");
         if (!TextUtils.isEmpty(signature)) {
@@ -207,61 +189,6 @@ public class PersonalInfoActivity extends AppCompatActivity {
             public void onFailure(@NonNull Call<Result<AccountLeaderProfile>> call, @NonNull Throwable t) {
             }
         });
-    }
-
-    private void showGenderDialog() {
-        final String[] options = {"男", "女", "保密"};
-        new AlertDialog.Builder(this)
-                .setTitle("选择性别")
-                .setItems(options, (dialog, which) -> {
-                    selectedGender = options[which];
-                    updateGenderText();
-                })
-                .show();
-    }
-
-    private void updateGenderText() {
-        if (TextUtils.isEmpty(selectedGender)) {
-            txtGender.setText("");
-            txtGender.setHint("请选择");
-        } else {
-            txtGender.setText(selectedGender);
-        }
-    }
-
-    private void showBirthdayPicker() {
-        Calendar calendar = Calendar.getInstance();
-        if (!TextUtils.isEmpty(selectedBirthday)) {
-            String[] parts = selectedBirthday.split("-");
-            if (parts.length == 3) {
-                try {
-                    calendar.set(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]) - 1, Integer.parseInt(parts[2]));
-                } catch (NumberFormatException ignored) {
-                }
-            }
-        }
-
-        DatePickerDialog dialog = new DatePickerDialog(
-                this,
-                (view, year, month, dayOfMonth) -> {
-                    selectedBirthday = String.format(Locale.CHINA, "%d-%02d-%02d", year, month + 1, dayOfMonth);
-                    updateBirthdayText();
-                },
-                calendar.get(Calendar.YEAR),
-                calendar.get(Calendar.MONTH),
-                calendar.get(Calendar.DAY_OF_MONTH)
-        );
-        dialog.getDatePicker().setMaxDate(System.currentTimeMillis());
-        dialog.show();
-    }
-
-    private void updateBirthdayText() {
-        if (TextUtils.isEmpty(selectedBirthday)) {
-            txtBirthday.setText("");
-            txtBirthday.setHint("请选择");
-        } else {
-            txtBirthday.setText(selectedBirthday);
-        }
     }
 
     private void saveProfile() {
@@ -359,8 +286,6 @@ public class PersonalInfoActivity extends AppCompatActivity {
     private void persistLocalPersonalFields(String signature) {
         getSharedPreferences("user_pref", MODE_PRIVATE)
                 .edit()
-                .putString(PREF_GENDER, selectedGender)
-                .putString(PREF_BIRTHDAY, selectedBirthday)
                 .putString(PREF_SIGNATURE, signature)
                 .apply();
     }

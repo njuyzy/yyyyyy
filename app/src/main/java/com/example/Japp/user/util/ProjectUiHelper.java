@@ -121,6 +121,17 @@ public final class ProjectUiHelper {
         return status == null ? "" : status.trim().toUpperCase(Locale.ROOT);
     }
 
+    public static String leaderRatingLabel(Double averageRating, Integer ratingCount) {
+        if (ratingCount == null || ratingCount <= 0
+                || averageRating == null
+                || !Double.isFinite(averageRating)
+                || averageRating <= 0
+                || averageRating > 5) {
+            return "--";
+        }
+        return String.format(Locale.ROOT, "%.1f", averageRating);
+    }
+
     public static boolean hasAssignedLeader(Integer leaderAccountId) {
         return leaderAccountId != null && leaderAccountId > 0;
     }

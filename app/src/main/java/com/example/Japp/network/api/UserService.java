@@ -259,7 +259,7 @@ public interface UserService {
     Call<Result> acceptProject(@Path("id") int projectId);
 
     @POST("projects/{id}/abandon")
-    Call<Result> abandonProject(@Path("id") int projectId);
+    Call<Result> abandonProject(@Path("id") int projectId, @Query("reason") String reason);
 
     @POST("projects/{id}/status")
     Call<Result> updateProjectStatus(@Path("id") int projectId,
