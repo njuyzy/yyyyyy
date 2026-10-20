@@ -42,6 +42,8 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         default void onMapClick(RouteChatItem item) {}
 
         default void onRetry(RouteChatItem item) {}
+        default void onAcceptPlan(RouteChatItem item) {}
+        default void onCancelPlan(RouteChatItem item) {}
     }
 
     private RouteChatListener listener;
@@ -302,17 +304,22 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             boolean failed = item.isStatus()
                     && item.getText() != null
                     && item.getText().startsWith("规划失败");
+            boolean progress = item.getType() == RouteChatItem.TYPE_ASSISTANT_PROGRESS;
+            boolean candidate = item.getType() == RouteChatItem.TYPE_ASSISTANT_PLAN;
             if (state != null) {
-                state.setText(failed ? "需重试" : (item.isStatus() ? "规划中" : "已更新"));
+                state.setText(failed ? "需重试" : (progress ? "规划中" : (candidate ? "待确认" : "已回复")));
                 state.setTextColor(Color.parseColor(failed ? "#C62828" : "#1E72FF"));
                 state.setBackgroundTintList(ColorStateList.valueOf(
                         Color.parseColor(failed ? "#FDECEC" : "#EAF2FF")));
             }
             if (retry != null) {
-                retry.setVisibility(failed ? View.VISIBLE : View.GONE);
-                retry.setOnClickListener(failed && listener != null
-                        ? v -> listener.onRetry(item)
-                        : null);
+                retry.setVisibility(failed || progress || candidate ? View.VISIBLE : View.GONE);
+                retry.setText(candidate ? "查看并应用" : (progress ? "取消规划" : "重新尝试"));
+                retry.setOnClickListener(listener == null ? null : v -> {
+                    if (candidate) listener.onAcceptPlan(item);
+                    else if (progress) listener.onCancelPlan(item);
+                    else listener.onRetry(item);
+                });
             }
             if (mapContainer == null || routeMapView == null || !item.hasPolyline()) {
                 if (mapContainer != null) {

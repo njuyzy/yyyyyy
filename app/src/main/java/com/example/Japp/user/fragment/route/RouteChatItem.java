@@ -12,6 +12,10 @@ public class RouteChatItem {
     public static final int TYPE_ASSISTANT_ROUTE = 1;
     /** 路线助手状态/等待反馈（无地图、不可发布） */
     public static final int TYPE_ASSISTANT_STATUS = 2;
+    public static final int TYPE_ASSISTANT_MESSAGE = 3;
+    public static final int TYPE_ASSISTANT_PLAN = 4;
+    public static final int TYPE_ASSISTANT_PROGRESS = 5;
+    private String agentRunId;
 
     private final int type;
     private String text;
@@ -48,6 +52,23 @@ public class RouteChatItem {
         return new RouteChatItem(
                 TYPE_ASSISTANT_STATUS, text, System.currentTimeMillis(), 0, null, null, false);
     }
+
+    public static RouteChatItem assistantMessage(String text) {
+        return new RouteChatItem(TYPE_ASSISTANT_MESSAGE, text, System.currentTimeMillis(), 0, null, null, false);
+    }
+
+    public static RouteChatItem agentProgress(String text) {
+        return new RouteChatItem(TYPE_ASSISTANT_PROGRESS, text, System.currentTimeMillis(), 0, null, null, false);
+    }
+
+    public static RouteChatItem agentPlan(String text, String runId) {
+        RouteChatItem item = new RouteChatItem(TYPE_ASSISTANT_PLAN, text, System.currentTimeMillis(), 0, null, null, false);
+        item.agentRunId = runId;
+        return item;
+    }
+
+    public String getAgentRunId() { return agentRunId; }
+    void setAgentRunId(String runId) { agentRunId = runId; }
 
     public static RouteChatItem assistantRoute(String text, List<LatLng> points) {
         return assistantRoute(text, points, 0);

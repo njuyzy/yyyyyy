@@ -56,6 +56,7 @@ import com.amap.api.maps.model.LatLng;
 import com.amap.api.maps.model.Marker;
 import com.amap.api.maps.model.MarkerOptions;
 import com.amap.api.maps.model.MyLocationStyle;
+import com.amap.api.maps.model.PolylineOptions;
 import com.amap.api.services.core.AMapException;
 import com.amap.api.services.core.LatLonPoint;
 import com.amap.api.services.core.PoiItem;
@@ -68,6 +69,8 @@ import com.example.Japp.network.ApiClient;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
+import com.example.Japp.network.models.RouteAgent;
+import com.example.Japp.user.util.RouteAgentHelper;
 import com.example.Japp.user.RoutePublishDetailActivity;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.RoutePlanHelper;
@@ -102,13 +105,6 @@ public class routeDesign extends Fragment {
     private static final String TAG = "RouteDesign";
     private static final String STATE_AI_ROUTE_MEMORY_ID = "ai_route_memory_id";
     private static final LatLng DEFAULT_MAP_CENTER = new LatLng(32.0603, 118.7969);
-    private static final String[] WAITING_TIPS = {
-            "路线助手正在理解你的需求…",
-            "正在检索合适的研学景点…",
-            "正在生成行程顺序与时长…",
-            "AI 规划可能需要 1～3 分钟，请稍候…",
-            "服务仍在处理，已有路线不会受到影响…"
-    };
 
     private MapView mainRouteMapView;
     private AMap mainMap;
@@ -138,7 +134,8 @@ public class routeDesign extends Fragment {
 
     private RouteChatAdapter adapter;
     private UserService service;
-    private LeaderWalkRoutePlanner walkRoutePlanner;
+    private RouteAgentCoordinator agent;
+    private Call<Result<JsonElement>> poiSyncCall;
     private LeaderWalkRoutePlanner customWalkPlanner;
 
     private final List<RouteNode> editableRouteNodes = new ArrayList<>();
@@ -195,26 +192,8 @@ public class routeDesign extends Fragment {
 
     private final Handler waitingHandler = new Handler(Looper.getMainLooper());
     private int waitingStatusPosition = -1;
-    private int waitingTipIndex;
-    private boolean waitingActive;
     private boolean routeRequestInFlight;
 
-    private final Runnable waitingTipRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (!waitingActive || !isAdded() || adapter == null || waitingStatusPosition < 0) {
-                return;
-            }
-            if (waitingTipIndex >= WAITING_TIPS.length - 1) {
-                return;
-            }
-            waitingTipIndex++;
-            adapter.updateItemText(waitingStatusPosition, WAITING_TIPS[waitingTipIndex]);
-            if (waitingTipIndex < WAITING_TIPS.length - 1) {
-                waitingHandler.postDelayed(this, 4500);
-            }
-        }
-    };
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -231,7 +210,6 @@ public class routeDesign extends Fragment {
                              Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.user_fragment_route_design, container, false);
         service = ApiClient.getClient().create(UserService.class);
-        walkRoutePlanner = new LeaderWalkRoutePlanner(requireContext());
 
         bindViews(root);
         setupRouteBottomSheet(root);
@@ -241,6 +219,7 @@ public class routeDesign extends Fragment {
 
         boolean restoredDraft = restoreLocalDraft();
         adapter.setDataChangedListener(this::persistLocalDraft);
+        setupAgent();
         renderEditableStops();
         if (restoredDraft && !editableRouteNodes.isEmpty()) {
             updateMapFromEditableRoute(true);
@@ -812,6 +791,10 @@ public class routeDesign extends Fragment {
             public void onRetry(RouteChatItem item) {
                 retryLastRouteRequest();
             }
+            @Override public void onAcceptPlan(RouteChatItem item) { confirmAgentPlan(item); }
+            @Override public void onCancelPlan(RouteChatItem item) {
+                if (agent != null && agent.state.busy) agent.cancel();
+            }
         });
         chatRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
         chatRecyclerView.setAdapter(adapter);
@@ -1147,6 +1130,7 @@ public class routeDesign extends Fragment {
         if (mainMap == null) {
             return;
         }
+        if (drawAppliedAgentPlan()) return;
         if (editableRouteNodes.isEmpty()) {
             mainMap.clear();
             showDefaultMapIfNeeded();
@@ -1243,6 +1227,7 @@ public class routeDesign extends Fragment {
                         adapter.clearItems();
                     }
                     aiRouteMemoryId = null;
+                    if (agent != null) agent.newConversation();
                     waitingStatusPosition = -1;
                     updateWelcomeVisibility();
                     persistLocalDraft();
@@ -1315,6 +1300,11 @@ public class routeDesign extends Fragment {
         if (routeRequestInFlight || adapter == null || editMessage == null) {
             return;
         }
+        if (agent != null && "transport_error".equals(agent.state.status)) {
+            beginAgentFeedback("正在恢复原规划请求…");
+            if (agent.retry()) return;
+            setSending(false);
+        }
         List<RouteChatItem> items = adapter.getItems();
         for (int i = items.size() - 1; i >= 0; i--) {
             RouteChatItem item = items.get(i);
@@ -1336,124 +1326,240 @@ public class routeDesign extends Fragment {
     }
 
     private void sendRouteRequest() {
-        if (editMessage == null) {
-            return;
-        }
-        String text = editMessage.getText().toString().trim();
-        if (TextUtils.isEmpty(text)) {
-            Toast.makeText(requireContext(), "请输入路线需求", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        if (editMessage == null || routeRequestInFlight || agent == null) return;
         if (!SessionHelper.isLoggedIn(requireContext())) {
-            Toast.makeText(requireContext(), "请先登录", Toast.LENGTH_SHORT).show();
             SessionHelper.handleUnauthorized(requireContext());
             return;
         }
-
-        adapter.addItem(RouteChatItem.user(text));
-        updateWelcomeVisibility();
-        editMessage.setText("");
-        scrollChatToBottom();
-        revealAssistantConversation();
-        setSending(true);
-        startWaitingFeedback();
-
-        int accountId = SessionHelper.getAccountId(requireContext());
-        String memoryId = getOrCreateAiRouteMemoryId(accountId);
-        List<RouteNode> protectedNodes = copyRouteNodes(editableRouteNodes);
-        if (protectedNodes.size() > 20) {
-            stopWaitingFeedback();
-            setSending(false);
-            restoreFailedRequest(text);
-            showPlanError("一次最多优化 20 个地点");
-            return;
-        }
-        for (RouteNode node : protectedNodes) {
-            if (TextUtils.isEmpty(node.getPoiId())) {
-                stopWaitingFeedback();
-                setSending(false);
-                restoreFailedRequest(text);
-                showPlanError("当前路线包含无法识别的地点，请重新搜索后再优化");
+        String text = editMessage.getText().toString().trim();
+        if ("transport_error".equals(agent.state.status) && agent.state.request != null) {
+            if (!text.equals(agent.state.request.message)) {
+                Toast.makeText(requireContext(), "上一轮状态尚未确认，请先点击重试恢复进度或新建对话", Toast.LENGTH_LONG).show();
                 return;
             }
-            if (TextUtils.isEmpty(node.getVisitTime())) {
-                node.setVisitTime(null);
-            }
+            beginAgentFeedback("正在恢复原规划请求…");
+            agent.retry();
+            return;
         }
-        Call<Result<JsonElement>> routeCall;
-        boolean optimizingExistingRoute = !protectedNodes.isEmpty();
-        if (optimizingExistingRoute) {
-            routeCall = service.optimizeRouteByAi(
-                    memoryId,
-                    text,
-                    accountId > 0 ? accountId : null,
-                    protectedNodes);
-        } else {
-            routeCall = service.planRouteByAi(
-                    memoryId, text, accountId > 0 ? accountId : null);
+        try {
+            RouteAgent.Request request = RouteAgentHelper.request(
+                    SessionHelper.getAccountId(requireContext()), getOrCreateAiRouteMemoryId(),
+                    text, agent.state.history, agent.state.constraints, editableRouteNodes);
+            if (currentLocation != null && hasLocationPermission()
+                    && currentLocation.longitude >= 73 && currentLocation.longitude <= 136
+                    && currentLocation.latitude >= 3 && currentLocation.latitude <= 54) {
+                request.origin = new RouteAgent.Origin();
+                request.origin.longitude = currentLocation.longitude;
+                request.origin.latitude = currentLocation.latitude;
+            }
+            adapter.addItem(RouteChatItem.user(text));
+            editMessage.setText("");
+            updateWelcomeVisibility();
+            revealAssistantConversation();
+            beginAgentFeedback("正在提交规划需求…");
+            agent.start(request, RouteAgentHelper.snapshot(editableRouteNodes));
+        } catch (IllegalArgumentException exception) {
+            Toast.makeText(requireContext(), exception.getMessage(), Toast.LENGTH_LONG).show();
         }
-        routeCall
-                .enqueue(new Callback<Result<JsonElement>>() {
-            @Override
-            public void onResponse(Call<Result<JsonElement>> call, Response<Result<JsonElement>> response) {
-                if (!isAdded()) {
-                    return;
-                }
-                Result<JsonElement> body = response.body();
-                Log.d(TAG, "AI route response: http=" + response.code()
-                        + ", resultCode=" + (body == null ? "null" : body.getCode())
-                        + ", message=" + (body == null ? "null" : body.getMsg()));
-                if (response.code() == 401) {
-                    stopWaitingFeedback();
-                    setSending(false);
-                    showPlanError("登录已失效，请重新登录");
-                    SessionHelper.handleUnauthorized(requireContext());
-                    return;
-                }
-                if (!response.isSuccessful() || body == null || body.getCode() != 1) {
-                    stopWaitingFeedback();
-                    setSending(false);
-                    restoreFailedRequest(text);
-                    showPlanError(RoutePlanHelper.readErrorMessage(response, body));
-                    return;
-                }
-                int routeId = RoutePlanHelper.parseRouteId(body.getData());
-                if (routeId <= 0) {
-                    stopWaitingFeedback();
-                    setSending(false);
-                    restoreFailedRequest(text);
-                    showPlanError("规划结果缺少必要信息，请稍后重试");
-                    return;
-                }
-                updateWaitingFeedback(optimizingExistingRoute
-                        ? "路线已优化，正在匹配道路路径…"
-                        : "路线已生成，正在匹配道路路径…");
-                loadRouteAndShow(
-                        routeId, text, protectedNodes, optimizingExistingRoute);
-            }
-
-            @Override
-            public void onFailure(Call<Result<JsonElement>> call, Throwable t) {
-                if (!isAdded()) {
-                    return;
-                }
-                stopWaitingFeedback();
-                setSending(false);
-                restoreFailedRequest(text);
-                Log.e(TAG, "AI route request failed", t);
-                showPlanError(RoutePlanHelper.failureMessage(t));
-            }
-        });
     }
 
-    @NonNull
-    private String getOrCreateAiRouteMemoryId(int accountId) {
-        if (TextUtils.isEmpty(aiRouteMemoryId)) {
-            aiRouteMemoryId = RoutePlanHelper.buildMemoryId(accountId)
-                    + "-route-" + UUID.randomUUID();
-            persistLocalDraft();
-        }
+    private String getOrCreateAiRouteMemoryId() {
+        if (agent.state.memoryId == null) agent.state.memoryId = UUID.randomUUID().toString();
+        aiRouteMemoryId = agent.state.memoryId;
         return aiRouteMemoryId;
+    }
+
+    private void beginAgentFeedback(String text) {
+        setSending(true);
+        if (waitingStatusPosition < 0 || waitingStatusPosition >= adapter.getItemCount()
+                || adapter.getItems().get(waitingStatusPosition).getType() != RouteChatItem.TYPE_ASSISTANT_PROGRESS) {
+            adapter.addItem(RouteChatItem.agentProgress(text));
+            waitingStatusPosition = adapter.getLastItemPosition();
+        } else adapter.updateItemText(waitingStatusPosition, text);
+        scrollChatToBottom();
+    }
+
+    private void replaceAgentFeedback(RouteChatItem item) {
+        setSending(false);
+        if (waitingStatusPosition >= 0 && waitingStatusPosition < adapter.getItemCount())
+            adapter.replaceItem(waitingStatusPosition, item);
+        else adapter.addItem(item);
+        waitingStatusPosition = -1;
+        persistLocalDraft();
+        scrollChatToBottom();
+    }
+
+    private void setupAgent() {
+        agent = new RouteAgentCoordinator(requireContext(),
+                SessionHelper.getAccountId(requireContext()), service);
+        if (agent.state.busy) {
+            for (int i = 0; i < adapter.getItemCount(); i++) {
+                if (adapter.getItems().get(i).getType() == RouteChatItem.TYPE_ASSISTANT_PROGRESS
+                        || adapter.getItems().get(i).getText().startsWith("上次路线规划因应用关闭")) {
+                    waitingStatusPosition = i;
+                    adapter.replaceItem(i, RouteChatItem.agentProgress("正在恢复规划进度…"));
+                }
+            }
+        }
+        agent.attach(new RouteAgentCoordinator.Listener() {
+            @Override public void onProgress(String text, boolean cancelling) {
+                beginAgentFeedback(text);
+            }
+            @Override public void onResult(String runId, RouteAgent.Result result) {
+                showAgentResult(runId, result);
+            }
+            @Override public void onError(String message, boolean unauthorized) {
+                if (agent.state.request != null) restoreFailedRequest(agent.state.request.message);
+                showPlanError(message);
+                if (unauthorized) SessionHelper.handleUnauthorized(requireContext());
+            }
+            @Override public void onCancelled() {
+                replaceAgentFeedback(RouteChatItem.assistantMessage("本轮规划已取消，当前路线已保留。"));
+            }
+        });
+        if (!agent.state.busy && agent.state.result != null && !agent.state.applied
+                && agent.state.runId != null) {
+            boolean shown = false;
+            for (RouteChatItem item : adapter.getItems())
+                if (agent.state.runId.equals(item.getAgentRunId())) shown = true;
+            if (!shown) showAgentResult(agent.state.runId, agent.state.result);
+        }
+    }
+
+    private void showAgentResult(String runId, RouteAgent.Result result) {
+        if ("plan".equals(result.kind)) {
+            if (result.nodes == null || result.nodes.isEmpty() || !result.requiresAcceptance) {
+                showPlanError("规划结果不完整，请重新规划");
+                return;
+            }
+            replaceAgentFeedback(RouteChatItem.agentPlan(RouteAgentHelper.describe(result), runId));
+        } else {
+            RouteChatItem message = RouteChatItem.assistantMessage(RouteAgentHelper.describe(result));
+            message.setAgentRunId(runId);
+            replaceAgentFeedback(message);
+        }
+    }
+
+    private void confirmAgentPlan(RouteChatItem item) {
+        if (agent == null || routeRequestInFlight || agent.state.applied || agent.state.result == null
+                || item.getAgentRunId() == null || !item.getAgentRunId().equals(agent.state.runId)) {
+            Toast.makeText(requireContext(), "该方案已应用或已被新方案替代", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!RouteAgentHelper.snapshot(editableRouteNodes).equals(agent.state.routeSnapshot)) {
+            Toast.makeText(requireContext(), "当前路线已修改，请基于最新地点重新规划", Toast.LENGTH_LONG).show();
+            return;
+        }
+        RouteAgent.Result result = agent.state.result;
+        new MaterialAlertDialogBuilder(requireContext()).setTitle("确认应用路线方案")
+                .setMessage(RouteAgentHelper.describe(result))
+                .setNegativeButton("暂不应用", null)
+                .setPositiveButton("应用方案", (dialog, which) -> {
+                    boolean relative = false;
+                    for (RouteNode node : result.nodes) {
+                        if (node.getVisitTime() != null && node.getVisitTime().startsWith("第")) relative = true;
+                    }
+                    if (relative) {
+                        java.time.LocalDate today = java.time.LocalDate.now();
+                        new android.app.DatePickerDialog(requireContext(), (picker, year, month, day) ->
+                                applyAgentPlan(result, java.time.LocalDate.of(year, month + 1, day)),
+                                today.getYear(), today.getMonthValue() - 1, today.getDayOfMonth())
+                                .show();
+                    } else applyAgentPlan(result, null);
+                }).show();
+    }
+
+    private void applyAgentPlan(RouteAgent.Result result, @Nullable java.time.LocalDate firstDay) {
+        if (routeRequestInFlight || agent == null || agent.state.result != result
+                || !RouteAgentHelper.snapshot(editableRouteNodes).equals(agent.state.routeSnapshot)) {
+            Toast.makeText(requireContext(), "路线或方案已变更，请重新确认", Toast.LENGTH_LONG).show();
+            return;
+        }
+        List<RouteNode> nodes = copyRouteNodes(result.nodes);
+        try {
+            RouteAgentHelper.request(SessionHelper.getAccountId(requireContext()), getOrCreateAiRouteMemoryId(),
+                    "确认方案", Collections.emptyList(), null, nodes);
+            for (RouteNode node : nodes)
+                node.setVisitTime(RouteAgentHelper.visitTimeToIso(node.getVisitTime(), firstDay));
+        } catch (IllegalArgumentException exception) {
+            Toast.makeText(requireContext(), exception.getMessage(), Toast.LENGTH_LONG).show();
+            return;
+        }
+        setSending(true);
+        syncAgentPoi(nodes, 0, result);
+    }
+
+    private boolean drawAppliedAgentPlan() {
+        if (agent == null || !agent.state.applied || agent.state.result == null
+                || !RouteAgentHelper.snapshot(editableRouteNodes).equals(agent.state.appliedSnapshot)) return false;
+        if (customWalkPlanner != null) customWalkPlanner.cancel();
+        RouteMapDrawHelper.drawRouteWithNodes(mainMap, Collections.emptyList(), editableRouteNodes);
+        if (agent.state.result.legs != null) for (RouteAgent.Leg leg : agent.state.result.legs) {
+            if (leg.polyline == null || leg.polyline.size() < 2) continue;
+            List<LatLng> segment = new ArrayList<>();
+            for (List<Double> point : leg.polyline) {
+                if (point != null && point.size() == 2 && point.get(0) != null && point.get(1) != null)
+                    segment.add(new LatLng(point.get(1), point.get(0)));
+            }
+            if (segment.size() >= 2) mainMap.addPolyline(new PolylineOptions().addAll(segment)
+                    .width(10f).color(ContextCompat.getColor(requireContext(), R.color.route_primary)));
+        }
+        return true;
+    }
+
+    private void syncAgentPoi(List<RouteNode> nodes, int index, RouteAgent.Result result) {
+        if (!isAdded() || getView() == null) return;
+        if (agent == null || agent.state.result != result
+                || !RouteAgentHelper.snapshot(editableRouteNodes).equals(agent.state.routeSnapshot)) {
+            setSending(false);
+            Toast.makeText(requireContext(), "当前路线已修改，请重新规划", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (index == nodes.size()) {
+            // Only change the local route after every POI is available on the server.
+            editableRouteNodes.clear();
+            editableRouteNodes.addAll(nodes);
+            renumberRouteNodes();
+            publishableRouteId = 0; // Agent runId is NEVER a persisted routeId.
+            publishableRouteSummary = result.message;
+            agent.markApplied(RouteAgentHelper.snapshot(editableRouteNodes));
+            setSending(false);
+            renderEditableStops();
+            updateMapFromEditableRoute(true);
+            for (int i = 0; i < adapter.getItemCount(); i++) {
+                RouteChatItem candidate = adapter.getItems().get(i);
+                if (agent.state.runId.equals(candidate.getAgentRunId())) {
+                    adapter.replaceItem(i, RouteChatItem.assistantMessage(
+                            "路线方案已应用\n\n" + RouteAgentHelper.describe(result)
+                                    .replace("候选路线 · 等待确认\n\n", "")
+                                    .replace("\n\n确认后才会替换当前路线。", "")));
+                }
+            }
+            persistLocalDraft(true);
+            routeStopsCard.setAlpha(0.55f);
+            routeStopsCard.animate().alpha(1f).setDuration(200).start();
+            return;
+        }
+        poiSyncCall = service.syncAttraction(nodes.get(index).getPoiId());
+        poiSyncCall.enqueue(new Callback<Result<JsonElement>>() {
+            @Override public void onResponse(Call<Result<JsonElement>> call, Response<Result<JsonElement>> response) {
+                if (!isAdded() || getView() == null || call.isCanceled()) return;
+                Result<JsonElement> body = response.body();
+                if (!response.isSuccessful() || body == null || body.getCode() != 1) {
+                    setSending(false);
+                    Toast.makeText(requireContext(), "地点同步失败：" + RoutePlanHelper.readErrorMessage(response, body),
+                            Toast.LENGTH_LONG).show();
+                    if (response.code() == 401) SessionHelper.handleUnauthorized(requireContext());
+                    return;
+                }
+                syncAgentPoi(nodes, index + 1, result);
+            }
+            @Override public void onFailure(Call<Result<JsonElement>> call, Throwable error) {
+                if (!isAdded() || getView() == null || call.isCanceled()) return;
+                setSending(false);
+                Toast.makeText(requireContext(), "地点同步失败，请再次应用方案", Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
     private void restoreFailedRequest(@NonNull String text) {
@@ -1464,169 +1570,6 @@ public class routeDesign extends Fragment {
         editMessage.setSelection(text.length());
     }
 
-    private void loadRouteAndShow(int routeId, String userRequirement,
-                                  @NonNull List<RouteNode> protectedNodes,
-                                  boolean optimizedExistingRoute) {
-        service.getRouteNodes(routeId).enqueue(new Callback<Result<List<RouteNode>>>() {
-            @Override
-            public void onResponse(Call<Result<List<RouteNode>>> call,
-                                   Response<Result<List<RouteNode>>> response) {
-                if (!isAdded() || adapter == null) {
-                    return;
-                }
-                List<RouteNode> nodes = null;
-                if (response.isSuccessful() && response.body() != null
-                        && response.body().getCode() == 1) {
-                    nodes = response.body().getData();
-                }
-                if (nodes == null || nodes.isEmpty()) {
-                    if (!protectedNodes.isEmpty()) {
-                        AiRouteMergeResult mergeResult =
-                                mergeAiRoute(protectedNodes, Collections.emptyList(), false);
-                        List<LatLng> protectedPoints =
-                                RouteMapDrawHelper.extractPointsFromNodes(mergeResult.nodes);
-                        finishWithRoute(userRequirement, mergeResult.nodes, routeId,
-                                Collections.emptyList(), protectedPoints, null, mergeResult);
-                        return;
-                    }
-                    String fallbackText = "根据你的描述「" + userRequirement
-                            + "」已生成路线，但暂无景点详情。";
-                    finishWithRoute(fallbackText, null, routeId,
-                            Collections.emptyList(), Collections.emptyList(), null, null);
-                    return;
-                }
-
-                updateWaitingFeedback("正在按真实道路规划步行路线…");
-                final List<RouteNode> orderedNodes = new ArrayList<>(nodes);
-                Collections.sort(orderedNodes, Comparator.comparingInt(RouteNode::getVisitOrder));
-                final AiRouteMergeResult mergeResult;
-                final List<RouteNode> displayNodes;
-                if (optimizedExistingRoute) {
-                    displayNodes = orderedNodes;
-                    mergeResult = compareOptimizedRoute(protectedNodes, displayNodes);
-                } else {
-                    mergeResult = mergeAiRoute(protectedNodes, orderedNodes, true);
-                    displayNodes = mergeResult.nodes;
-                }
-                List<LatLng> waypoints = RouteMapDrawHelper.extractPointsFromNodes(displayNodes);
-                if (waypoints.size() < 2 || walkRoutePlanner == null) {
-                    finishWithRoute(userRequirement, displayNodes, routeId,
-                            Collections.emptyList(), waypoints, null, mergeResult);
-                    return;
-                }
-
-                walkRoutePlanner.planSummary(displayNodes, new LeaderWalkRoutePlanner.Callback() {
-                    @Override
-                    public void onPlanningStarted() {
-                    }
-
-                    @Override
-                    public void onPlanningFinished(@NonNull String summary,
-                                                   @NonNull ArrayList<String> instructions,
-                                                   boolean hadFailures) {
-                    }
-
-                    @Override
-                    public void onPlanningFinished(@NonNull String summary,
-                                                   @NonNull ArrayList<String> instructions,
-                                                   @NonNull List<LatLng> roadPolyline,
-                                                   boolean hadFailures) {
-                        if (!isAdded()) {
-                            return;
-                        }
-                        finishWithRoute(userRequirement, displayNodes, routeId,
-                                roadPolyline, waypoints, summary, mergeResult);
-                    }
-
-                    @Override
-                    public void onPlanningFailed(@NonNull String message) {
-                        if (isAdded()) {
-                            finishWithRoute(userRequirement, displayNodes, routeId,
-                                    Collections.emptyList(), waypoints, null, mergeResult);
-                        }
-                    }
-                });
-            }
-
-            @Override
-            public void onFailure(Call<Result<List<RouteNode>>> call, Throwable t) {
-                if (!isAdded() || adapter == null) {
-                    return;
-                }
-                String fallbackText = "路线已生成，但节点加载失败，请稍后重试发布。";
-                if (!protectedNodes.isEmpty()) {
-                    AiRouteMergeResult mergeResult =
-                            mergeAiRoute(protectedNodes, Collections.emptyList(), false);
-                    List<LatLng> protectedPoints =
-                            RouteMapDrawHelper.extractPointsFromNodes(mergeResult.nodes);
-                    finishWithRoute(userRequirement, mergeResult.nodes, routeId,
-                            Collections.emptyList(), protectedPoints, null, mergeResult);
-                } else {
-                    finishWithRoute(fallbackText, null, routeId,
-                            Collections.emptyList(), Collections.emptyList(), null, null);
-                }
-            }
-        });
-    }
-
-    private void finishWithRoute(String userRequirementOrText,
-                                 @Nullable List<RouteNode> nodes,
-                                 int routeId,
-                                 @NonNull List<LatLng> roadPolyline,
-                                 @NonNull List<LatLng> waypoints,
-                                 @Nullable String walkSummary,
-                                 @Nullable AiRouteMergeResult mergeResult) {
-        stopWaitingFeedback();
-        setSending(false);
-        if (!isAdded() || adapter == null) {
-            return;
-        }
-
-        String description;
-        if (nodes != null) {
-            description = buildDescription(nodes, mergeResult);
-            if (!TextUtils.isEmpty(walkSummary)) {
-                description += "\n\n步行参考：" + walkSummary;
-            }
-            editableRouteNodes.clear();
-            editableRouteNodes.addAll(nodes);
-            renumberRouteNodes();
-            renderEditableStops();
-        } else {
-            description = userRequirementOrText;
-        }
-
-        List<LatLng> road = roadPolyline.size() >= 2
-                ? roadPolyline : Collections.emptyList();
-        List<LatLng> marks = !waypoints.isEmpty() ? waypoints : road;
-        mapRouteRevision++;
-        if (mainMap != null && (!road.isEmpty() || !marks.isEmpty())) {
-            if (nodes != null && !nodes.isEmpty()) {
-                RouteMapDrawHelper.drawRouteWithNodes(mainMap, road, editableRouteNodes);
-            } else {
-                RouteMapDrawHelper.drawRoute(mainMap, road, marks);
-            }
-        }
-
-        boolean canPublish = nodes != null
-                && (mergeResult == null || (mergeResult.serverRouteLoaded
-                && mergeResult.removedNodes.isEmpty()));
-        publishableRouteId = canPublish ? routeId : 0;
-        publishableRouteSummary = canPublish ? description : null;
-        if (btnPublishRoute != null) {
-            btnPublishRoute.setEnabled(canPublish || !editableRouteNodes.isEmpty());
-        }
-        RouteChatItem item = RouteChatItem.assistantRoute(
-                description, road, marks, routeId, canPublish);
-        int statusPos = waitingStatusPosition;
-        if (statusPos >= 0 && statusPos < adapter.getItemCount()) {
-            adapter.replaceItem(statusPos, item);
-        } else {
-            adapter.addItem(item);
-        }
-        waitingStatusPosition = -1;
-        scrollChatToBottom();
-    }
 
     private boolean restoreLocalDraft() {
         RouteDraftStore.Draft draft = RouteDraftStore.load(requireContext());
@@ -1642,7 +1585,6 @@ public class routeDesign extends Fragment {
         }
         publishableRouteId = draft.publishableRouteId;
         publishableRouteSummary = draft.publishableRouteSummary;
-        waitingActive = false;
         waitingStatusPosition = -1;
         if (btnPublishRoute != null) {
             btnPublishRoute.setEnabled(!editableRouteNodes.isEmpty());
@@ -1669,168 +1611,6 @@ public class routeDesign extends Fragment {
                 routeRequestInFlight, waitingStatusPosition, synchronous);
     }
 
-    private String buildDescription(List<RouteNode> nodes,
-                                    @Nullable AiRouteMergeResult mergeResult) {
-        StringBuilder sb = new StringBuilder();
-        if (mergeResult != null && mergeResult.protectedCount > 0) {
-            if (!mergeResult.serverRouteLoaded) {
-                sb.append("路线暂未更新\n\n")
-                        .append("详情加载失败，当前已安全保留原路线，请稍后重新尝试。\n");
-            } else {
-                sb.append("路线优化完成\n\n")
-                        .append("• 已保留全部 ")
-                        .append(mergeResult.protectedCount)
-                        .append(" 个原有地点\n");
-            }
-            if (mergeResult.serverRouteLoaded && !mergeResult.addedNodes.isEmpty()) {
-                sb.append("• 新增：")
-                        .append(joinNodeNames(mergeResult.addedNodes))
-                        .append("\n");
-            }
-            if (mergeResult.serverRouteLoaded && !mergeResult.removedNodes.isEmpty()) {
-                sb.append("• AI 建议移除：")
-                        .append(joinNodeNames(mergeResult.removedNodes))
-                        .append("（未自动删除）\n")
-                        .append("• 发布时将以当前完整路线为准\n");
-            }
-            if (mergeResult.serverRouteLoaded
-                    && mergeResult.addedNodes.isEmpty()
-                    && mergeResult.removedNodes.isEmpty()) {
-                sb.append("• 地点保持不变，已调整顺序或行程安排\n");
-            }
-        } else {
-            sb.append("路线已生成\n");
-        }
-        if (nodes != null && !nodes.isEmpty()) {
-            int totalMin = ProjectUiHelper.sumDurationMinutes(nodes);
-            String routeSummary = ProjectUiHelper.buildRouteSummary(nodes)
-                    .replaceFirst("^途经[：:]", "");
-            sb.append("\n行程：").append(routeSummary).append("\n");
-            sb.append("时长：约 ").append(ProjectUiHelper.formatDuration(totalMin)).append("\n");
-        }
-        if (mergeResult != null && mergeResult.protectedCount > 0) {
-            sb.append("\n可继续让路线助手新增、删除或调整地点，也可切回「自定义」手动修改。");
-        } else if (mergeResult == null || mergeResult.serverRouteLoaded) {
-            sb.append("\n可继续让路线助手优化路线，或切回「自定义」手动调整。");
-        }
-        return sb.toString();
-    }
-
-    @NonNull
-    private AiRouteMergeResult mergeAiRoute(@NonNull List<RouteNode> protectedNodes,
-                                            @NonNull List<RouteNode> generatedNodes,
-                                            boolean serverRouteLoaded) {
-        List<RouteNode> merged = copyRouteNodes(protectedNodes);
-        List<RouteNode> added = new ArrayList<>();
-        List<RouteNode> omitted = new ArrayList<>();
-
-        for (RouteNode protectedNode : protectedNodes) {
-            if (!containsMatchingNode(generatedNodes, protectedNode)) {
-                omitted.add(copyRouteNode(protectedNode));
-            }
-        }
-        for (RouteNode generatedNode : generatedNodes) {
-            if (containsMatchingNode(protectedNodes, generatedNode)
-                    || containsMatchingNode(merged, generatedNode)) {
-                continue;
-            }
-            RouteNode addition = copyRouteNode(generatedNode);
-            merged.add(addition);
-            added.add(addition);
-        }
-        for (int i = 0; i < merged.size(); i++) {
-            merged.get(i).setVisitOrder(i + 1);
-        }
-        return new AiRouteMergeResult(
-                merged, added, omitted, protectedNodes.size(), serverRouteLoaded);
-    }
-
-    @NonNull
-    private AiRouteMergeResult compareOptimizedRoute(
-            @NonNull List<RouteNode> originalNodes,
-            @NonNull List<RouteNode> optimizedNodes) {
-        List<RouteNode> merged = new ArrayList<>();
-        List<RouteNode> added = new ArrayList<>();
-        List<RouteNode> removed = new ArrayList<>();
-        for (RouteNode optimizedNode : optimizedNodes) {
-            RouteNode original = findMatchingNode(originalNodes, optimizedNode);
-            if (original != null) {
-                if (!containsMatchingNode(merged, original)) {
-                    RouteNode retained = copyRouteNode(original);
-                    if (!TextUtils.isEmpty(optimizedNode.getVisitTime())) {
-                        retained.setVisitTime(optimizedNode.getVisitTime());
-                    }
-                    if (optimizedNode.getRecommendedDuration() > 0) {
-                        retained.setRecommendedDuration(optimizedNode.getRecommendedDuration());
-                    }
-                    if (!TextUtils.isEmpty(optimizedNode.getNotes())) {
-                        retained.setNotes(optimizedNode.getNotes());
-                    }
-                    merged.add(retained);
-                }
-            } else if (!containsMatchingNode(merged, optimizedNode)) {
-                RouteNode addition = copyRouteNode(optimizedNode);
-                merged.add(addition);
-                added.add(addition);
-            }
-        }
-        for (RouteNode originalNode : originalNodes) {
-            if (!containsMatchingNode(optimizedNodes, originalNode)) {
-                removed.add(copyRouteNode(originalNode));
-            }
-            if (!containsMatchingNode(merged, originalNode)) {
-                merged.add(copyRouteNode(originalNode));
-            }
-        }
-        for (int i = 0; i < merged.size(); i++) {
-            merged.get(i).setVisitOrder(i + 1);
-        }
-        return new AiRouteMergeResult(
-                merged,
-                added,
-                removed,
-                originalNodes.size(),
-                true);
-    }
-
-    @Nullable
-    private RouteNode findMatchingNode(@NonNull List<RouteNode> nodes,
-                                       @NonNull RouteNode candidate) {
-        for (RouteNode node : nodes) {
-            if (isSamePlace(node, candidate)) {
-                return node;
-            }
-        }
-        return null;
-    }
-
-    private boolean containsMatchingNode(@NonNull List<RouteNode> nodes,
-                                         @NonNull RouteNode candidate) {
-        for (RouteNode node : nodes) {
-            if (isSamePlace(node, candidate)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isSamePlace(@NonNull RouteNode first, @NonNull RouteNode second) {
-        if (!TextUtils.isEmpty(first.getPoiId())
-                && first.getPoiId().equals(second.getPoiId())) {
-            return true;
-        }
-        LatLng firstPoint = RouteMapDrawHelper.parseLocation(first.getLocation());
-        LatLng secondPoint = RouteMapDrawHelper.parseLocation(second.getLocation());
-        if (firstPoint != null && secondPoint != null
-                && Math.abs(firstPoint.latitude - secondPoint.latitude) < 0.00005
-                && Math.abs(firstPoint.longitude - secondPoint.longitude) < 0.00005) {
-            return true;
-        }
-        String firstName = safeNodeName(first).replaceAll("\\s+", "");
-        String secondName = safeNodeName(second).replaceAll("\\s+", "");
-        return !"未命名地点".equals(firstName)
-                && firstName.equalsIgnoreCase(secondName);
-    }
 
     @NonNull
     private List<RouteNode> copyRouteNodes(@NonNull List<RouteNode> source) {
@@ -1878,64 +1658,6 @@ public class routeDesign extends Fragment {
         return TextUtils.isEmpty(node.getName()) ? "未命名地点" : node.getName().trim();
     }
 
-    @NonNull
-    private String joinNodeNames(@NonNull List<RouteNode> nodes) {
-        StringBuilder names = new StringBuilder();
-        for (RouteNode node : nodes) {
-            if (names.length() > 0) {
-                names.append("、");
-            }
-            names.append(safeNodeName(node));
-        }
-        return names.toString();
-    }
-
-    private static final class AiRouteMergeResult {
-        final List<RouteNode> nodes;
-        final List<RouteNode> addedNodes;
-        final List<RouteNode> removedNodes;
-        final int protectedCount;
-        final boolean serverRouteLoaded;
-
-        AiRouteMergeResult(@NonNull List<RouteNode> nodes,
-                           @NonNull List<RouteNode> addedNodes,
-                           @NonNull List<RouteNode> removedNodes,
-                           int protectedCount,
-                           boolean serverRouteLoaded) {
-            this.nodes = nodes;
-            this.addedNodes = addedNodes;
-            this.removedNodes = removedNodes;
-            this.protectedCount = protectedCount;
-            this.serverRouteLoaded = serverRouteLoaded;
-        }
-    }
-
-    private void startWaitingFeedback() {
-        stopWaitingFeedback();
-        waitingActive = true;
-        waitingTipIndex = 0;
-        adapter.addItem(RouteChatItem.assistantStatus(WAITING_TIPS[0]));
-        waitingStatusPosition = adapter.getLastItemPosition();
-        persistLocalDraft();
-        scrollChatToBottom();
-        if (WAITING_TIPS.length > 1) {
-            waitingHandler.postDelayed(waitingTipRunnable, 4500);
-        }
-    }
-
-    private void updateWaitingFeedback(String text) {
-        if (!isAdded() || adapter == null || waitingStatusPosition < 0) {
-            return;
-        }
-        stopWaitingFeedback();
-        adapter.updateItemText(waitingStatusPosition, text);
-        scrollChatToBottom();
-    }
-
-    private void stopWaitingFeedback() {
-        waitingActive = false;
-        waitingHandler.removeCallbacks(waitingTipRunnable);
-    }
 
     private void openPublishDetails() {
         if (editableRouteNodes.isEmpty()) {
@@ -1981,6 +1703,7 @@ public class routeDesign extends Fragment {
         publishableRouteId = 0;
         publishableRouteSummary = null;
         aiRouteMemoryId = null;
+        if (agent != null && !agent.state.busy) agent.newConversation();
         adapter.replaceAllItems(Collections.singletonList(
                 RouteChatItem.assistantStatus("已载入保存路线，可继续调整或让路线助手优化。")));
         renderEditableStops();
@@ -2013,7 +1736,6 @@ public class routeDesign extends Fragment {
     }
 
     private void showPlanError(String message) {
-        stopWaitingFeedback();
         setSending(false);
         if (!isAdded() || adapter == null) {
             return;
@@ -2021,7 +1743,7 @@ public class routeDesign extends Fragment {
         String display = TextUtils.isEmpty(message) ? "路线规划失败" : message;
         Toast.makeText(requireContext(), display, Toast.LENGTH_SHORT).show();
         RouteChatItem item = RouteChatItem.assistantStatus(
-                "规划失败：" + display + "\n\n请检查网络或登录状态后重试。");
+                "规划失败：" + display + "\n\n当前路线已保留，可稍后重试或调整需求。");
         if (waitingStatusPosition >= 0 && waitingStatusPosition < adapter.getItemCount()) {
             adapter.replaceItem(waitingStatusPosition, item);
         } else {
@@ -2125,10 +1847,9 @@ public class routeDesign extends Fragment {
     @Override
     public void onDestroyView() {
         persistLocalDraft(true);
-        stopWaitingFeedback();
-        if (walkRoutePlanner != null) {
-            walkRoutePlanner.cancel();
-        }
+        if (agent != null) agent.detach();
+        if (poiSyncCall != null) poiSyncCall.cancel();
+        routeRequestInFlight = false;
         if (customWalkPlanner != null) {
             customWalkPlanner.cancel();
         }

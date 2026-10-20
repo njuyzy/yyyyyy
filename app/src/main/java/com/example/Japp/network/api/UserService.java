@@ -170,18 +170,15 @@ public interface UserService {
     Call<Result<JsonElement>> publishRoute(@Path("id") int routeId,
                                            @Body PublishRouteRequest request);
 
-    // 统一 AI 路线接口：不传请求体时生成路线，传入已有地点时优化路线。
-    // 两种方式成功时 data 均为路线 ID（数字）。
-    @POST("routes/ai/{memoryId}")
-    Call<Result<JsonElement>> planRouteByAi(@Path("memoryId") String memoryId,
-                                            @Query("message") String message,
-                                            @Query("accountId") Integer accountId);
+    @POST("routes/agent/runs")
+    Call<com.example.Japp.network.models.RouteAgent.Run> createAgentRun(
+            @Body com.example.Japp.network.models.RouteAgent.Request request);
 
-    @POST("routes/ai/{memoryId}")
-    Call<Result<JsonElement>> optimizeRouteByAi(@Path("memoryId") String memoryId,
-                                                @Query("message") String message,
-                                                @Query("accountId") Integer accountId,
-                                                @Body List<RouteNode> routeNodes);
+    @GET("routes/agent/runs/{runId}")
+    Call<com.example.Japp.network.models.RouteAgent.Run> getAgentRun(@Path("runId") String runId);
+
+    @DELETE("routes/agent/runs/{runId}")
+    Call<com.example.Japp.network.models.RouteAgent.Run> cancelAgentRun(@Path("runId") String runId);
 
     @POST("routes/manual")
     Call<Result<JsonElement>> createManualRoute(@Body List<RouteNode> routeNodes);

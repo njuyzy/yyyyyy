@@ -23,6 +23,7 @@ import com.example.Japp.network.models.RouteNode;
 import com.example.Japp.network.models.requests.PublishRouteRequest;
 import com.example.Japp.user.fragment.route.RouteMapDrawHelper;
 import com.example.Japp.user.util.RoutePlanHelper;
+import com.example.Japp.user.util.RouteAgentHelper;
 import com.example.Japp.user.util.SessionHelper;
 import com.example.Japp.util.DisplayCutoutAdapter;
 import com.google.android.material.appbar.MaterialToolbar;
@@ -251,6 +252,49 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
     }
 
     private void createManualRouteAndPublish(PublishForm form) {
+        try {
+            java.time.LocalDate firstDay = TextUtils.isEmpty(form.departureDate)
+                    ? null : java.time.LocalDate.parse(form.departureDate);
+            for (RouteNode node : routeNodes) {
+                if (TextUtils.isEmpty(node.getPoiId()))
+                    throw new IllegalArgumentException("路线地点缺少有效标识，请重新搜索地点");
+                node.setVisitTime(RouteAgentHelper.visitTimeToIso(node.getVisitTime(), firstDay));
+            }
+        } catch (RuntimeException exception) {
+            btnSubmit.setEnabled(true);
+            Toast.makeText(this, "请检查行程日期和地点时间：" + exception.getMessage(), Toast.LENGTH_LONG).show();
+            return;
+        }
+        syncPublishPoi(form, 0);
+    }
+
+    private void syncPublishPoi(PublishForm form, int index) {
+        if (isFinishing() || isDestroyed()) return;
+        if (index == routeNodes.size()) {
+            saveManualRouteAndPublish(form);
+            return;
+        }
+        service.syncAttraction(routeNodes.get(index).getPoiId()).enqueue(new Callback<Result<JsonElement>>() {
+            @Override public void onResponse(Call<Result<JsonElement>> call, Response<Result<JsonElement>> response) {
+                if (isFinishing() || isDestroyed()) return;
+                if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
+                    syncPublishPoi(form, index + 1);
+                } else {
+                    btnSubmit.setEnabled(true);
+                    Toast.makeText(RoutePublishDetailActivity.this, "地点同步失败："
+                            + RoutePlanHelper.readErrorMessage(response, response.body()), Toast.LENGTH_LONG).show();
+                    if (response.code() == 401) SessionHelper.handleUnauthorized(RoutePublishDetailActivity.this);
+                }
+            }
+            @Override public void onFailure(Call<Result<JsonElement>> call, Throwable error) {
+                if (isFinishing() || isDestroyed()) return;
+                btnSubmit.setEnabled(true);
+                Toast.makeText(RoutePublishDetailActivity.this, "地点同步失败，请稍后重试", Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private void saveManualRouteAndPublish(PublishForm form) {
         service.createManualRoute(routeNodes).enqueue(new Callback<Result<JsonElement>>() {
             @Override
             public void onResponse(Call<Result<JsonElement>> call,

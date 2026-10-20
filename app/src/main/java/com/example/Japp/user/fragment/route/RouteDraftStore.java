@@ -176,6 +176,7 @@ final class RouteDraftStore {
         long timestamp;
         int routeId;
         boolean publishAllowed;
+        String agentRunId;
         List<PointRecord> polyline;
         List<PointRecord> waypoints;
 
@@ -186,6 +187,7 @@ final class RouteDraftStore {
             record.timestamp = item.getTimestamp();
             record.routeId = item.getRouteId();
             record.publishAllowed = item.isPublishAllowed();
+            record.agentRunId = item.getAgentRunId();
             record.polyline = PointRecord.from(item.getPolylinePoints());
             record.waypoints = PointRecord.from(item.getWaypointPoints());
             return record;
@@ -195,13 +197,18 @@ final class RouteDraftStore {
         RouteChatItem toItem() {
             if (type != RouteChatItem.TYPE_USER
                     && type != RouteChatItem.TYPE_ASSISTANT_ROUTE
-                    && type != RouteChatItem.TYPE_ASSISTANT_STATUS) {
+                    && type != RouteChatItem.TYPE_ASSISTANT_STATUS
+                    && type != RouteChatItem.TYPE_ASSISTANT_MESSAGE
+                    && type != RouteChatItem.TYPE_ASSISTANT_PLAN
+                    && type != RouteChatItem.TYPE_ASSISTANT_PROGRESS) {
                 return null;
             }
-            return RouteChatItem.restore(type, text, timestamp, routeId,
+            RouteChatItem item = RouteChatItem.restore(type, text, timestamp, routeId,
                     PointRecord.toLatLng(polyline),
                     PointRecord.toLatLng(waypoints),
                     publishAllowed);
+            item.setAgentRunId(agentRunId);
+            return item;
         }
     }
 
