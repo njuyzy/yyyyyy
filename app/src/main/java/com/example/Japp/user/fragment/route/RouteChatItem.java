@@ -1,6 +1,7 @@
 package com.example.Japp.user.fragment.route;
 
 import com.amap.api.maps.model.LatLng;
+import com.example.Japp.user.util.RoutePlanText;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,6 +33,7 @@ public class RouteChatItem {
         this.text = type == TYPE_ASSISTANT_ROUTE
                 ? hideInternalRouteId(text)
                 : (text != null ? text : "");
+        if (type != TYPE_USER) this.text = RoutePlanText.withoutDirections(this.text);
         this.timestamp = timestamp;
         this.routeId = routeId;
         this.publishAllowed = publishAllowed;
@@ -106,7 +108,7 @@ public class RouteChatItem {
     }
 
     public void setText(String text) {
-        this.text = text != null ? text : "";
+        this.text = type == TYPE_USER ? (text != null ? text : "") : RoutePlanText.withoutDirections(text);
     }
 
     /** 兼容本地已保存的旧消息，路线 ID 仅供内部发布流程使用。 */

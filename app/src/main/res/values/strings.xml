@@ -105,7 +105,7 @@
     <string name="route_ai_panel_title">AI 路线助手</string>
     <string name="route_ai_input_hint">描述想如何优化，或新建一条路线</string>
     <string name="route_ai_optimize_hint">例如：减少步行，增加一个博物馆</string>
-    <string name="route_ai_empty_state">告诉我城市、时长和研学偏好</string>
+    <string name="route_ai_empty_state">告诉我城市、日期、预算与研学偏好</string>
     <string name="route_ai_context_new">新建路线</string>
     <string name="route_ai_state_done">已更新</string>
     <string name="route_ai_retry">重新尝试</string>
@@ -116,7 +116,7 @@
     <string name="route_map_tap_fullscreen">展开地图</string>
     <string name="route_map_no_coords">暂无坐标，无法展示地图</string>
     <string name="route_welcome_title">发现一条适合你的研学路线</string>
-    <string name="route_welcome_subtitle">输入城市、天数和研学主题，AI 会整理景点顺序、停留时间和步行路线。</string>
+    <string name="route_welcome_subtitle">描述日期、时长、预算、同行人和必去地点。助手会检索真实地点、比较交通并校验行程，方案确认后再应用。</string>
     <string name="route_chip_nanjing">南京 2 日历史文化</string>
     <string name="route_chip_beijing">北京 3 日科技研学</string>
     <string name="route_chip_suzhou">苏州 亲子自然探索</string>

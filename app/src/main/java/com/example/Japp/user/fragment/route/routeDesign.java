@@ -71,6 +71,7 @@ import com.example.Japp.network.models.Result;
 import com.example.Japp.network.models.RouteNode;
 import com.example.Japp.network.models.RouteAgent;
 import com.example.Japp.user.util.RouteAgentHelper;
+import com.example.Japp.user.util.RoutePlanText;
 import com.example.Japp.user.RoutePublishDetailActivity;
 import com.example.Japp.user.util.ProjectUiHelper;
 import com.example.Japp.user.util.RoutePlanHelper;
@@ -1332,6 +1333,17 @@ public class routeDesign extends Fragment {
             return;
         }
         String text = editMessage.getText().toString().trim();
+        String knownAnswer = agent.answerKnownQuestion(text, editableRouteNodes);
+        if (knownAnswer != null) {
+            adapter.addItem(RouteChatItem.user(text));
+            adapter.addItem(RouteChatItem.assistantMessage(knownAnswer));
+            editMessage.setText("");
+            updateWelcomeVisibility();
+            revealAssistantConversation();
+            scrollChatToBottom();
+            persistLocalDraft();
+            return;
+        }
         if ("transport_error".equals(agent.state.status) && agent.state.request != null) {
             if (!text.equals(agent.state.request.message)) {
                 Toast.makeText(requireContext(), "上一轮状态尚未确认，请先点击重试恢复进度或新建对话", Toast.LENGTH_LONG).show();
@@ -1342,9 +1354,8 @@ public class routeDesign extends Fragment {
             return;
         }
         try {
-            RouteAgent.Request request = RouteAgentHelper.request(
-                    SessionHelper.getAccountId(requireContext()), getOrCreateAiRouteMemoryId(),
-                    text, agent.state.history, agent.state.constraints, editableRouteNodes);
+            RouteAgent.Request request = agent.prepareRequest(
+                    SessionHelper.getAccountId(requireContext()), getOrCreateAiRouteMemoryId(), text, editableRouteNodes);
             if (currentLocation != null && hasLocationPermission()
                     && currentLocation.longitude >= 73 && currentLocation.longitude <= 136
                     && currentLocation.latitude >= 3 && currentLocation.latitude <= 54) {
@@ -1356,7 +1367,7 @@ public class routeDesign extends Fragment {
             editMessage.setText("");
             updateWelcomeVisibility();
             revealAssistantConversation();
-            beginAgentFeedback("正在提交规划需求…");
+            beginAgentFeedback(request.usesCandidateContext ? "正在基于上一版候选方案调整…" : "正在结合已有要求处理…");
             agent.start(request, RouteAgentHelper.snapshot(editableRouteNodes));
         } catch (IllegalArgumentException exception) {
             Toast.makeText(requireContext(), exception.getMessage(), Toast.LENGTH_LONG).show();
@@ -1364,7 +1375,8 @@ public class routeDesign extends Fragment {
     }
 
     private String getOrCreateAiRouteMemoryId() {
-        if (agent.state.memoryId == null) agent.state.memoryId = UUID.randomUUID().toString();
+        if (agent.state.memoryId == null || !agent.state.memoryId.matches("[A-Za-z0-9_-]{1,128}"))
+            agent.state.memoryId = UUID.randomUUID().toString();
         aiRouteMemoryId = agent.state.memoryId;
         return aiRouteMemoryId;
     }
@@ -1427,6 +1439,10 @@ public class routeDesign extends Fragment {
     }
 
     private void showAgentResult(String runId, RouteAgent.Result result) {
+        if (!RouteAgentHelper.validResult(result)) {
+            showPlanError("规划结果不完整或未通过校验，当前路线已保留");
+            return;
+        }
         if ("plan".equals(result.kind)) {
             if (result.nodes == null || result.nodes.isEmpty() || !result.requiresAcceptance) {
                 showPlanError("规划结果不完整，请重新规划");
@@ -1451,6 +1467,10 @@ public class routeDesign extends Fragment {
             return;
         }
         RouteAgent.Result result = agent.state.result;
+        if (!RouteAgentHelper.validResult(result)) {
+            showPlanError("方案已失效，请重新规划");
+            return;
+        }
         new MaterialAlertDialogBuilder(requireContext()).setTitle("确认应用路线方案")
                 .setMessage(RouteAgentHelper.describe(result))
                 .setNegativeButton("暂不应用", null)
@@ -1495,14 +1515,16 @@ public class routeDesign extends Fragment {
         if (customWalkPlanner != null) customWalkPlanner.cancel();
         RouteMapDrawHelper.drawRouteWithNodes(mainMap, Collections.emptyList(), editableRouteNodes);
         if (agent.state.result.legs != null) for (RouteAgent.Leg leg : agent.state.result.legs) {
-            if (leg.polyline == null || leg.polyline.size() < 2) continue;
+            if (leg == null || !RouteAgentHelper.validPolyline(leg.polyline)) continue;
             List<LatLng> segment = new ArrayList<>();
             for (List<Double> point : leg.polyline) {
                 if (point != null && point.size() == 2 && point.get(0) != null && point.get(1) != null)
                     segment.add(new LatLng(point.get(1), point.get(0)));
             }
             if (segment.size() >= 2) mainMap.addPolyline(new PolylineOptions().addAll(segment)
-                    .width(10f).color(ContextCompat.getColor(requireContext(), R.color.route_primary)));
+                    .width(10f).color("transit".equals(leg.mode) ? 0xFF8C57CE :
+                            ("driving".equals(leg.mode) ? 0xFF168B78 :
+                                    ContextCompat.getColor(requireContext(), R.color.route_primary))));
         }
         return true;
     }
@@ -1521,7 +1543,7 @@ public class routeDesign extends Fragment {
             editableRouteNodes.addAll(nodes);
             renumberRouteNodes();
             publishableRouteId = 0; // Agent runId is NEVER a persisted routeId.
-            publishableRouteSummary = result.message;
+            publishableRouteSummary = RoutePlanText.withoutDirections(result.message);
             agent.markApplied(RouteAgentHelper.snapshot(editableRouteNodes));
             setSending(false);
             renderEditableStops();
@@ -1715,8 +1737,8 @@ public class routeDesign extends Fragment {
 
     private void launchPublishDetails() {
 
-        String summary = !TextUtils.isEmpty(publishableRouteSummary)
-                ? publishableRouteSummary : "研学路线";
+        String summary = RoutePlanText.withoutDirections(publishableRouteSummary);
+        if (TextUtils.isEmpty(summary)) summary = "研学路线";
         String title = summary.length() > 20
                 ? summary.substring(0, 20) + "…"
                 : summary;

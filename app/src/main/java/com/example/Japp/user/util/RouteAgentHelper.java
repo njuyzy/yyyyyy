@@ -62,6 +62,60 @@ public final class RouteAgentHelper {
 
     public static String snapshot(List<RouteNode> nodes) { return GSON.toJson(nodes); }
 
+    /** A malformed completion must not enter history, render a map, or replace the current route. */
+    public static boolean validResult(RouteAgent.Result result) {
+        if (result == null) return false;
+        if ("clarification".equals(result.kind)) {
+            if (result.questions == null || result.questions.isEmpty() || result.questions.size() > 3
+                    || (result.nodes != null && !result.nodes.isEmpty())
+                    || (result.legs != null && !result.legs.isEmpty())) return false;
+            for (String question : result.questions)
+                if (question == null || question.trim().isEmpty()) return false;
+            return true;
+        }
+        if (!"plan".equals(result.kind) || !result.feasible || !result.requiresAcceptance
+                || result.issues == null || !result.issues.isEmpty()
+                || result.nodes == null || result.nodes.isEmpty() || result.nodes.size() > 20
+                || result.days == null || result.days.isEmpty() || result.days.size() > 7
+                || !Double.isFinite(result.estimatedCost) || result.estimatedCost < 0
+                || result.unknownCosts < 0) return false;
+        Set<String> ids = new HashSet<>();
+        for (RouteNode node : result.nodes) {
+            if (node == null || node.getPoiId() == null || !node.getPoiId().matches("[A-Za-z0-9_-]{1,80}")
+                    || !ids.add(node.getPoiId()) || node.getName() == null || node.getName().trim().isEmpty()
+                    || node.getRecommendedDuration() < 10 || node.getRecommendedDuration() > 480
+                    || node.getLocation() == null || node.getVisitTime() == null) return false;
+            try {
+                String[] point = node.getLocation().split(",", -1);
+                if (point.length != 2 || !validCoordinate(Double.parseDouble(point[0]), Double.parseDouble(point[1])))
+                    return false;
+                // This date is only a syntax-check anchor; it is never applied to the user's route.
+                if (visitTimeToIso(node.getVisitTime(), LocalDate.of(2000, 1, 1)) == null) return false;
+            } catch (RuntimeException invalid) { return false; }
+        }
+        Set<Integer> dayNumbers = new HashSet<>();
+        for (RouteAgent.Day day : result.days) {
+            if (day == null || day.day < 1 || day.day > 7 || !dayNumbers.add(day.day)
+                    || day.totalMinutes < 0 || (day.walkingMeters != null && day.walkingMeters < 0)) return false;
+            if (day.schedule != null && day.schedule.contains(null)) return false;
+        }
+        return result.legs == null || !result.legs.contains(null);
+    }
+
+    public static boolean validCoordinate(double longitude, double latitude) {
+        return Double.isFinite(longitude) && Double.isFinite(latitude)
+                && longitude >= 73 && longitude <= 136 && latitude >= 3 && latitude <= 54;
+    }
+
+    /** Reject the whole bad segment instead of connecting across missing or invalid geometry. */
+    public static boolean validPolyline(List<List<Double>> points) {
+        if (points == null || points.size() < 2) return false;
+        for (List<Double> point : points)
+            if (point == null || point.size() != 2 || point.get(0) == null || point.get(1) == null
+                    || !validCoordinate(point.get(0), point.get(1))) return false;
+        return true;
+    }
+
     public static String progress(RouteAgent.Run run) {
         StringBuilder text = new StringBuilder(run.stage == null || run.stage.isEmpty()
                 ? "路线助手正在处理…" : run.stage);
@@ -87,31 +141,50 @@ public final class RouteAgentHelper {
             appendLines(text, result.questions);
             return text.toString().trim();
         }
-        text.append("候选路线 · 等待确认\n\n").append(limit(result.message, 2500));
+        text.append("候选路线 · 等待确认\n\n").append(RoutePlanText.withoutDirections(limit(result.message, 2500)));
         if (result.nodes != null) for (RouteNode node : result.nodes) {
             text.append("\n").append(node.getVisitOrder()).append(". ").append(node.getName())
                     .append(" · ").append(node.getVisitTime()).append(" · ")
                     .append(node.getRecommendedDuration()).append(" 分钟");
-            if (node.getNotes() != null && !node.getNotes().isEmpty())
-                text.append("\n   ").append(node.getNotes());
+            String notes = RoutePlanText.withoutDirections(node.getNotes());
+            if (!notes.isEmpty()) text.append("\n   ").append(notes);
         }
         if (result.days != null) for (RouteAgent.Day day : result.days) {
             text.append("\n第").append(day.day).append("天：约 ").append(day.totalMinutes)
-                    .append(" 分钟，通勤步行约 ").append(day.walkingMeters).append(" 米，结束 ")
-                    .append(day.finishTime);
+                    .append(" 分钟，通勤步行")
+                    .append(day.walkingMeters == null ? "待核实" : "约 " + day.walkingMeters + " 米");
+            if (day.finishTime != null) text.append("，结束 ").append(day.finishTime);
+            if (day.schedule != null) for (RouteAgent.Visit visit : day.schedule) {
+                if (visit == null) continue;
+                text.append("\n  ").append(limit(visit.arrival, 20)).append("–")
+                        .append(limit(visit.departure, 20)).append(" ")
+                        .append("break".equals(visit.type) ? "休息 / 用餐" : limit(visit.name, 160));
+                String goal = RoutePlanText.withoutDirections(visit.learningGoal);
+                if (!goal.isEmpty()) text.append("\n    ").append(goal);
+            }
         }
-        text.append(String.format(Locale.CHINA, "\n\n已知费用估算：每人 ¥%.2f（非全部费用）", result.estimatedCost));
+        // Keep legs for timing, validation and map rendering, not conversational navigation output.
+        text.append(String.format(Locale.CHINA, "\n\n已知交通费用估算：每人 ¥%.2f（非全部费用）", result.estimatedCost));
         text.append("\n未核价项目：").append(result.unknownCosts).append(" 项");
+        text.append("\n门票、餐饮及其他未核价支出不包含在内，不能据此承诺免费或全程预算满足。");
         if (result.assumptions != null && !result.assumptions.isEmpty()) {
             text.append("\n\n方案假设："); appendLines(text, result.assumptions);
         }
-        if (result.warnings != null && !result.warnings.isEmpty()) {
-            text.append("\n\n出行提醒："); appendLines(text, result.warnings);
+        Set<String> warnings = new java.util.LinkedHashSet<>();
+        if (result.warnings != null) warnings.addAll(result.warnings);
+        if (result.legs != null) for (RouteAgent.Leg leg : result.legs) {
+            if (leg == null) continue;
+            String advisory = RoutePlanText.advisory(leg.note);
+            if (!advisory.isEmpty()) warnings.add(advisory);
+        }
+        if (!warnings.isEmpty()) {
+            text.append("\n\n出行提醒：");
+            for (String warning : warnings) if (warning != null) text.append("\n• ").append(warning);
         }
         if (result.removedPoiIds != null && !result.removedPoiIds.isEmpty())
-            text.append("\n\n本方案将移除 ").append(result.removedPoiIds.size()).append(" 个原有地点，请确认行程后应用。");
+            text.append("\n\n相对本轮参考方案，减少了 ").append(result.removedPoiIds.size()).append(" 个地点。");
         text.append("\n\n确认后才会替换当前路线。");
-        return text.toString();
+        return RoutePlanText.withoutDirections(text.toString());
     }
 
     public static String visitTimeToIso(String value, LocalDate firstDay) {
@@ -161,11 +234,28 @@ public final class RouteAgentHelper {
     public static String safeError(String error) {
         if (error == null || error.trim().isEmpty()) return "本轮规划失败，请稍后重试";
         String lower = error.toLowerCase(Locale.ROOT);
+        if (lower.contains("arrearage") || lower.contains("overdue-payment"))
+            return "模型供应商账户不可用，请联系管理员检查欠费或服务权限；不是你的登录失效";
         if (lower.contains("embeddings") && (lower.contains("connection refused") || lower.contains("connect")))
             return "路线检索服务暂不可用，请联系管理员检查向量嵌入服务连接";
         if (error.matches("(?is).*(sk-[a-z0-9_-]+|bearer\\s|https?://|stacktrace|jdbc:).*"))
             return "路线服务执行失败，请联系管理员检查模型、检索或地图服务配置";
         return limit(error.trim(), 600);
+    }
+
+    public static String transportError(Throwable error) {
+        for (int depth = 0; error != null && depth < 8; depth++, error = error.getCause()) {
+            if (error instanceof javax.net.ssl.SSLException)
+                return "路线服务的 HTTPS 证书或安全连接异常，请联系管理员；未绕过证书校验";
+            if (error instanceof java.net.ConnectException || error instanceof java.net.UnknownHostException)
+                return "无法连接路线服务，请检查后端地址、端口和部署状态；重试将恢复原请求";
+            if (error instanceof java.net.SocketTimeoutException)
+                return "路线服务响应超时，点击重试可恢复原任务，不会重复生成";
+            if (error instanceof com.google.gson.JsonParseException
+                    || error instanceof com.google.gson.stream.MalformedJsonException)
+                return "路线接口返回的内容不是有效 JSON，请检查后端或网关路由；当前路线未变";
+        }
+        return "连接中断，点击重试可查询原任务或安全重发原请求";
     }
 
     private static void appendLines(StringBuilder text, List<String> lines) {

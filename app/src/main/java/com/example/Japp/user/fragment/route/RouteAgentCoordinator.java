@@ -7,10 +7,13 @@ import android.os.Looper;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.RouteAgent;
 import com.example.Japp.user.util.RouteAgentHelper;
+import com.example.Japp.user.util.RouteConversationContext;
+import com.example.Japp.network.models.RouteNode;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.LongSupplier;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -47,6 +50,12 @@ final class RouteAgentCoordinator {
         boolean delivered;
         boolean applied;
         String appliedSnapshot;
+        long startedAtMillis;
+        RouteAgent.Result discussionPlan;
+        String discussionSnapshot;
+        boolean discussionApplied;
+        JsonObject pendingConstraintPatch;
+        int conversationVersion;
     }
 
     final State state;
@@ -54,6 +63,8 @@ final class RouteAgentCoordinator {
     private final Store store;
     private final Gson gson = new Gson();
     private final Scheduler scheduler;
+    private final LongSupplier clock;
+    private static final long WAIT_LIMIT_MILLIS = 270_000L;
     private Listener listener;
     private Call<RouteAgent.Run> call;
     private int generation;
@@ -65,14 +76,36 @@ final class RouteAgentCoordinator {
     }
 
     RouteAgentCoordinator(UserService service, Store store, Scheduler scheduler) {
+        this(service, store, scheduler, System::currentTimeMillis);
+    }
+
+    RouteAgentCoordinator(UserService service, Store store, Scheduler scheduler, LongSupplier clock) {
         this.service = service;
         this.store = store;
         this.scheduler = scheduler;
+        this.clock = clock;
         State loaded = null;
         try { loaded = gson.fromJson(store.read(), State.class); }
         catch (RuntimeException ignored) { }
         state = loaded == null ? new State() : loaded;
         if (state.history == null) state.history = new ArrayList<>();
+        if (state.busy && state.startedAtMillis == 0) state.startedAtMillis = clock.getAsLong();
+        if (state.conversationVersion == 0) {
+            if (state.result != null && "plan".equals(state.result.kind)) {
+                state.discussionPlan = state.result;
+                state.discussionApplied = state.applied;
+                state.discussionSnapshot = state.applied ? state.appliedSnapshot : state.routeSnapshot;
+            }
+            for (int i = state.history.size() - 1; i >= 0; i--) {
+                RouteAgent.Turn turn = state.history.get(i);
+                if (state.result != null && turn != null && "assistant".equals(turn.role) && turn.content != null
+                        && (turn.content.startsWith("候选路线") || turn.content.startsWith("需要补充信息"))) {
+                    turn.content = RouteConversationContext.memorySummary(state.result);
+                    break;
+                }
+            }
+            state.conversationVersion = 1;
+        }
     }
 
     private static Store androidStore(Context context, int accountId) {
@@ -96,6 +129,7 @@ final class RouteAgentCoordinator {
     void attach(Listener listener) {
         this.listener = listener;
         if (state.busy) {
+            if (waitExpired()) return;
             listener.onProgress(state.cancelRequested ? "正在取消规划…" : "正在恢复规划进度…", state.cancelRequested);
             if (state.runId == null) create();
             else if (state.cancelRequested) cancel();
@@ -107,7 +141,12 @@ final class RouteAgentCoordinator {
         if (state.busy) return;
         generation++;
         state.memoryId = request.memoryId;
-        state.request = request;
+        state.request = gson.fromJson(gson.toJson(request), RouteAgent.Request.class);
+        state.pendingConstraintPatch = request.explicitConstraintPatch == null
+                ? new JsonObject() : request.explicitConstraintPatch.deepCopy();
+        state.constraints = request.constraints == null ? new JsonObject() : request.constraints.deepCopy();
+        // The user's words remain context even if a service dependency fails. Retries never add them again.
+        remember("user", request.message);
         state.routeSnapshot = snapshot;
         state.runId = null;
         state.result = null;
@@ -117,6 +156,8 @@ final class RouteAgentCoordinator {
         state.cancelAcknowledged = false;
         state.delivered = false;
         state.applied = false;
+        state.appliedSnapshot = null;
+        state.startedAtMillis = clock.getAsLong();
         networkFailures = 0;
         save();
         create();
@@ -126,6 +167,7 @@ final class RouteAgentCoordinator {
         if (state.busy || state.request == null || !"transport_error".equals(state.status)) return false;
         state.busy = true;
         networkFailures = 0;
+        state.startedAtMillis = clock.getAsLong();
         save();
         if (state.runId != null) {
             if (state.cancelRequested) cancel(); else query();
@@ -156,10 +198,40 @@ final class RouteAgentCoordinator {
         state.runId = null;
         state.status = null;
         state.cancelRequested = false;
+        state.discussionPlan = null;
+        state.discussionSnapshot = null;
+        state.discussionApplied = false;
+        state.pendingConstraintPatch = null;
         save();
     }
 
-    void markApplied(String snapshot) { state.applied = true; state.appliedSnapshot = snapshot; save(); }
+    RouteAgent.Request prepareRequest(int accountId, String memoryId, String message, List<RouteNode> actualNodes) {
+        return RouteConversationContext.prepare(accountId, memoryId, message, state.history, state.constraints,
+                actualNodes, state.discussionPlan, state.discussionApplied, state.discussionSnapshot);
+    }
+
+    String answerKnownQuestion(String message, List<RouteNode> actualNodes) {
+        if (state.busy) return null;
+        boolean candidate = state.discussionPlan != null && RouteAgentHelper.validResult(state.discussionPlan)
+                && !state.discussionApplied && RouteAgentHelper.snapshot(actualNodes).equals(state.discussionSnapshot);
+        List<RouteNode> nodes = candidate ? state.discussionPlan.nodes : actualNodes;
+        String answer = RouteConversationContext.answerKnownQuestion(message, nodes, state.constraints);
+        if (answer != null) {
+            remember("user", message);
+            remember("assistant", answer);
+            save();
+        }
+        return answer;
+    }
+
+    void markApplied(String snapshot) {
+        state.applied = true;
+        state.appliedSnapshot = snapshot;
+        state.discussionApplied = true;
+        state.discussionSnapshot = snapshot;
+        remember("assistant", "上一版候选方案已由用户确认应用；后续修改以实际当前路线为准。");
+        save();
+    }
 
     void detach() {
         listener = null;
@@ -172,6 +244,7 @@ final class RouteAgentCoordinator {
     private void create() { execute(service.createAgentRun(state.request), 202); }
     private void query() {
         if (state.busy && listener != null && state.runId != null) {
+            if (waitExpired()) return;
             if (state.cancelRequested && !state.cancelAcknowledged) cancel();
             else execute(service.getAgentRun(state.runId), 200);
         }
@@ -184,15 +257,18 @@ final class RouteAgentCoordinator {
         next.enqueue(new Callback<RouteAgent.Run>() {
             @Override public void onResponse(Call<RouteAgent.Run> source, Response<RouteAgent.Run> response) {
                 if (expectedGeneration != generation || listener == null) return;
-                networkFailures = 0;
                 if (response.code() != expectedStatus || response.body() == null) {
                     String raw = "";
                     try { if (response.errorBody() != null) raw = response.errorBody().string(); }
                     catch (Exception ignored) { }
-                    fail(RouteAgentHelper.error(response.code(), raw), response.code() == 401,
-                            response.code() >= 500);
+                    boolean temporary = response.code() >= 500 || response.code() == 429;
+                    if (temporary && state.runId != null && ++networkFailures <= 3) {
+                        listener.onProgress("路线服务暂时繁忙，正在恢复原任务进度…", state.cancelRequested);
+                        scheduler.post(poll, 2000L * networkFailures);
+                    } else fail(RouteAgentHelper.error(response.code(), raw), response.code() == 401, temporary);
                     return;
                 }
+                networkFailures = 0;
                 if (source.request().method().equals("DELETE")) state.cancelAcknowledged = true;
                 receive(response.body());
             }
@@ -202,7 +278,7 @@ final class RouteAgentCoordinator {
                     listener.onProgress("连接暂时中断，正在恢复规划进度…", state.cancelRequested);
                     scheduler.post(poll, 2000L * networkFailures);
                 } else {
-                    fail("连接中断，点击重试可查询原任务或安全重发原请求", false, true);
+                    fail(RouteAgentHelper.transportError(error), false, true);
                 }
             }
         });
@@ -226,14 +302,25 @@ final class RouteAgentCoordinator {
         }
         state.busy = false;
         scheduler.remove(poll);
-        if ("completed".equals(run.status) && run.result != null
-                && ("plan".equals(run.result.kind) || "clarification".equals(run.result.kind))) {
+        if ("completed".equals(run.status) && !RouteAgentHelper.validResult(run.result)) {
+            fail("规划结果不完整或未通过校验，当前路线已保留，请重新规划", false, false);
+            return;
+        }
+        if ("completed".equals(run.status)) {
+            if ("plan".equals(run.result.kind) && !confirmsLatestPatch(run.result.constraints)) {
+                fail("后端未确认本轮约束修改，当前路线已保留，请重试或重新确认条件", false, false);
+                return;
+            }
             state.result = run.result;
-            state.constraints = run.result.constraints;
+            state.constraints = RouteConversationContext.merge(
+                    RouteConversationContext.merge(state.constraints, run.result.constraints), state.pendingConstraintPatch);
+            if ("plan".equals(run.result.kind)) {
+                state.discussionPlan = run.result;
+                state.discussionSnapshot = state.routeSnapshot;
+                state.discussionApplied = false;
+            }
             if (!state.delivered) {
-                state.history.add(new RouteAgent.Turn("user", state.request.message));
-                state.history.add(new RouteAgent.Turn("assistant", RouteAgentHelper.describe(run.result)));
-                while (state.history.size() > 24) state.history.remove(0);
+                remember("assistant", RouteConversationContext.memorySummary(run.result));
                 state.delivered = true;
                 save();
                 listener.onResult(run.runId, run.result);
@@ -254,5 +341,34 @@ final class RouteAgentCoordinator {
         if (listener != null) listener.onError(message, unauthorized);
     }
 
+    private boolean waitExpired() {
+        if (clock.getAsLong() - state.startedAtMillis <= WAIT_LIMIT_MILLIS) return false;
+        fail(state.cancelRequested ? "取消状态仍未确认，可重试查询原任务；当前路线未变"
+                : "等待规划结果超时，可重试查询原任务；当前路线未变", false, true);
+        return true;
+    }
+
     private void save() { store.write(gson.toJson(state)); }
+
+    private void remember(String role, String text) {
+        state.history.add(new RouteAgent.Turn(role, text));
+        while (state.history.size() > 24) state.history.remove(0);
+    }
+
+    private boolean confirmsLatestPatch(JsonObject confirmed) {
+        if (state.pendingConstraintPatch == null || state.pendingConstraintPatch.size() == 0) return true;
+        if (confirmed == null) return false;
+        for (java.util.Map.Entry<String, com.google.gson.JsonElement> entry : state.pendingConstraintPatch.entrySet()) {
+            if (!confirmed.has(entry.getKey())) return false;
+            com.google.gson.JsonElement received = confirmed.get(entry.getKey());
+            if (entry.getValue().isJsonArray() && received.isJsonArray()) {
+                java.util.Set<com.google.gson.JsonElement> expectedSet = new java.util.HashSet<>();
+                java.util.Set<com.google.gson.JsonElement> receivedSet = new java.util.HashSet<>();
+                for (com.google.gson.JsonElement item : entry.getValue().getAsJsonArray()) expectedSet.add(item);
+                for (com.google.gson.JsonElement item : received.getAsJsonArray()) receivedSet.add(item);
+                if (!expectedSet.equals(receivedSet)) return false;
+            } else if (!entry.getValue().equals(received)) return false;
+        }
+        return true;
+    }
 }

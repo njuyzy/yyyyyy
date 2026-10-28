@@ -35,6 +35,9 @@ public final class RouteAgent {
         public List<Stop> currentRoute = new ArrayList<>();
         public JsonObject constraints;
         public Origin origin;
+        // Client bookkeeping only; Gson must not send extra fields to the strict API.
+        public transient JsonObject explicitConstraintPatch;
+        public transient boolean usesCandidateContext;
     }
 
     public static final class Event {
@@ -57,6 +60,8 @@ public final class RouteAgent {
         public String kind;
         public String message;
         public JsonObject constraints;
+        public boolean feasible;
+        public List<String> issues;
         public List<String> questions;
         public List<String> assumptions;
         public List<String> warnings;
@@ -74,8 +79,17 @@ public final class RouteAgent {
         public int day;
         public String date;
         public int totalMinutes;
-        public int walkingMeters;
+        public Integer walkingMeters;
         public String finishTime;
+        public List<Visit> schedule;
+    }
+
+    public static final class Visit {
+        public String type;
+        public String name;
+        public String arrival;
+        public String departure;
+        public String learningGoal;
     }
 
     public static final class Leg {

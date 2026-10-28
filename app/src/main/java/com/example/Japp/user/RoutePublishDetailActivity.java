@@ -23,7 +23,8 @@ import com.example.Japp.network.models.RouteNode;
 import com.example.Japp.network.models.requests.PublishRouteRequest;
 import com.example.Japp.user.fragment.route.RouteMapDrawHelper;
 import com.example.Japp.user.util.RoutePlanHelper;
-import com.example.Japp.user.util.RouteAgentHelper;
+import com.example.Japp.user.util.ManualRoutePayload;
+import com.example.Japp.network.agent.AttractionSyncCoordinator;
 import com.example.Japp.user.util.SessionHelper;
 import com.example.Japp.util.DisplayCutoutAdapter;
 import com.google.android.material.appbar.MaterialToolbar;
@@ -32,6 +33,8 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.JsonElement;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -66,6 +69,7 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
     private TextView textRouteStartHint;
     private MaterialButton btnSubmit;
     private UserService service;
+    private AttractionSyncCoordinator publicationPoiSync;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -91,6 +95,7 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
         currentLat = getIntent().getDoubleExtra(EXTRA_CURRENT_LAT, 0d);
         currentLng = getIntent().getDoubleExtra(EXTRA_CURRENT_LNG, 0d);
         service = ApiClient.getClient().create(UserService.class);
+        publicationPoiSync = new AttractionSyncCoordinator(service);
 
         bindViews();
         setupToolbar();
@@ -121,6 +126,19 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
         departure.add(Calendar.DAY_OF_MONTH, 7);
         updateDateText();
         setupDepartureTimeOptions();
+        if (!routeNodes.isEmpty()) {
+            try {
+                String iso = ManualRoutePayload.toIso(routeNodes.get(0).getVisitTime(), textOf(editDepartureDate));
+                if (iso != null) {
+                    LocalDateTime firstVisit = LocalDateTime.parse(iso);
+                    departure.set(firstVisit.getYear(), firstVisit.getMonthValue() - 1, firstVisit.getDayOfMonth());
+                    updateDateText();
+                    editDepartureTime.setText(firstVisit.format(DateTimeFormatter.ofPattern("HH:mm")), false);
+                }
+            } catch (IllegalArgumentException invalid) {
+                // Keep the form accessible; submission reports invalid node times.
+            }
+        }
         renderRoutePreview();
     }
 
@@ -252,53 +270,33 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
     }
 
     private void createManualRouteAndPublish(PublishForm form) {
+        final List<RouteNode> payload;
         try {
-            java.time.LocalDate firstDay = TextUtils.isEmpty(form.departureDate)
-                    ? null : java.time.LocalDate.parse(form.departureDate);
-            for (RouteNode node : routeNodes) {
-                if (TextUtils.isEmpty(node.getPoiId()))
-                    throw new IllegalArgumentException("路线地点缺少有效标识，请重新搜索地点");
-                node.setVisitTime(RouteAgentHelper.visitTimeToIso(node.getVisitTime(), firstDay));
-            }
+            payload = ManualRoutePayload.prepare(routeNodes, form.departureDate);
         } catch (RuntimeException exception) {
             btnSubmit.setEnabled(true);
             Toast.makeText(this, "请检查行程日期和地点时间：" + exception.getMessage(), Toast.LENGTH_LONG).show();
             return;
         }
-        syncPublishPoi(form, 0);
-    }
-
-    private void syncPublishPoi(PublishForm form, int index) {
-        if (isFinishing() || isDestroyed()) return;
-        if (index == routeNodes.size()) {
-            saveManualRouteAndPublish(form);
-            return;
-        }
-        service.syncAttraction(routeNodes.get(index).getPoiId()).enqueue(new Callback<Result<JsonElement>>() {
-            @Override public void onResponse(Call<Result<JsonElement>> call, Response<Result<JsonElement>> response) {
-                if (isFinishing() || isDestroyed()) return;
-                if (response.isSuccessful() && response.body() != null && response.body().getCode() == 1) {
-                    syncPublishPoi(form, index + 1);
-                } else {
-                    btnSubmit.setEnabled(true);
-                    Toast.makeText(RoutePublishDetailActivity.this, "地点同步失败："
-                            + RoutePlanHelper.readErrorMessage(response, response.body()), Toast.LENGTH_LONG).show();
-                    if (response.code() == 401) SessionHelper.handleUnauthorized(RoutePublishDetailActivity.this);
-                }
+        publicationPoiSync.sync(payload, new AttractionSyncCoordinator.Listener() {
+            @Override public void onComplete() {
+                if (!isFinishing() && !isDestroyed()) saveManualRouteAndPublish(form, payload);
             }
-            @Override public void onFailure(Call<Result<JsonElement>> call, Throwable error) {
+            @Override public void onError(String message, boolean unauthorized) {
                 if (isFinishing() || isDestroyed()) return;
                 btnSubmit.setEnabled(true);
-                Toast.makeText(RoutePublishDetailActivity.this, "地点同步失败，请稍后重试", Toast.LENGTH_LONG).show();
+                Toast.makeText(RoutePublishDetailActivity.this, message, Toast.LENGTH_LONG).show();
+                if (unauthorized) SessionHelper.handleUnauthorized(RoutePublishDetailActivity.this);
             }
         });
     }
 
-    private void saveManualRouteAndPublish(PublishForm form) {
-        service.createManualRoute(routeNodes).enqueue(new Callback<Result<JsonElement>>() {
+    private void saveManualRouteAndPublish(PublishForm form, List<RouteNode> payload) {
+        service.createManualRoute(payload).enqueue(new Callback<Result<JsonElement>>() {
             @Override
             public void onResponse(Call<Result<JsonElement>> call,
                                    Response<Result<JsonElement>> response) {
+                if (isFinishing() || isDestroyed()) return;
                 if (response.code() == 401) {
                     SessionHelper.handleUnauthorized(RoutePublishDetailActivity.this);
                     return;
@@ -319,6 +317,7 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Call<Result<JsonElement>> call, Throwable t) {
+                if (isFinishing() || isDestroyed()) return;
                 btnSubmit.setEnabled(true);
                 Toast.makeText(RoutePublishDetailActivity.this,
                         "网络错误，路线保存失败", Toast.LENGTH_SHORT).show();
@@ -350,6 +349,7 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
             @Override
             public void onResponse(Call<Result<JsonElement>> call,
                                    Response<Result<JsonElement>> response) {
+                if (isFinishing() || isDestroyed()) return;
                 btnSubmit.setEnabled(true);
                 if (response.code() == 401) {
                     SessionHelper.handleUnauthorized(RoutePublishDetailActivity.this);
@@ -370,11 +370,17 @@ public class RoutePublishDetailActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Call<Result<JsonElement>> call, Throwable t) {
+                if (isFinishing() || isDestroyed()) return;
                 btnSubmit.setEnabled(true);
                 Toast.makeText(RoutePublishDetailActivity.this,
                         "网络错误，发布失败", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    @Override protected void onDestroy() {
+        if (publicationPoiSync != null) publicationPoiSync.cancel();
+        super.onDestroy();
     }
 
     private static final class PublishForm {

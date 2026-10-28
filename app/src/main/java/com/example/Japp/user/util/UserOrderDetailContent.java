@@ -140,7 +140,8 @@ public final class UserOrderDetailContent {
             String hours = clean(node.getOpentimeToday());
             if (hours.isEmpty()) hours = clean(node.getOpentimeWeek());
             addField(details, "营业时间", hours.isEmpty() ? "尚未提供，出发前请确认" : hours);
-            if (!clean(node.getNotes()).isEmpty()) addField(details, "游览提示", clean(node.getNotes()));
+            String visitNotes = RoutePlanText.withoutDirections(node.getNotes());
+            if (!visitNotes.isEmpty()) addField(details, "游览提示", visitNotes);
             LinearLayout actions = new LinearLayout(activity);
             actions.setOrientation(LinearLayout.HORIZONTAL);
             details.addView(actions);

@@ -23,6 +23,7 @@ import com.amap.api.maps.model.Polyline;
 import com.amap.api.maps.model.PolylineOptions;
 import com.example.Japp.data.RouteStop;
 import com.example.Japp.network.models.RouteNode;
+import com.example.Japp.network.agent.RouteAgentResult;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,6 +42,29 @@ public final class RouteMapDrawHelper {
     public static final int ROUTE_LINE_COLOR = 0xFF1E72FF;
 
     private RouteMapDrawHelper() {}
+
+    /** Draw each verified traffic leg independently, including gaps between days. */
+    public static void drawAgentRoute(@Nullable AMap aMap,
+                                      @Nullable List<RouteAgentResult.Leg> legs,
+                                      @NonNull List<RouteNode> nodes) {
+        drawRouteWithNodes(aMap, Collections.emptyList(), nodes);
+        if (aMap == null || legs == null) return;
+        for (RouteAgentResult.Leg leg : legs) {
+            List<LatLng> points = new ArrayList<>();
+            if (leg.polyline == null) continue;
+            for (List<Double> point : leg.polyline) {
+                if (point == null || point.size() != 2 || point.get(0) == null || point.get(1) == null) continue;
+                double lon = point.get(0), lat = point.get(1);
+                if (Double.isFinite(lon) && Double.isFinite(lat) && lon >= 73 && lon <= 136 && lat >= 3 && lat <= 54)
+                    points.add(new LatLng(lat, lon));
+            }
+            if (points.size() < 2) continue;
+            int color = "transit".equals(leg.mode) ? 0xFF8C57CE :
+                    ("driving".equals(leg.mode) ? 0xFF168B78 : ROUTE_LINE_COLOR);
+            aMap.addPolyline(new PolylineOptions().addAll(points).width(ROUTE_LINE_WIDTH)
+                    .color(color).geodesic(false));
+        }
+    }
 
     @Nullable
     public static Polyline drawRoute(@Nullable AMap aMap, @NonNull List<LatLng> points) {

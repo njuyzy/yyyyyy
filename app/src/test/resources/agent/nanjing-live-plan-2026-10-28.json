@@ -1,0 +1,282 @@
+{
+  "runId": "8ecce43d595e4a93901570b275aee19d",
+  "status": "completed",
+  "stage": "方案已完成",
+  "events": [
+    {
+      "tool": null,
+      "label": "理解需求",
+      "status": "running",
+      "elapsedMs": null
+    },
+    {
+      "tool": "search_places",
+      "label": "检索候选地点",
+      "status": "running",
+      "elapsedMs": null
+    },
+    {
+      "tool": "search_places",
+      "label": "检索候选地点",
+      "status": "completed",
+      "elapsedMs": 1325
+    },
+    {
+      "tool": "get_place_details",
+      "label": "核实地点详情",
+      "status": "running",
+      "elapsedMs": null
+    },
+    {
+      "tool": "get_place_details",
+      "label": "核实地点详情",
+      "status": "completed",
+      "elapsedMs": 14
+    },
+    {
+      "tool": "calculate_leg",
+      "label": "计算交通段",
+      "status": "running",
+      "elapsedMs": null
+    },
+    {
+      "tool": "calculate_leg",
+      "label": "计算交通段",
+      "status": "completed",
+      "elapsedMs": 164
+    },
+    {
+      "tool": "build_itinerary",
+      "label": "校验行程与约束",
+      "status": "running",
+      "elapsedMs": null
+    },
+    {
+      "tool": "build_itinerary",
+      "label": "校验行程与约束",
+      "status": "completed",
+      "elapsedMs": 0
+    },
+    {
+      "tool": "finish_plan",
+      "label": "方案已完成",
+      "status": "completed",
+      "elapsedMs": null
+    }
+  ],
+  "result": {
+    "kind": "plan",
+    "message": "按「历史人文」主题安排 3 个地点，共 1 天：朝天宫、中共代表团梅园新村纪念馆、中国南京云锦博物馆。已计入通勤、缓冲与休息时间，费用为估算值。",
+    "assumptions": [
+      "每天从 09:00 开始计时，未计入出发地到第一站的交通",
+      "未安排返回每天出发点的交通",
+      "每个交通段额外计入 5 分钟缓冲"
+    ],
+    "constraints": {
+      "city": "南京",
+      "date": "2026-10-30",
+      "days": 1,
+      "dailyMinutes": 480,
+      "startTime": "09:00",
+      "finishByTime": "17:00",
+      "budget": 500,
+      "maxWalkingMeters": 8000,
+      "modes": [
+        "walking",
+        "transit"
+      ],
+      "mustVisit": [],
+      "avoid": [],
+      "interests": [],
+      "group": "2名成人",
+      "accessibility": "",
+      "pace": "balanced",
+      "returnToStart": false
+    },
+    "feasible": true,
+    "issues": [],
+    "warnings": [
+      "有 5 项费用未核实",
+      "费用为估算，预约与出行日开放时间需复查"
+    ],
+    "nodes": [
+      {
+        "poiId": "B00190AMPT",
+        "name": "朝天宫",
+        "location": "118.775320,32.034344",
+        "address": "朝天宫4号(朝天宫地铁站1号口步行210米)",
+        "cityname": "南京市",
+        "citycode": "025",
+        "adcode": "320104",
+        "type": "风景名胜;风景名胜;国家级景点",
+        "typecode": "110202",
+        "tel": "025-84200177;025-84466460",
+        "opentimeToday": "09:00-18:00",
+        "opentimeWeek": "周一至周日 09:00-18:00 最晚进入17:00",
+        "visitOrder": 1,
+        "visitTime": "2026-10-30 09:00",
+        "recommendedDuration": 120,
+        "notes": "从这里步行前往下一个景点"
+      },
+      {
+        "poiId": "B001907IVB",
+        "name": "中共代表团梅园新村纪念馆",
+        "location": "118.801602,32.042379",
+        "address": "汉府街18-1",
+        "cityname": "南京市",
+        "citycode": "025",
+        "adcode": "320102",
+        "type": "风景名胜;风景名胜;纪念馆",
+        "typecode": "110204",
+        "tel": "025-84540739",
+        "opentimeToday": "",
+        "opentimeWeek": "",
+        "visitOrder": 2,
+        "visitTime": "2026-10-30 11:26",
+        "recommendedDuration": 90,
+        "notes": "从这里乘坐地铁2号线到下一个景点"
+      },
+      {
+        "poiId": "B00190682O",
+        "name": "中国南京云锦博物馆",
+        "location": "118.744814,32.036390",
+        "address": "茶亭东街240号",
+        "cityname": "南京市",
+        "citycode": "025",
+        "adcode": "320105",
+        "type": "科教文化服务;博物馆;博物馆",
+        "typecode": "140100",
+        "tel": "025-86611377;025-86518580",
+        "opentimeToday": "09:00-18:00",
+        "opentimeWeek": "周一至周日 09:00-18:00",
+        "visitOrder": 3,
+        "visitTime": "2026-10-30 13:49",
+        "recommendedDuration": 90,
+        "notes": "路线结束"
+      }
+    ],
+    "days": [
+      {
+        "day": 1,
+        "date": "2026-10-30",
+        "schedule": [
+          {
+            "poiId": "B00190AMPT",
+            "name": "朝天宫",
+            "arrival": "09:00",
+            "departure": "11:00",
+            "minutes": 120,
+            "learningGoal": ""
+          },
+          {
+            "poiId": "B001907IVB",
+            "name": "中共代表团梅园新村纪念馆",
+            "arrival": "11:26",
+            "departure": "12:56",
+            "minutes": 90,
+            "learningGoal": ""
+          },
+          {
+            "type": "break",
+            "arrival": "12:56",
+            "departure": "13:16",
+            "minutes": 20
+          },
+          {
+            "poiId": "B00190682O",
+            "name": "中国南京云锦博物馆",
+            "arrival": "13:49",
+            "departure": "15:19",
+            "minutes": 90,
+            "learningGoal": "路线结束"
+          }
+        ],
+        "totalMinutes": 379,
+        "walkingMeters": 2136,
+        "estimatedCost": 0,
+        "legCount": 2,
+        "finishTime": "15:19"
+      }
+    ],
+    "legs": [
+      {
+        "day": 1,
+        "origin": "B00190AMPT",
+        "destination": "B001907IVB",
+        "originName": "朝天宫",
+        "destinationName": "中共代表团梅园新村纪念馆",
+        "mode": "transit",
+        "minutes": 21,
+        "distanceMeters": 5108,
+        "walkingMeters": 1170,
+        "cost": null,
+        "polyline": [],
+        "instructions": [
+          "步行11米左转",
+          "步行133米右转",
+          "步行63米右转",
+          "沿莫愁路辅路步行39米左转",
+          "步行20米左转",
+          "步行115米右转",
+          "步行8米到达目的地",
+          "步行1米左转",
+          "步行103米到达朝天宫",
+          "乘坐 地铁5号线(吉印大道--方家营)",
+          "步行1米右转到达上海路",
+          "乘坐 地铁2号线(鱼嘴--经天路)",
+          "步行131米左转",
+          "步行1米到达目的地",
+          "步行13米左转",
+          "步行29米右转",
+          "沿中山东路辅路步行186米右转",
+          "沿汉府街步行165米左转",
+          "沿汉府街步行69米右转",
+          "沿梅园新村步行29米到达目的地"
+        ],
+        "source": "高德路径规划",
+        "note": "查询时参考结果，不保证未来交通情况"
+      },
+      {
+        "day": 1,
+        "origin": "B001907IVB",
+        "destination": "B00190682O",
+        "originName": "中共代表团梅园新村纪念馆",
+        "destinationName": "中国南京云锦博物馆",
+        "mode": "transit",
+        "minutes": 28,
+        "distanceMeters": 6959,
+        "walkingMeters": 966,
+        "cost": null,
+        "polyline": [],
+        "instructions": [
+          "沿梅园新村步行29米左转",
+          "沿汉府街步行69米右转",
+          "沿汉府街步行165米左转",
+          "沿中山东路辅路步行186米左转",
+          "步行29米右转",
+          "步行13米到达目的地",
+          "步行1米右转",
+          "步行131米到达西安门·浦发银行",
+          "乘坐 地铁2号线(经天路--鱼嘴)",
+          "步行98米直行",
+          "步行1米到达目的地",
+          "步行9米右转",
+          "沿茶亭东街步行207米右转",
+          "步行30米左转到达目的地"
+        ],
+        "source": "高德路径规划",
+        "note": "查询时参考结果，不保证未来交通情况"
+      }
+    ],
+    "estimatedCost": 0,
+    "unknownCosts": 5,
+    "addedPoiIds": [
+      "B00190AMPT",
+      "B001907IVB",
+      "B00190682O"
+    ],
+    "removedPoiIds": [],
+    "requiresAcceptance": true
+  },
+  "error": null
+}

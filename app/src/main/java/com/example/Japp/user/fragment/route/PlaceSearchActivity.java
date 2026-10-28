@@ -2,6 +2,8 @@ package com.example.Japp.user.fragment.route;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
@@ -62,6 +64,7 @@ public class PlaceSearchActivity extends AppCompatActivity
     public static final String EXTRA_LNG = "selected_place_lng";
     public static final String EXTRA_PHOTO_URL = "selected_place_photo_url";
     private static final LatLonPoint DEFAULT_ORIGIN = new LatLonPoint(32.0603, 118.7969);
+    private static final int AMAP_INVALID_USER_KEY = 10001;
 
     private MaterialToolbar toolbar;
     private EditText editSearch;
@@ -165,6 +168,10 @@ public class PlaceSearchActivity extends AppCompatActivity
             txtStatus.setText("请输入地点名称");
             return;
         }
+        if (!hasConfiguredAmapKey()) {
+            txtStatus.setText("未配置高德 Key，请在 local.properties 中配置 AMAP_API_KEY");
+            return;
+        }
         hideKeyboard();
         showResults();
         txtStatus.setText("正在搜索“" + keyword + "”…");
@@ -184,7 +191,7 @@ public class PlaceSearchActivity extends AppCompatActivity
             poiSearch.searchPOIAsyn();
         } catch (AMapException e) {
             btnSearch.setEnabled(true);
-            txtStatus.setText("搜索失败（错误码 " + e.getErrorCode() + "）");
+            txtStatus.setText(amapErrorMessage(e.getErrorCode()));
         }
     }
 
@@ -195,7 +202,7 @@ public class PlaceSearchActivity extends AppCompatActivity
         if (errorCode != AMapException.CODE_AMAP_SUCCESS) {
             adapter.submitItems(null);
             lastResultCount = 0;
-            txtStatus.setText("搜索失败（错误码 " + errorCode + "）");
+            txtStatus.setText(amapErrorMessage(errorCode));
             return;
         }
         if (items == null || items.isEmpty()) {
@@ -211,6 +218,27 @@ public class PlaceSearchActivity extends AppCompatActivity
         adapter.submitItems(sorted);
         txtStatus.setText("找到 " + sorted.size() + " 个地点，已按"
                 + (usingDeviceOrigin ? "当前位置" : "南京默认位置") + "由近到远排序");
+    }
+
+    private boolean hasConfiguredAmapKey() {
+        try {
+            ApplicationInfo appInfo = getPackageManager().getApplicationInfo(
+                    getPackageName(), PackageManager.GET_META_DATA);
+            if (appInfo.metaData == null) {
+                return false;
+            }
+            String apiKey = appInfo.metaData.getString("com.amap.api.v2.apikey");
+            return !TextUtils.isEmpty(apiKey) && !apiKey.contains("${");
+        } catch (PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
+
+    private String amapErrorMessage(int errorCode) {
+        if (errorCode == AMAP_INVALID_USER_KEY) {
+            return "高德 Key 无效或已过期（错误码 10001），请检查 AMAP_API_KEY";
+        }
+        return "搜索失败（错误码 " + errorCode + "）";
     }
 
     private void loadPlaceDetail(@NonNull PoiItem item) {

@@ -71,3 +71,9 @@ signing.properties
 **/signing.properties
 release/
 !app/release/
+
+# Route Agent runtime
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
