@@ -24,6 +24,7 @@ import com.amap.api.maps.model.LatLng;
 import com.example.Japp.R;
 import com.example.Japp.leader.LeaderWalkRoutePlanner;
 import com.example.Japp.network.ApiClient;
+import com.example.Japp.network.ResponseMessageReader;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.Project;
@@ -609,12 +610,13 @@ public class TeamDetailActivity extends AppCompatActivity {
                 if (!response.isSuccessful() || response.body() == null
                         || response.body().getCode() != 1) {
                     setupLeaderAction();
-                    String message = response.body() == null
-                            ? "暂时无法放弃接单，请刷新确认行程状态后重试"
-                            : response.body().getMsg();
+                    String message = ResponseMessageReader.read(response,
+                            "暂时无法放弃接单，请刷新确认行程状态后重试");
                     Toast.makeText(TeamDetailActivity.this,
                             message, Toast.LENGTH_SHORT).show();
-                    retryAbandon(reason);
+                    if (response.code() == 403) {
+                        refreshProject();
+                    }
                     return;
                 }
                 project.setLeaderAccountId(null);

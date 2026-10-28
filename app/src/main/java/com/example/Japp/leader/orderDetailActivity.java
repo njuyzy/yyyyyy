@@ -23,6 +23,7 @@ import com.amap.api.maps.MapsInitializer;
 import com.amap.api.maps.model.LatLng;
 import com.example.Japp.R;
 import com.example.Japp.network.ApiClient;
+import com.example.Japp.network.ResponseMessageReader;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.Project;
@@ -496,11 +497,12 @@ public class orderDetailActivity extends AppCompatActivity {
                 if (!response.isSuccessful() || response.body() == null
                         || response.body().getCode() != 1) {
                     setupLeaderAction();
-                    String message = response.body() == null
-                            ? "放弃接单失败" : response.body().getMsg();
+                    String message = ResponseMessageReader.read(response, "放弃接单失败");
                     Toast.makeText(orderDetailActivity.this,
                             message, Toast.LENGTH_SHORT).show();
-                    retryAbandon(reason);
+                    if (response.code() == 403) {
+                        refreshProjectDetail();
+                    }
                     return;
                 }
                 project.setLeaderAccountId(null);

@@ -16,6 +16,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.Japp.R;
 import com.example.Japp.network.ApiClient;
+import com.example.Japp.network.ResponseMessageReader;
 import com.example.Japp.network.api.UserService;
 import com.example.Japp.network.models.Account;
 import com.example.Japp.network.models.Project;
@@ -148,9 +149,8 @@ public class LeaderOrderListActivity extends AppCompatActivity {
         }
 
         loading = true;
-        String status = type == TYPE_COMPLETED ? "DONE" : null;
-        // 已接单包含后端 MATCHING / CONFIRMED / IN_PROGRESS，统一在客户端归并展示。
-        service.getMyProjects("LEADING", status, page, PAGE_SIZE)
+        String stage = type == TYPE_COMPLETED ? "COMPLETED" : "ACCEPTED";
+        service.getMyProjects("LEADING", null, stage, page, PAGE_SIZE)
                 .enqueue(new Callback<Result<ProjectPage>>() {
                     @Override
                     public void onResponse(@NonNull Call<Result<ProjectPage>> call,
@@ -169,7 +169,9 @@ public class LeaderOrderListActivity extends AppCompatActivity {
                         if (!response.isSuccessful() || response.body() == null
                                 || response.body().getCode() != 1) {
                             Toast.makeText(LeaderOrderListActivity.this,
-                                    "加载失败，请下拉刷新重试", Toast.LENGTH_SHORT).show();
+                                    ResponseMessageReader.read(response,
+                                            "加载失败，请下拉刷新重试"),
+                                    Toast.LENGTH_SHORT).show();
                             updateEmptyState();
                             return;
                         }

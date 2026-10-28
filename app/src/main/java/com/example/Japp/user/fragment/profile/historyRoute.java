@@ -127,7 +127,7 @@ public class historyRoute extends Fragment {
             return;
         }
         int accountId = SessionHelper.getAccountId(requireContext());
-        service.getMyProjects("ALL", null, 1, 30)
+        service.getMyProjects("ALL", null, null, 1, 30)
                 .enqueue(new Callback<Result<ProjectPage>>() {
             @Override
             public void onResponse(Call<Result<ProjectPage>> call,

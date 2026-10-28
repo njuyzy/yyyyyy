@@ -137,8 +137,7 @@ public final class ProjectUiHelper {
     }
 
     public static boolean canLeaderAbandon(String status) {
-        String normalized = normalizeStatus(status);
-        return !STATUS_DONE.equals(normalized) && !STATUS_CANCELLED.equals(normalized);
+        return STATUS_CONFIRMED.equals(normalizeStatus(status));
     }
 
     public static boolean isLeaderAvailableStatus(String status) {

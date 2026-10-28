@@ -138,6 +138,7 @@ public interface UserService {
     @GET("projects/mine")
     Call<Result<ProjectPage>> getMyProjects(@Query("relation") String relation,
                                             @Query("status") String status,
+                                             @Query("stage") String stage,
                                             @Query("pageNum") int pageNum,
                                             @Query("pageSize") int pageSize);
 
