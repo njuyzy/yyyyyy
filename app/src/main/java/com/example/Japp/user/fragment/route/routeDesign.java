@@ -910,8 +910,13 @@ public class routeDesign extends Fragment {
     }
 
     private void renderEditableStops() {
+        // AI plans and saved routes also enter here without manual edits.
+        // Derive both actions from the current nodes on every route render.
         if (btnSaveRoute != null) {
             btnSaveRoute.setEnabled(!editableRouteNodes.isEmpty());
+        }
+        if (btnPublishRoute != null) {
+            btnPublishRoute.setEnabled(!editableRouteNodes.isEmpty());
         }
         if (routeStopsContainer == null || txtRouteStopCount == null) {
             return;
@@ -1120,9 +1125,6 @@ public class routeDesign extends Fragment {
     private void invalidatePublishableRoute() {
         publishableRouteId = 0;
         publishableRouteSummary = null;
-        if (btnPublishRoute != null) {
-            btnPublishRoute.setEnabled(!editableRouteNodes.isEmpty());
-        }
     }
 
     private void updateMapFromEditableRoute(boolean planRoad) {
@@ -1608,9 +1610,6 @@ public class routeDesign extends Fragment {
         publishableRouteId = draft.publishableRouteId;
         publishableRouteSummary = draft.publishableRouteSummary;
         waitingStatusPosition = -1;
-        if (btnPublishRoute != null) {
-            btnPublishRoute.setEnabled(!editableRouteNodes.isEmpty());
-        }
         updateWelcomeVisibility();
         if (!draft.chatItems.isEmpty() && chatRecyclerView != null) {
             chatRecyclerView.post(this::scrollChatToBottom);
