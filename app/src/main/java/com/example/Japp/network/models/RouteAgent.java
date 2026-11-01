@@ -41,6 +41,7 @@ public final class RouteAgent {
     }
 
     public static final class Event {
+        // A missing/blank tool denotes a user-facing phase narration in label.
         public String tool;
         public String label;
         public String status;

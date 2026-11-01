@@ -16,6 +16,7 @@ public class RouteChatItem {
     public static final int TYPE_ASSISTANT_MESSAGE = 3;
     public static final int TYPE_ASSISTANT_PLAN = 4;
     public static final int TYPE_ASSISTANT_PROGRESS = 5;
+    public static final int TYPE_ASSISTANT_PHASE = 6;
     private String agentRunId;
 
     private final int type;
@@ -33,7 +34,8 @@ public class RouteChatItem {
         this.text = type == TYPE_ASSISTANT_ROUTE
                 ? hideInternalRouteId(text)
                 : (text != null ? text : "");
-        if (type != TYPE_USER) this.text = RoutePlanText.withoutDirections(this.text);
+        if (type != TYPE_USER && type != TYPE_ASSISTANT_PHASE)
+            this.text = RoutePlanText.withoutDirections(this.text);
         this.timestamp = timestamp;
         this.routeId = routeId;
         this.publishAllowed = publishAllowed;
@@ -61,6 +63,10 @@ public class RouteChatItem {
 
     public static RouteChatItem agentProgress(String text) {
         return new RouteChatItem(TYPE_ASSISTANT_PROGRESS, text, System.currentTimeMillis(), 0, null, null, false);
+    }
+
+    public static RouteChatItem assistantPhase(String text) {
+        return new RouteChatItem(TYPE_ASSISTANT_PHASE, text, System.currentTimeMillis(), 0, null, null, false);
     }
 
     public static RouteChatItem agentPlan(String text, String runId) {
@@ -108,7 +114,8 @@ public class RouteChatItem {
     }
 
     public void setText(String text) {
-        this.text = type == TYPE_USER ? (text != null ? text : "") : RoutePlanText.withoutDirections(text);
+        this.text = type == TYPE_USER || type == TYPE_ASSISTANT_PHASE
+                ? (text != null ? text : "") : RoutePlanText.withoutDirections(text);
     }
 
     /** 兼容本地已保存的旧消息，路线 ID 仅供内部发布流程使用。 */

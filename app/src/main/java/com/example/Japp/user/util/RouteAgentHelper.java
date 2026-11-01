@@ -135,6 +135,8 @@ public final class RouteAgentHelper {
     }
 
     public static String describe(RouteAgent.Result result) {
+        if ("answer".equals(result.kind))
+            return RoutePlanText.withoutDirections(limit(result.message, 8000));
         StringBuilder text = new StringBuilder();
         if ("clarification".equals(result.kind)) {
             text.append("需要补充信息\n\n").append(limit(result.message, 500));

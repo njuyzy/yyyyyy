@@ -4,6 +4,7 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.style.StyleSpan;
@@ -22,12 +23,16 @@ import com.amap.api.maps.model.LatLng;
 import com.amap.api.maps.model.Polyline;
 import com.example.Japp.R;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
+import androidx.core.content.ContextCompat;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.function.Consumer;
 
 public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
@@ -36,6 +41,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     private static final int TYPE_ASSISTANT = 1;
 
     private final List<RouteChatItem> items = new ArrayList<>();
+    private final Map<RouteChatItem, ProgressiveTextView.Reveal> reveals = new IdentityHashMap<>();
     private final SimpleDateFormat timeFmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
 
     public interface RouteChatListener {
@@ -70,6 +76,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     }
 
     public void addItem(RouteChatItem item) {
+        prepareReveal(item);
         items.add(item);
         notifyItemInserted(items.size() - 1);
         dispatchDataChanged();
@@ -79,7 +86,9 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         if (position < 0 || position >= items.size()) {
             return;
         }
+        if (items.get(position).getText().equals(text)) return;
         items.get(position).setText(text);
+        prepareReveal(items.get(position));
         notifyItemChanged(position);
         dispatchDataChanged();
     }
@@ -88,12 +97,14 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         if (position < 0 || position >= items.size()) {
             return;
         }
-        items.set(position, item);
+        reveals.remove(items.set(position, item));
+        prepareReveal(item);
         notifyItemChanged(position);
         dispatchDataChanged();
     }
 
     public void replaceAllItems(@NonNull List<RouteChatItem> restoredItems) {
+        reveals.clear();
         items.clear();
         items.addAll(restoredItems);
         notifyDataSetChanged();
@@ -104,6 +115,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             return;
         }
         int oldSize = items.size();
+        reveals.clear();
         items.clear();
         notifyItemRangeRemoved(0, oldSize);
         dispatchDataChanged();
@@ -141,12 +153,34 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         }
     }
 
+    private void prepareReveal(RouteChatItem item) {
+        int type = item.getType();
+        // Polling refreshes the transient work indicator, not the narrative response.
+        if (type == RouteChatItem.TYPE_USER || type == RouteChatItem.TYPE_ASSISTANT_PROGRESS
+                || item.getText().isEmpty()) return;
+        ProgressiveTextView.Reveal reveal = new ProgressiveTextView.Reveal(
+                item.getText(), SystemClock.uptimeMillis());
+        reveals.put(item, reveal);
+    }
+
+    private void followGrowingText() {
+        RecyclerView view = recyclerView;
+        if (view == null || view.getScrollState() != RecyclerView.SCROLL_STATE_IDLE
+                || view.canScrollVertically(1)) return;
+        view.postOnAnimation(() -> {
+            if (recyclerView == view && view.getScrollState() == RecyclerView.SCROLL_STATE_IDLE
+                    && !items.isEmpty()) view.scrollToPosition(items.size() - 1);
+        });
+    }
+
     public void onHostResume() {
         forEachVisibleAssistant(AssistantVH::mapResume);
+        forEachVisibleAssistant(vh -> vh.message.resumeReveal());
     }
 
     public void onHostPause() {
         forEachVisibleAssistant(AssistantVH::mapPause);
+        forEachVisibleAssistant(vh -> vh.message.pauseReveal());
     }
 
     /** 打开全屏地图前彻底释放列表内 MapView，高德 SDK 不支持多个 MapView 同时存在 */
@@ -173,7 +207,9 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     }
 
     public void onHostDestroy() {
+        forEachVisibleAssistant(vh -> vh.message.clearReveal());
         forEachVisibleAssistant(AssistantVH::destroyMapCompletely);
+        reveals.clear();
         recyclerView = null;
     }
 
@@ -213,7 +249,8 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             vh.message.setText(item.getText());
             vh.time.setText(time);
         } else if (holder instanceof AssistantVH) {
-            ((AssistantVH) holder).bind(item, time, mapCreateBundle);
+            ((AssistantVH) holder).bind(item, time, mapCreateBundle,
+                    reveals.get(item), this::followGrowingText);
         }
     }
 
@@ -222,6 +259,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         super.onViewAttachedToWindow(holder);
         if (holder instanceof AssistantVH) {
             AssistantVH vh = (AssistantVH) holder;
+            vh.message.resumeReveal();
             vh.mapResume();
             vh.redrawRouteIfNeeded();
         }
@@ -230,6 +268,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     @Override
     public void onViewDetachedFromWindow(@NonNull RecyclerView.ViewHolder holder) {
         if (holder instanceof AssistantVH) {
+            ((AssistantVH) holder).message.pauseReveal();
             ((AssistantVH) holder).mapPause();
         }
         super.onViewDetachedFromWindow(holder);
@@ -238,6 +277,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     @Override
     public void onViewRecycled(@NonNull RecyclerView.ViewHolder holder) {
         if (holder instanceof AssistantVH) {
+            ((AssistantVH) holder).message.clearReveal();
             ((AssistantVH) holder).mapPause();
         }
         super.onViewRecycled(holder);
@@ -260,7 +300,8 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     }
 
     static class AssistantVH extends RecyclerView.ViewHolder {
-        final TextView message;
+        final ProgressiveTextView message;
+        final MaterialCardView messageCard;
         final TextView time;
         final TextView state;
         final MaterialButton retry;
@@ -286,6 +327,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             super(itemView);
             this.listener = listener;
             message = itemView.findViewById(R.id.txtMessage);
+            messageCard = itemView.findViewById(R.id.assistantMessageCard);
             time = itemView.findViewById(R.id.txtTime);
             state = itemView.findViewById(R.id.txtAssistantState);
             retry = itemView.findViewById(R.id.btnRetry);
@@ -294,9 +336,22 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             mapTapHint = itemView.findViewById(R.id.mapTapHint);
         }
 
-        void bind(@NonNull RouteChatItem item, @NonNull String timeText, @Nullable Bundle mapBundle) {
+        void bind(@NonNull RouteChatItem item, @NonNull String timeText, @Nullable Bundle mapBundle,
+                  @Nullable ProgressiveTextView.Reveal reveal, Runnable onTextGrowing) {
+            boolean routeResult = item.getType() == RouteChatItem.TYPE_ASSISTANT_PLAN
+                    || item.getType() == RouteChatItem.TYPE_ASSISTANT_ROUTE;
+            float density = itemView.getResources().getDisplayMetrics().density;
+            messageCard.setCardBackgroundColor(routeResult
+                    ? ContextCompat.getColor(itemView.getContext(), R.color.route_assistant_message_surface)
+                    : Color.TRANSPARENT);
+            messageCard.setStrokeWidth(routeResult ? Math.max(1, Math.round(density)) : 0);
+            messageCard.setRadius(routeResult ? 20 * density : 0);
             if (message != null) {
-                message.setText(formatAssistantText(item.getText()));
+                int horizontalPadding = Math.round((routeResult ? 14 : 4) * density);
+                message.setPaddingRelative(horizontalPadding, Math.round((routeResult ? 12 : 2) * density),
+                        horizontalPadding, Math.round(10 * density));
+                message.bind(routeResult ? formatAssistantText(item.getText()) : item.getText(),
+                        reveal, onTextGrowing);
             }
             if (time != null) {
                 time.setText(timeText);
@@ -306,8 +361,10 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
                     && item.getText().startsWith("规划失败");
             boolean progress = item.getType() == RouteChatItem.TYPE_ASSISTANT_PROGRESS;
             boolean candidate = item.getType() == RouteChatItem.TYPE_ASSISTANT_PLAN;
+            boolean phase = item.getType() == RouteChatItem.TYPE_ASSISTANT_PHASE;
             if (state != null) {
-                state.setText(failed ? "需重试" : (progress ? "规划中" : (candidate ? "待确认" : "已回复")));
+                state.setText(failed ? "需重试" : (progress ? "规划中"
+                        : (candidate ? "待确认" : (phase ? "阶段说明" : "已回复"))));
                 state.setTextColor(Color.parseColor(failed ? "#C62828" : "#1E72FF"));
                 state.setBackgroundTintList(ColorStateList.valueOf(
                         Color.parseColor(failed ? "#FDECEC" : "#EAF2FF")));

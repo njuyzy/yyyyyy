@@ -1403,6 +1403,22 @@ public class routeDesign extends Fragment {
         scrollChatToBottom();
     }
 
+    private void showAgentPhaseMessage(String text) {
+        RouteChatItem message = RouteChatItem.assistantPhase(text);
+        if (waitingStatusPosition >= 0 && waitingStatusPosition < adapter.getItemCount()
+                && adapter.getItems().get(waitingStatusPosition).getType()
+                == RouteChatItem.TYPE_ASSISTANT_PROGRESS) {
+            adapter.replaceItem(waitingStatusPosition, message);
+        } else {
+            adapter.addItem(message);
+        }
+        // Preserve the narration; subsequent progress/result gets its own item.
+        // The task is still running, so do not reset sending/cancellation state.
+        waitingStatusPosition = -1;
+        persistLocalDraft();
+        scrollChatToBottom();
+    }
+
     private void setupAgent() {
         agent = new RouteAgentCoordinator(requireContext(),
                 SessionHelper.getAccountId(requireContext()), service);
@@ -1418,6 +1434,9 @@ public class routeDesign extends Fragment {
         agent.attach(new RouteAgentCoordinator.Listener() {
             @Override public void onProgress(String text, boolean cancelling) {
                 beginAgentFeedback(text);
+            }
+            @Override public void onPhaseMessage(String text) {
+                showAgentPhaseMessage(text);
             }
             @Override public void onResult(String runId, RouteAgent.Result result) {
                 showAgentResult(runId, result);
@@ -1553,10 +1572,10 @@ public class routeDesign extends Fragment {
             for (int i = 0; i < adapter.getItemCount(); i++) {
                 RouteChatItem candidate = adapter.getItems().get(i);
                 if (agent.state.runId.equals(candidate.getAgentRunId())) {
-                    adapter.replaceItem(i, RouteChatItem.assistantMessage(
+                    adapter.replaceItem(i, RouteChatItem.assistantRoute(
                             "路线方案已应用\n\n" + RouteAgentHelper.describe(result)
                                     .replace("候选路线 · 等待确认\n\n", "")
-                                    .replace("\n\n确认后才会替换当前路线。", "")));
+                                    .replace("\n\n确认后才会替换当前路线。", ""), Collections.emptyList()));
                 }
             }
             persistLocalDraft(true);

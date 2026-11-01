@@ -200,6 +200,7 @@ final class RouteDraftStore {
                     && type != RouteChatItem.TYPE_ASSISTANT_STATUS
                     && type != RouteChatItem.TYPE_ASSISTANT_MESSAGE
                     && type != RouteChatItem.TYPE_ASSISTANT_PLAN
+                    && type != RouteChatItem.TYPE_ASSISTANT_PHASE
                     && type != RouteChatItem.TYPE_ASSISTANT_PROGRESS) {
                 return null;
             }

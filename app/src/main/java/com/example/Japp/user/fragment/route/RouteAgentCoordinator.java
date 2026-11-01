@@ -30,6 +30,7 @@ final class RouteAgentCoordinator {
     }
     interface Listener {
         void onProgress(String text, boolean cancelling);
+        default void onPhaseMessage(String text) {}
         void onResult(String runId, RouteAgent.Result result);
         void onError(String message, boolean unauthorized);
         void onCancelled();
@@ -56,6 +57,7 @@ final class RouteAgentCoordinator {
         boolean discussionApplied;
         JsonObject pendingConstraintPatch;
         int conversationVersion;
+        List<String> displayedPhaseMessages = new ArrayList<>();
     }
 
     final State state;
@@ -89,6 +91,7 @@ final class RouteAgentCoordinator {
         catch (RuntimeException ignored) { }
         state = loaded == null ? new State() : loaded;
         if (state.history == null) state.history = new ArrayList<>();
+        if (state.displayedPhaseMessages == null) state.displayedPhaseMessages = new ArrayList<>();
         if (state.busy && state.startedAtMillis == 0) state.startedAtMillis = clock.getAsLong();
         if (state.conversationVersion == 0) {
             if (state.result != null && "plan".equals(state.result.kind)) {
@@ -149,6 +152,7 @@ final class RouteAgentCoordinator {
         remember("user", request.message);
         state.routeSnapshot = snapshot;
         state.runId = null;
+        state.displayedPhaseMessages.clear();
         state.result = null;
         state.status = "queued";
         state.busy = true;
@@ -197,6 +201,7 @@ final class RouteAgentCoordinator {
         state.result = null;
         state.runId = null;
         state.status = null;
+        state.displayedPhaseMessages.clear();
         state.cancelRequested = false;
         state.discussionPlan = null;
         state.discussionSnapshot = null;
@@ -291,6 +296,9 @@ final class RouteAgentCoordinator {
         }
         state.runId = run.runId;
         state.status = run.status;
+        // Snapshots include previous events. Deliver each backend narration once,
+        // including events first seen in the final response between two polls.
+        deliverPhaseMessages(run);
         if ("queued".equals(run.status) || "running".equals(run.status)) {
             save();
             listener.onProgress(state.cancelRequested ? "正在取消规划，等待服务确认…" : RouteAgentHelper.progress(run),
@@ -339,6 +347,18 @@ final class RouteAgentCoordinator {
         scheduler.remove(poll);
         save();
         if (listener != null) listener.onError(message, unauthorized);
+    }
+
+    private void deliverPhaseMessages(RouteAgent.Run run) {
+        if (run.events == null) return;
+        for (RouteAgent.Event event : run.events) {
+            if (event == null || (event.tool != null && !event.tool.trim().isEmpty())
+                    || event.label == null || event.label.trim().isEmpty()) continue;
+            String text = event.label.trim();
+            if (state.displayedPhaseMessages.contains(text)) continue;
+            state.displayedPhaseMessages.add(text);
+            listener.onPhaseMessage(text);
+        }
     }
 
     private boolean waitExpired() {
