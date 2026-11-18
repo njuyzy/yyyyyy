@@ -6,6 +6,9 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.widget.Toast;
+import android.widget.TextView;
+import android.view.View;
+import com.example.Japp.user.util.ProjectUiHelper;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
@@ -152,6 +155,7 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
         routePoints = readPointsFromIntent();
         waypointPoints = readWaypointsFromIntent();
         routeNodes = readNodesFromIntent();
+        bindRouteSummary();
         mapView = findViewById(R.id.mapView);
         if (mapView == null) {
             Toast.makeText(this, "地图加载失败", Toast.LENGTH_SHORT).show();
@@ -174,6 +178,18 @@ public class RouteMapFullscreenActivity extends AppCompatActivity {
             aMap.getUiSettings().setCompassEnabled(true);
             aMap.setOnMapLoadedListener(this::drawRouteSafely);
         }
+    }
+
+    private void bindRouteSummary() {
+        int count = routeNodes.isEmpty() ? waypointPoints.size() : routeNodes.size();
+        if (count == 0) return;
+        TextView heading = findViewById(R.id.firstline);
+        TextView detail = findViewById(R.id.secondline);
+        heading.setText("路线概览");
+        int minutes = ProjectUiHelper.sumDurationMinutes(routeNodes);
+        detail.setText(count + " 处地点" + (minutes > 0
+                ? " · 建议游览 " + ProjectUiHelper.formatDuration(minutes) : ""));
+        findViewById(R.id.bottom_layout).setVisibility(View.VISIBLE);
     }
 
     private void drawRouteSafely() {

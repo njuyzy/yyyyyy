@@ -12,6 +12,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.transition.AutoTransition;
+import androidx.core.content.ContextCompat;
 import androidx.transition.TransitionManager;
 import com.example.Japp.R;
 import com.example.Japp.network.models.Project;
@@ -24,7 +25,9 @@ import static com.example.Japp.user.util.UserOrderPresentation.clean;
 
 /** Builds only the public travel information; IDs, raw status codes and audit fields stay private. */
 public final class UserOrderDetailContent {
-    private static final int INK = 0xFF182338, MUTED = 0xFF637086, BLUE = 0xFF2563EB;
+    private final int ink;
+    private final int muted;
+    private final int accent;
     private final Activity activity;
     private final Set<String> expandedStops = new HashSet<>();
     private TextView meetingValue;
@@ -33,7 +36,12 @@ public final class UserOrderDetailContent {
 
     public interface OnStopSelected { void select(RouteNode node); }
 
-    public UserOrderDetailContent(Activity activity) { this.activity = activity; }
+    public UserOrderDetailContent(Activity activity) {
+        this.activity = activity;
+        ink = ContextCompat.getColor(activity, R.color.text_primary);
+        muted = ContextCompat.getColor(activity, R.color.text_secondary);
+        accent = ContextCompat.getColor(activity, R.color.accent);
+    }
 
     public void bind(Project project) {
         this.project = project;
@@ -41,14 +49,15 @@ public final class UserOrderDetailContent {
         TextView status = activity.findViewById(R.id.txtStatus);
         status.setText(UserOrderPresentation.statusLabel(project.getStatus()));
         status.setVisibility(status.getText().length() == 0 ? View.GONE : View.VISIBLE);
-        status.setTextColor("CANCELLED".equals(phase) ? 0xFFB45353 : BLUE);
+        ProjectUiHelper.bindStatusBadge(status, project.getStatus());
+        status.setTextColor(ContextCompat.getColor(activity, R.color.white));
         LinearLayout phases = activity.findViewById(R.id.userOrderPhases);
         phases.removeAllViews();
         phases.setVisibility(phase.isEmpty() || "CANCELLED".equals(phase) ? View.GONE : View.VISIBLE);
         String[] labels = {"招募中", "已确认", "已完成"};
         int current = "DONE".equals(phase) ? 2 : "CONFIRMED".equals(phase) ? 1 : 0;
         for (int i = 0; i < labels.length; i++) {
-            TextView step = text((i < current ? "✓  " : "●  ") + labels[i], 12, i <= current ? BLUE : MUTED);
+            TextView step = text((i < current ? "✓  " : "●  ") + labels[i], 12, i <= current ? accent : muted);
             step.setGravity(Gravity.CENTER);
             step.setPadding(0, dp(10), 0, dp(10));
             step.setBackground(background(i <= current ? 0xFFEAF1FF : 0xFFF4F6FA, 10));
@@ -117,18 +126,18 @@ public final class UserOrderDetailContent {
             LinearLayout card = new LinearLayout(activity);
             card.setOrientation(LinearLayout.VERTICAL);
             card.setPadding(dp(14), dp(4), dp(14), dp(6));
-            card.setBackground(background(0xFFF5F8FE, 14));
+            card.setBackground(background(ContextCompat.getColor(activity, R.color.background), 12));
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
             params.bottomMargin = dp(10);
             stops.addView(card, params);
             String caption = i == 0 ? "集合 · 首站" : i == nodes.size() - 1 ? "最后一站" : "沿途停留";
-            TextView header = text(caption + "\n" + fallback(node.getName(), "行程地点"), 16, INK);
+            TextView header = text(caption + "\n" + fallback(node.getName(), "行程地点"), 16, ink);
             header.setTypeface(null, Typeface.BOLD);
             header.setPadding(0, dp(12), 0, dp(8));
             card.addView(header);
             String duration = node.getRecommendedDuration() > 0
                     ? "建议停留 " + ProjectUiHelper.formatDuration(node.getRecommendedDuration()) : "停留时长待安排";
-            TextView subtitle = text(duration, 12, MUTED);
+            TextView subtitle = text(duration, 12, muted);
             card.addView(subtitle);
             TextView toggle = action("查看地点详情  ⌄");
             card.addView(toggle);
@@ -201,17 +210,17 @@ public final class UserOrderDetailContent {
     }
 
     private TextView addField(LinearLayout parent, String label, String value) {
-        TextView title = text(label, 12, MUTED);
+        TextView title = text(label, 12, muted);
         title.setPadding(0, dp(16), 0, dp(5));
         parent.addView(title);
-        TextView body = text(value, 14, INK);
+        TextView body = text(value, 14, ink);
         body.setTextIsSelectable(true);
         parent.addView(body);
         return body;
     }
 
     private TextView action(String value) {
-        TextView view = text(value, 14, BLUE);
+        TextView view = text(value, 14, accent);
         view.setGravity(Gravity.CENTER_VERTICAL);
         view.setMinHeight(dp(48));
         android.util.TypedValue ripple = new android.util.TypedValue();

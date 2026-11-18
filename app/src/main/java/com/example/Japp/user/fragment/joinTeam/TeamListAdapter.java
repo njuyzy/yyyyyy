@@ -183,8 +183,11 @@ public class TeamListAdapter extends RecyclerView.Adapter<TeamListAdapter.Holder
             holder.txtStatus.setText(label);
             holder.txtStatus.setVisibility(label.isEmpty() ? View.GONE : View.VISIBLE);
             String phase = UserOrderPresentation.phase(project.getStatus());
-            holder.txtStatus.setTextColor("CANCELLED".equals(phase) ? 0xFFB45353
-                    : "DONE".equals(phase) ? 0xFF637086 : 0xFF2563EB);
+            int statusColor = R.color.accent_dark;
+            if ("CANCELLED".equals(phase)) statusColor = R.color.status_cancelled;
+            if ("DONE".equals(phase)) statusColor = R.color.text_secondary;
+            holder.txtStatus.setTextColor(androidx.core.content.ContextCompat.getColor(
+                    holder.itemView.getContext(), statusColor));
         }
 
         bindFavorite(holder, item);

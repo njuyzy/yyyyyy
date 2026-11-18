@@ -2,12 +2,12 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:background="#F3F6FB">
+    android:orientation="vertical" android:background="@color/background">
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar" style="@style/Widget.Japp.CompactToolbar"
         android:layout_width="match_parent" android:layout_height="@dimen/compact_toolbar_height"
         android:background="@color/white" app:navigationIcon="@drawable/ic_arrow_back"
-        app:navigationIconTint="@color/black" app:title="行程详情"
+        app:navigationIconTint="@color/black" app:title="订单详情"
         app:titleCentered="true" app:titleTextColor="@color/black" />
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/userOrderRefresh" android:layout_width="match_parent"
@@ -21,13 +21,15 @@
                     android:paddingBottom="12dp" android:visibility="gone" />
                 <com.google.android.material.card.MaterialCardView style="@style/UserOrderCard">
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                        android:orientation="vertical" android:padding="20dp">
-                        <TextView android:id="@+id/txtMeta" style="@style/UserOrderBody" android:textColor="#2563EB" />
+                        android:orientation="vertical" android:padding="16dp">
                         <TextView android:id="@+id/txtTitle" style="@style/UserOrderHeading"
-                            android:layout_marginTop="8dp" android:textSize="24sp" />
+                            android:textSize="20sp" />
+                        <TextView android:id="@+id/txtMeta" style="@style/UserOrderBody"
+                            android:layout_marginTop="8dp" />
                         <TextView android:id="@+id/txtStatus" style="@style/UserOrderBody"
                             android:layout_width="wrap_content" android:layout_marginTop="12dp"
-                            android:textStyle="bold" android:textColor="#2563EB" />
+                            android:background="@drawable/tag_background_green" android:paddingHorizontal="10dp"
+                            android:paddingVertical="4dp" android:textSize="12sp" android:textColor="@color/white" />
                         <LinearLayout android:id="@+id/userOrderPhases" android:layout_width="match_parent"
                             android:layout_height="wrap_content" android:layout_marginTop="12dp"
                             android:orientation="horizontal" android:gravity="center_vertical" />
@@ -37,45 +39,50 @@
                 </com.google.android.material.card.MaterialCardView>
                 <com.google.android.material.card.MaterialCardView style="@style/UserOrderCard">
                     <LinearLayout android:id="@+id/userOrderOverview" android:layout_width="match_parent"
-                        android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
+                        android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
                         <TextView style="@style/UserOrderHeading" android:text="出行安排" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
                 <com.google.android.material.card.MaterialCardView style="@style/UserOrderCard">
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                        android:orientation="vertical" android:padding="20dp">
+                        android:orientation="vertical" android:padding="16dp">
                         <TextView style="@style/UserOrderHeading" android:text="一起出发" />
                         <TextView android:id="@+id/userOrderCapacity" style="@style/UserOrderHeading"
-                            android:layout_marginTop="12dp" android:textSize="26sp" android:textColor="#2563EB" />
+                            android:layout_marginTop="12dp" android:textSize="26sp" android:textColor="@color/accent" />
                         <com.google.android.material.progressindicator.LinearProgressIndicator
                             android:id="@+id/userOrderCapacityProgress" android:layout_width="match_parent"
                             android:layout_height="wrap_content" android:layout_marginTop="12dp"
                             app:trackThickness="6dp" app:trackCornerRadius="3dp"
-                            app:indicatorColor="#2563EB" app:trackColor="#EAF0FA" />
+                            app:indicatorColor="@color/accent" app:trackColor="@color/route_primary_soft" />
                         <TextView android:id="@+id/userOrderCapacityHint" style="@style/UserOrderBody"
                             android:layout_marginTop="10dp" android:textSize="12sp" />
                         <TextView android:id="@+id/txtOwner" style="@style/UserOrderBody" android:layout_marginTop="16dp" />
                         <TextView android:id="@+id/userOrderLeader" style="@style/UserOrderBody" android:layout_marginTop="6dp" />
                         <TextView android:id="@+id/txtMyPartySize" style="@style/UserOrderBody"
-                            android:layout_marginTop="8dp" android:textColor="#2563EB" android:visibility="gone" />
+                            android:layout_marginTop="8dp" android:textColor="@color/accent" android:visibility="gone" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
+                <TextView style="@style/OrderDetailHeading" android:text="路线地图"
+                    android:layout_marginTop="8dp" android:layout_marginBottom="8dp" />
                 <com.google.android.material.card.MaterialCardView style="@style/UserOrderCard">
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                        android:orientation="vertical">
-                        <TextView style="@style/UserOrderHeading" android:text="沿途探索" android:padding="20dp" />
                         <FrameLayout android:id="@+id/mapContainer" android:layout_width="match_parent"
-                            android:layout_height="210dp" android:visibility="gone">
+                            android:layout_height="220dp" android:visibility="gone">
                             <com.amap.api.maps.MapView android:id="@+id/routeMapView"
                                 android:layout_width="match_parent" android:layout_height="match_parent" />
                             <TextView android:id="@+id/mapTapHint" android:layout_width="match_parent"
-                                android:layout_height="48dp" android:layout_gravity="bottom"
-                                android:background="#E4EDFF" android:gravity="center" android:text="展开路线地图  ↗"
-                                android:textColor="#1D4ED8" android:textSize="14sp" android:textStyle="bold" android:clickable="true"
+                                android:layout_height="40dp" android:layout_gravity="bottom"
+                                android:background="#CCFFFFFF" android:gravity="center" android:text="@string/route_map_tap_fullscreen"
+                                android:textColor="@color/accent" android:textSize="14sp" android:textStyle="bold" android:clickable="true"
                                 android:focusable="true" android:foreground="?attr/selectableItemBackground" />
                         </FrameLayout>
+                </com.google.android.material.card.MaterialCardView>
+                <TextView style="@style/OrderDetailHeading" android:text="路线详情"
+                    android:layout_marginTop="4dp" android:layout_marginBottom="8dp" />
+                <com.google.android.material.card.MaterialCardView style="@style/UserOrderCard">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical">
                         <TextView android:id="@+id/txtRouteDetail" style="@style/UserOrderBody"
-                            android:padding="20dp" android:text="正在加载路线…" />
+                            android:padding="16dp" android:text="正在加载路线…" />
                         <LinearLayout android:id="@+id/userOrderStops" android:layout_width="match_parent"
                             android:layout_height="wrap_content" android:orientation="vertical"
                             android:paddingHorizontal="16dp" android:paddingBottom="8dp" />
@@ -83,7 +90,7 @@
                 </com.google.android.material.card.MaterialCardView>
                 <com.google.android.material.card.MaterialCardView style="@style/UserOrderCard">
                     <LinearLayout android:id="@+id/userOrderRequirements" android:layout_width="match_parent"
-                        android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
+                        android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
                         <TextView style="@style/UserOrderHeading" android:text="参团须知" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
@@ -91,14 +98,14 @@
         </androidx.core.widget.NestedScrollView>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="8dp"
-        android:paddingBottom="8dp" android:background="#FFFFFF">
+        android:orientation="vertical" android:paddingHorizontal="16dp" android:paddingTop="8dp"
+        android:paddingBottom="8dp" android:background="@color/white">
         <TextView android:id="@+id/userOrderActionHint" style="@style/UserOrderBody"
             android:gravity="center" android:textSize="12sp" />
-        <com.google.android.material.button.MaterialButton android:id="@+id/btnJoin"
-            android:layout_width="match_parent" android:layout_height="56dp"
+        <com.google.android.material.button.MaterialButton android:id="@+id/btnJoin" style="@style/OrderPrimaryButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="加入行程" android:textSize="16sp" android:textStyle="bold"
-            android:insetTop="4dp" android:insetBottom="4dp" app:cornerRadius="14dp"
-            app:backgroundTint="#2563EB" />
+            android:insetTop="4dp" android:insetBottom="4dp" app:cornerRadius="12dp"
+            app:backgroundTint="@color/accent" />
     </LinearLayout>
 </LinearLayout>

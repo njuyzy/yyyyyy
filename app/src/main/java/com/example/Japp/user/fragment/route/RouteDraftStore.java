@@ -179,6 +179,7 @@ final class RouteDraftStore {
         String agentRunId;
         List<PointRecord> polyline;
         List<PointRecord> waypoints;
+        List<RouteNode> routeStops;
 
         static ChatRecord from(RouteChatItem item) {
             ChatRecord record = new ChatRecord();
@@ -188,6 +189,7 @@ final class RouteDraftStore {
             record.routeId = item.getRouteId();
             record.publishAllowed = item.isPublishAllowed();
             record.agentRunId = item.getAgentRunId();
+            if (!item.getRouteStops().isEmpty()) record.routeStops = item.getRouteStops();
             record.polyline = PointRecord.from(item.getPolylinePoints());
             record.waypoints = PointRecord.from(item.getWaypointPoints());
             return record;
@@ -209,6 +211,7 @@ final class RouteDraftStore {
                     PointRecord.toLatLng(waypoints),
                     publishAllowed);
             item.setAgentRunId(agentRunId);
+            item.setRouteStops(routeStops);
             return item;
         }
     }

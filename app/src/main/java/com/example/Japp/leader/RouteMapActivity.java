@@ -88,6 +88,8 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_route_map);
+        com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        toolbar.setNavigationOnClickListener(v -> finish());
 
         if (!hasConfiguredAmapKey()) {
             Toast.makeText(this, "未配置高德Key，请在local.properties配置AMAP_API_KEY", Toast.LENGTH_LONG).show();
@@ -391,7 +393,7 @@ public class RouteMapActivity extends AppCompatActivity implements RouteSearch.O
         if (aMap == null || plannedPolylinePoints.size() < 2) return;
         aMap.addPolyline(new PolylineOptions()
                 .addAll(plannedPolylinePoints)
-                .color(0xFF1E88E5)
+                .color(androidx.core.content.ContextCompat.getColor(this, R.color.accent))
                 .width(8f));
     }
 

@@ -9,6 +9,7 @@ import com.google.gson.JsonParser;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -120,15 +121,23 @@ public final class RouteAgentHelper {
         StringBuilder text = new StringBuilder(run.stage == null || run.stage.isEmpty()
                 ? "路线助手正在处理…" : run.stage);
         if (run.events != null) {
-            // events is a full snapshot: replace the visible summary, never append it again.
-            int start = Math.max(0, run.events.size() - 5);
-            for (int i = start; i < run.events.size(); i++) {
+            // Scan newest first so adjacent events with the same label keep the latest status.
+            List<RouteAgent.Event> latestSteps = new ArrayList<>(5);
+            String previousLabel = null;
+            for (int i = run.events.size() - 1; i >= 0 && latestSteps.size() < 5; i--) {
                 RouteAgent.Event event = run.events.get(i);
-                if (event == null || event.label == null) continue;
+                if (event == null || event.label == null || event.label.trim().isEmpty()) continue;
+                String label = event.label.trim();
+                if (label.equals(previousLabel)) continue;
+                latestSteps.add(event);
+                previousLabel = label;
+            }
+            for (int i = latestSteps.size() - 1; i >= 0; i--) {
+                RouteAgent.Event event = latestSteps.get(i);
                 String state = "completed".equals(event.status) ? "完成" :
                         ("failed".equals(event.status) ? "本步骤未完成" :
                         ("needs_revision".equals(event.status) ? "调整中" : "进行中"));
-                text.append("\n• ").append(event.label).append(" · ").append(state);
+                text.append("\n• ").append(event.label.trim()).append(" · ").append(state);
             }
         }
         return text.toString();
@@ -165,7 +174,18 @@ public final class RouteAgentHelper {
                 if (!goal.isEmpty()) text.append("\n    ").append(goal);
             }
         }
-        // Keep legs for timing, validation and map rendering, not conversational navigation output.
+        appendPlanAdvisories(text, result);
+        text.append("\n\n确认后才会替换当前路线。");
+        return RoutePlanText.withoutDirections(text.toString());
+    }
+
+    public static String describePlanCard(RouteAgent.Result result, String title) {
+        StringBuilder text = new StringBuilder(title);
+        appendPlanAdvisories(text, result);
+        return RoutePlanText.withoutDirections(text.toString());
+    }
+
+    private static void appendPlanAdvisories(StringBuilder text, RouteAgent.Result result) {
         text.append(String.format(Locale.CHINA, "\n\n已知交通费用估算：每人 ¥%.2f（非全部费用）", result.estimatedCost));
         text.append("\n未核价项目：").append(result.unknownCosts).append(" 项");
         text.append("\n门票、餐饮及其他未核价支出不包含在内，不能据此承诺免费或全程预算满足。");
@@ -185,8 +205,6 @@ public final class RouteAgentHelper {
         }
         if (result.removedPoiIds != null && !result.removedPoiIds.isEmpty())
             text.append("\n\n相对本轮参考方案，减少了 ").append(result.removedPoiIds.size()).append(" 个地点。");
-        text.append("\n\n确认后才会替换当前路线。");
-        return RoutePlanText.withoutDirections(text.toString());
     }
 
     public static String visitTimeToIso(String value, LocalDate firstDay) {

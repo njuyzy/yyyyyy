@@ -122,7 +122,7 @@ public class TeamDetailActivity extends AppCompatActivity {
         mapTapHint = findViewById(R.id.mapTapHint);
         detailContent = new UserOrderDetailContent(this);
         refreshLayout = findViewById(R.id.userOrderRefresh);
-        refreshLayout.setColorSchemeColors(0xFF2563EB);
+        refreshLayout.setColorSchemeColors(ContextCompat.getColor(this, R.color.accent));
         refreshLayout.setOnRefreshListener(this::refreshProject);
 
         if (!hasConfiguredAmapKey()) {
@@ -310,7 +310,7 @@ public class TeamDetailActivity extends AppCompatActivity {
     private void loadRouteDetail() {
         final int generation = detailGeneration;
         txtRouteDetail.setText("正在加载路线…");
-        txtRouteDetail.setTextColor(0xFF637086);
+        txtRouteDetail.setTextColor(ContextCompat.getColor(this, R.color.text_secondary));
         txtRouteDetail.setOnClickListener(null);
         Call<Result<List<RouteNode>>> request = service.getRouteNodes(project.getRouteId());
         detailCalls.add(request);
@@ -354,7 +354,7 @@ public class TeamDetailActivity extends AppCompatActivity {
 
     private void showRouteFailure() {
         txtRouteDetail.setText("暂未获取到路线详情，点击重新加载");
-        txtRouteDetail.setTextColor(0xFF2563EB);
+        txtRouteDetail.setTextColor(ContextCompat.getColor(this, R.color.accent));
         txtRouteDetail.setOnClickListener(v -> loadRouteDetail());
         detailContent.routeUnavailable();
         hideMapSection();
@@ -737,7 +737,7 @@ public class TeamDetailActivity extends AppCompatActivity {
     private void stylePrimaryAction() {
         btnJoin.setBackgroundTintList(new ColorStateList(
                 new int[][]{new int[]{-android.R.attr.state_enabled}, new int[]{}},
-                new int[]{0xFFE3E9F2, 0xFF2563EB}));
+                new int[]{0xFFE3E9F2, ContextCompat.getColor(this, R.color.accent)}));
         btnJoin.setTextColor(new ColorStateList(
                 new int[][]{new int[]{-android.R.attr.state_enabled}, new int[]{}},
                 new int[]{0xFF78859A, 0xFFFFFFFF}));

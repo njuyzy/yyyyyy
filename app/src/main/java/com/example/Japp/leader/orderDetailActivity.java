@@ -218,7 +218,7 @@ public class orderDetailActivity extends AppCompatActivity {
                 + " / 人数上限 " + (project.getMaxMembers() > 0
                 ? String.valueOf(project.getMaxMembers()) : "不限"));
 
-        txtStatus.setText(ProjectUiHelper.statusLabel(project.getStatus()));
+        ProjectUiHelper.bindStatusBadge(txtStatus, project.getStatus());
     }
 
     private boolean hideIfCancelled() {

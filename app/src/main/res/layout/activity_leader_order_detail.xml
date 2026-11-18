@@ -38,11 +38,9 @@
             android:padding="16dp">
 
             <com.google.android.material.card.MaterialCardView
+                style="@style/OrderDetailCard"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/card_background"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="2dp">
+                android:layout_height="wrap_content">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -102,11 +100,9 @@
                 android:textStyle="bold" />
 
             <com.google.android.material.card.MaterialCardView
+                style="@style/OrderDetailCard"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/card_background"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="2dp">
+                android:layout_height="wrap_content">
 
                 <FrameLayout
                     android:id="@+id/mapContainer"
@@ -147,11 +143,9 @@
                 android:textStyle="bold" />
 
             <com.google.android.material.card.MaterialCardView
+                style="@style/OrderDetailCard"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/card_background"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="2dp">
+                android:layout_height="wrap_content">
 
                 <TextView
                     android:id="@+id/txtRouteDetail"
@@ -168,6 +162,7 @@
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnJoin"
+        style="@style/OrderPrimaryButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_margin="16dp"

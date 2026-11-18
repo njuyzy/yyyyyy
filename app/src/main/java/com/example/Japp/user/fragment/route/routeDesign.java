@@ -136,7 +136,6 @@ public class routeDesign extends Fragment {
     private RouteChatAdapter adapter;
     private UserService service;
     private RouteAgentCoordinator agent;
-    private Call<Result<JsonElement>> poiSyncCall;
     private LeaderWalkRoutePlanner customWalkPlanner;
 
     private final List<RouteNode> editableRouteNodes = new ArrayList<>();
@@ -951,29 +950,7 @@ public class routeDesign extends Fragment {
                 routeStopsContainer.addView(divider, dividerParams);
             }
 
-            LinearLayout row = new LinearLayout(requireContext());
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setPadding(dp(4), 0, dp(2), 0);
-
-            TextView number = new TextView(requireContext());
-            number.setGravity(Gravity.CENTER);
-            number.setText(String.valueOf(i + 1));
-            number.setTextColor(ContextCompat.getColor(requireContext(), R.color.route_primary));
-            number.setTextSize(10f);
-            number.setBackgroundResource(R.drawable.bg_route_stop_number);
-            row.addView(number, new LinearLayout.LayoutParams(dp(20), dp(20)));
-
-            TextView name = new TextView(requireContext());
-            name.setText(node.getName());
-            name.setTextColor(ContextCompat.getColor(requireContext(), R.color.route_text_primary));
-            name.setTextSize(14f);
-            name.setSingleLine(true);
-            name.setEllipsize(TextUtils.TruncateAt.END);
-            LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(
-                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-            nameParams.setMarginStart(dp(12));
-            row.addView(name, nameParams);
+            LinearLayout row = RouteStopRow.create(requireContext(), node, position);
 
             TextView remove = new TextView(requireContext());
             remove.setText("×");
@@ -1453,8 +1430,17 @@ public class routeDesign extends Fragment {
         if (!agent.state.busy && agent.state.result != null && !agent.state.applied
                 && agent.state.runId != null) {
             boolean shown = false;
-            for (RouteChatItem item : adapter.getItems())
-                if (agent.state.runId.equals(item.getAgentRunId())) shown = true;
+            for (int i = 0; i < adapter.getItemCount(); i++) {
+                RouteChatItem item = adapter.getItems().get(i);
+                if (!agent.state.runId.equals(item.getAgentRunId())) continue;
+                if (item.getType() == RouteChatItem.TYPE_ASSISTANT_PLAN && item.getRouteStops().isEmpty()
+                        && RouteAgentHelper.validResult(agent.state.result)) {
+                    RouteAgent.Result result = agent.state.result;
+                    adapter.replaceItem(i, RouteChatItem.agentPlan(
+                            RouteAgentHelper.describePlanCard(result, "候选路线"), agent.state.runId, result.nodes));
+                }
+                shown = true;
+            }
             if (!shown) showAgentResult(agent.state.runId, agent.state.result);
         }
     }
@@ -1469,7 +1455,7 @@ public class routeDesign extends Fragment {
                 showPlanError("规划结果不完整，请重新规划");
                 return;
             }
-            replaceAgentFeedback(RouteChatItem.agentPlan(RouteAgentHelper.describe(result), runId));
+            replaceAgentFeedback(RouteChatItem.agentPlan(RouteAgentHelper.describePlanCard(result, "候选路线"), runId, result.nodes));
         } else {
             RouteChatItem message = RouteChatItem.assistantMessage(RouteAgentHelper.describe(result));
             message.setAgentRunId(runId);
@@ -1492,22 +1478,16 @@ public class routeDesign extends Fragment {
             showPlanError("方案已失效，请重新规划");
             return;
         }
-        new MaterialAlertDialogBuilder(requireContext()).setTitle("确认应用路线方案")
-                .setMessage(RouteAgentHelper.describe(result))
-                .setNegativeButton("暂不应用", null)
-                .setPositiveButton("应用方案", (dialog, which) -> {
-                    boolean relative = false;
-                    for (RouteNode node : result.nodes) {
-                        if (node.getVisitTime() != null && node.getVisitTime().startsWith("第")) relative = true;
-                    }
-                    if (relative) {
-                        java.time.LocalDate today = java.time.LocalDate.now();
-                        new android.app.DatePickerDialog(requireContext(), (picker, year, month, day) ->
-                                applyAgentPlan(result, java.time.LocalDate.of(year, month + 1, day)),
-                                today.getYear(), today.getMonthValue() - 1, today.getDayOfMonth())
-                                .show();
-                    } else applyAgentPlan(result, null);
-                }).show();
+        for (RouteNode node : result.nodes) {
+            if (node.getVisitTime() != null && node.getVisitTime().startsWith("第")) {
+                java.time.LocalDate today = java.time.LocalDate.now();
+                new android.app.DatePickerDialog(requireContext(), (picker, year, month, day) ->
+                        applyAgentPlan(result, java.time.LocalDate.of(year, month + 1, day)),
+                        today.getYear(), today.getMonthValue() - 1, today.getDayOfMonth()).show();
+                return;
+            }
+        }
+        applyAgentPlan(result, null);
     }
 
     private void applyAgentPlan(RouteAgent.Result result, @Nullable java.time.LocalDate firstDay) {
@@ -1526,8 +1506,7 @@ public class routeDesign extends Fragment {
             Toast.makeText(requireContext(), exception.getMessage(), Toast.LENGTH_LONG).show();
             return;
         }
-        setSending(true);
-        syncAgentPoi(nodes, 0, result);
+        refreshAppliedRoute(nodes, result);
     }
 
     private boolean drawAppliedAgentPlan() {
@@ -1550,59 +1529,33 @@ public class routeDesign extends Fragment {
         return true;
     }
 
-    private void syncAgentPoi(List<RouteNode> nodes, int index, RouteAgent.Result result) {
-        if (!isAdded() || getView() == null) return;
-        if (agent == null || agent.state.result != result
-                || !RouteAgentHelper.snapshot(editableRouteNodes).equals(agent.state.routeSnapshot)) {
-            setSending(false);
-            Toast.makeText(requireContext(), "当前路线已修改，请重新规划", Toast.LENGTH_LONG).show();
-            return;
+    private void refreshAppliedRoute(List<RouteNode> nodes, RouteAgent.Result result) {
+        editableRouteNodes.clear();
+        editableRouteNodes.addAll(nodes);
+        renumberRouteNodes();
+        invalidatePublishableRoute();
+        publishableRouteSummary = RoutePlanText.withoutDirections(result.message);
+        agent.markApplied(RouteAgentHelper.snapshot(editableRouteNodes));
+        renderEditableStops();
+        updateMapFromEditableRoute(true);
+        routeStopsScrollView.scrollTo(0, 0);
+
+        for (int i = 0; i < adapter.getItemCount(); i++) {
+            RouteChatItem candidate = adapter.getItems().get(i);
+            if (agent.state.runId.equals(candidate.getAgentRunId())) {
+                RouteChatItem applied = RouteChatItem.assistantRoute(
+                        RouteAgentHelper.describePlanCard(result, "路线方案已应用"), Collections.emptyList());
+                applied.setRouteStops(nodes);
+                adapter.replaceItem(i, applied);
+                break;
+            }
         }
-        if (index == nodes.size()) {
-            // Only change the local route after every POI is available on the server.
-            editableRouteNodes.clear();
-            editableRouteNodes.addAll(nodes);
-            renumberRouteNodes();
-            publishableRouteId = 0; // Agent runId is NEVER a persisted routeId.
-            publishableRouteSummary = RoutePlanText.withoutDirections(result.message);
-            agent.markApplied(RouteAgentHelper.snapshot(editableRouteNodes));
-            setSending(false);
-            renderEditableStops();
-            updateMapFromEditableRoute(true);
-            for (int i = 0; i < adapter.getItemCount(); i++) {
-                RouteChatItem candidate = adapter.getItems().get(i);
-                if (agent.state.runId.equals(candidate.getAgentRunId())) {
-                    adapter.replaceItem(i, RouteChatItem.assistantRoute(
-                            "路线方案已应用\n\n" + RouteAgentHelper.describe(result)
-                                    .replace("候选路线 · 等待确认\n\n", "")
-                                    .replace("\n\n确认后才会替换当前路线。", ""), Collections.emptyList()));
-                }
-            }
-            persistLocalDraft(true);
-            routeStopsCard.setAlpha(0.55f);
-            routeStopsCard.animate().alpha(1f).setDuration(200).start();
-            return;
-        }
-        poiSyncCall = service.syncAttraction(nodes.get(index).getPoiId());
-        poiSyncCall.enqueue(new Callback<Result<JsonElement>>() {
-            @Override public void onResponse(Call<Result<JsonElement>> call, Response<Result<JsonElement>> response) {
-                if (!isAdded() || getView() == null || call.isCanceled()) return;
-                Result<JsonElement> body = response.body();
-                if (!response.isSuccessful() || body == null || body.getCode() != 1) {
-                    setSending(false);
-                    Toast.makeText(requireContext(), "地点同步失败：" + RoutePlanHelper.readErrorMessage(response, body),
-                            Toast.LENGTH_LONG).show();
-                    if (response.code() == 401) SessionHelper.handleUnauthorized(requireContext());
-                    return;
-                }
-                syncAgentPoi(nodes, index + 1, result);
-            }
-            @Override public void onFailure(Call<Result<JsonElement>> call, Throwable error) {
-                if (!isAdded() || getView() == null || call.isCanceled()) return;
-                setSending(false);
-                Toast.makeText(requireContext(), "地点同步失败，请再次应用方案", Toast.LENGTH_LONG).show();
-            }
-        });
+        persistLocalDraft(true);
+        routeStopsCard.setAlpha(0.55f);
+        routeStopsCard.animate().alpha(1f).setDuration(200).start();
+
+        // Keep the editor responsive. Publishing checks POI synchronization again before saving.
+        for (RouteNode node : nodes) syncAttractionSilently(node.getPoiId());
     }
 
     private void restoreFailedRequest(@NonNull String text) {
@@ -1888,7 +1841,6 @@ public class routeDesign extends Fragment {
     public void onDestroyView() {
         persistLocalDraft(true);
         if (agent != null) agent.detach();
-        if (poiSyncCall != null) poiSyncCall.cancel();
         routeRequestInFlight = false;
         if (customWalkPlanner != null) {
             customWalkPlanner.cancel();

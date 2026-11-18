@@ -1,6 +1,7 @@
 package com.example.Japp.user.fragment.route;
 
 import com.amap.api.maps.model.LatLng;
+import com.example.Japp.network.models.RouteNode;
 import com.example.Japp.user.util.RoutePlanText;
 
 import java.util.ArrayList;
@@ -18,6 +19,7 @@ public class RouteChatItem {
     public static final int TYPE_ASSISTANT_PROGRESS = 5;
     public static final int TYPE_ASSISTANT_PHASE = 6;
     private String agentRunId;
+    private List<RouteNode> routeStops = Collections.emptyList();
 
     private final int type;
     private String text;
@@ -69,10 +71,18 @@ public class RouteChatItem {
         return new RouteChatItem(TYPE_ASSISTANT_PHASE, text, System.currentTimeMillis(), 0, null, null, false);
     }
 
-    public static RouteChatItem agentPlan(String text, String runId) {
+    public static RouteChatItem agentPlan(String text, String runId, List<RouteNode> stops) {
         RouteChatItem item = new RouteChatItem(TYPE_ASSISTANT_PLAN, text, System.currentTimeMillis(), 0, null, null, false);
         item.agentRunId = runId;
+        item.setRouteStops(stops);
         return item;
+    }
+
+    List<RouteNode> getRouteStops() { return routeStops; }
+
+    void setRouteStops(List<RouteNode> stops) {
+        routeStops = stops == null ? Collections.emptyList()
+                : Collections.unmodifiableList(new ArrayList<>(stops));
     }
 
     public String getAgentRunId() { return agentRunId; }

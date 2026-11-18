@@ -12,6 +12,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -302,6 +303,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
     static class AssistantVH extends RecyclerView.ViewHolder {
         final ProgressiveTextView message;
         final MaterialCardView messageCard;
+        final LinearLayout routeStops;
         final TextView time;
         final TextView state;
         final MaterialButton retry;
@@ -328,6 +330,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             this.listener = listener;
             message = itemView.findViewById(R.id.txtMessage);
             messageCard = itemView.findViewById(R.id.assistantMessageCard);
+            routeStops = itemView.findViewById(R.id.assistantRouteStops);
             time = itemView.findViewById(R.id.txtTime);
             state = itemView.findViewById(R.id.txtAssistantState);
             retry = itemView.findViewById(R.id.btnRetry);
@@ -346,6 +349,15 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
                     : Color.TRANSPARENT);
             messageCard.setStrokeWidth(routeResult ? Math.max(1, Math.round(density)) : 0);
             messageCard.setRadius(routeResult ? 20 * density : 0);
+            routeStops.removeAllViews();
+            routeStops.setVisibility(item.getRouteStops().isEmpty() ? View.GONE : View.VISIBLE);
+            for (int i = 0; i < item.getRouteStops().size(); i++) {
+                LinearLayout row = RouteStopRow.create(
+                        itemView.getContext(), item.getRouteStops().get(i), i, true);
+                row.setMinimumHeight(Math.round(44 * density));
+                routeStops.addView(row, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            }
             if (message != null) {
                 int horizontalPadding = Math.round((routeResult ? 14 : 4) * density);
                 message.setPaddingRelative(horizontalPadding, Math.round((routeResult ? 12 : 2) * density),
@@ -371,7 +383,7 @@ public class RouteChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             }
             if (retry != null) {
                 retry.setVisibility(failed || progress || candidate ? View.VISIBLE : View.GONE);
-                retry.setText(candidate ? "查看并应用" : (progress ? "取消规划" : "重新尝试"));
+                retry.setText(candidate ? "应用" : (progress ? "取消规划" : "重新尝试"));
                 retry.setOnClickListener(listener == null ? null : v -> {
                     if (candidate) listener.onAcceptPlan(item);
                     else if (progress) listener.onCancelPlan(item);
